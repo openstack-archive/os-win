@@ -32,7 +32,7 @@ import six
 from six.moves import range
 
 from nova import exception
-from nova.i18n import _, _LW
+from oslo_windows._i18n import _, _LW
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import hostutils
 

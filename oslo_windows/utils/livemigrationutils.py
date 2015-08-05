@@ -21,7 +21,7 @@ if sys.platform == 'win32':
 from oslo_log import log as logging
 
 from nova import exception
-from nova.i18n import _, _LE
+from oslo_windows._i18n import _, _LE
 from nova.virt.hyperv import vmutils
 from nova.virt.hyperv import vmutilsv2
 from nova.virt.hyperv import volumeutilsv2

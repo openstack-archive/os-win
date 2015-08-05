@@ -20,7 +20,7 @@ import sys
 if sys.platform == 'win32':
     import wmi
 
-from nova.i18n import _
+from oslo_windows._i18n import _
 from nova.virt.hyperv import constants
 
 

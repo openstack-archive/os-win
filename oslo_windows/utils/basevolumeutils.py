@@ -31,7 +31,7 @@ if sys.platform == 'win32':
 from oslo_log import log as logging
 
 from nova import block_device
-from nova.i18n import _LI
+from oslo_windows._i18n import _LI
 from nova.virt import driver
 
 LOG = logging.getLogger(__name__)

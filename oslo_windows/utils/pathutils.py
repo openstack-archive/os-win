@@ -24,7 +24,7 @@ if sys.platform == 'win32':
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from nova.i18n import _
+from oslo_windows._i18n import _
 from nova import utils
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vmutils

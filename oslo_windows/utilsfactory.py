@@ -16,7 +16,7 @@
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from nova.i18n import _
+from oslo_windows._i18n import _
 from nova.virt.hyperv import hostutils
 from nova.virt.hyperv import hostutilsv2
 from nova.virt.hyperv import livemigrationutils
