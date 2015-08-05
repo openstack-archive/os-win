@@ -14,9 +14,9 @@
 
 import mock
 
-from nova.tests.unit.virt.hyperv import test_vmutils
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vmutilsv2
+from oslo_windows.tests.utils import test_vmutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vmutilsv2
 
 
 class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
@@ -89,7 +89,7 @@ class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
         self._vmutils.set_nic_connection(self._FAKE_VM_NAME, None, None)
         mock_add_virt_res.assert_called_with(fake_eth_port, self._FAKE_VM_PATH)
 
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils._get_vm_disks')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_vm_disks')
     def test_enable_vm_metrics_collection(self, mock_get_vm_disks):
         self._lookup_vm()
         mock_svc = self._vmutils._conn.Msvm_MetricService()[0]
@@ -153,8 +153,8 @@ class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
     def _get_fake_instance_notes(self):
         return [self._FAKE_VM_UUID]
 
-    @mock.patch('nova.virt.hyperv.vmutilsv2.VMUtilsV2.check_ret_val')
-    @mock.patch('nova.virt.hyperv.vmutilsv2.VMUtilsV2._get_wmi_obj')
+    @mock.patch('oslo_windows.utils.vmutilsv2.VMUtilsV2.check_ret_val')
+    @mock.patch('oslo_windows.utils.vmutilsv2.VMUtilsV2._get_wmi_obj')
     def _test_create_vm_obj(self, mock_get_wmi_obj, mock_check_ret_val,
                             vm_path, dynamic_memory_ratio=1.0):
         mock_vs_man_svc = mock.MagicMock()

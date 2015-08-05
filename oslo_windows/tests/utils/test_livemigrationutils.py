@@ -14,12 +14,12 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
-from nova.virt.hyperv import livemigrationutils
+from oslo_windows.utils import livemigrationutils
 
 
-class LiveMigrationUtilsTestCase(test.NoDBTestCase):
+class LiveMigrationUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V LiveMigrationUtils class."""
 
     _FAKE_RET_VAL = 0

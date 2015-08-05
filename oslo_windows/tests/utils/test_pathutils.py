@@ -15,14 +15,14 @@
 import os
 
 import mock
+from oslotest import base
 
-from nova.tests.unit.virt.hyperv import test_base
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import pathutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import pathutils
 
 
-class PathUtilsTestCase(test_base.HyperVBaseTestCase):
+class PathUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V PathUtils class."""
 
     def setUp(self):
@@ -31,6 +31,7 @@ class PathUtilsTestCase(test_base.HyperVBaseTestCase):
         self.fake_instance_name = 'fake_instance_name'
 
         self._pathutils = pathutils.PathUtils()
+        self._pathutils._smb_conn = mock.MagicMock()
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
     @mock.patch.object(os.path, 'isfile')

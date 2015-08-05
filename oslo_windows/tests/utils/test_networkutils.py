@@ -13,13 +13,13 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
 from oslo_windows import exceptions
-from nova.virt.hyperv import networkutils
+from oslo_windows.utils import networkutils
 
 
-class NetworkUtilsTestCase(test.NoDBTestCase):
+class NetworkUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V NetworkUtils class."""
 
     _FAKE_PORT = {'Name': mock.sentinel.FAKE_PORT_NAME}

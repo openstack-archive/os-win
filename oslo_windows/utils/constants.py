@@ -17,9 +17,6 @@
 Constants used in ops classes
 """
 
-from nova.compute import arch
-from nova.compute import power_state
-
 HYPERV_VM_STATE_OTHER = 1
 HYPERV_VM_STATE_ENABLED = 2
 HYPERV_VM_STATE_DISABLED = 3
@@ -28,37 +25,6 @@ HYPERV_VM_STATE_REBOOT = 10
 HYPERV_VM_STATE_PAUSED = 32768
 HYPERV_VM_STATE_SUSPENDED = 32769
 
-HYPERV_POWER_STATE = {
-    HYPERV_VM_STATE_DISABLED: power_state.SHUTDOWN,
-    HYPERV_VM_STATE_SHUTTING_DOWN: power_state.SHUTDOWN,
-    HYPERV_VM_STATE_ENABLED: power_state.RUNNING,
-    HYPERV_VM_STATE_PAUSED: power_state.PAUSED,
-    HYPERV_VM_STATE_SUSPENDED: power_state.SUSPENDED
-}
-
-WMI_WIN32_PROCESSOR_ARCHITECTURE = {
-    0: arch.I686,
-    1: arch.MIPS,
-    2: arch.ALPHA,
-    3: arch.PPC,
-    5: arch.ARMV7,
-    6: arch.IA64,
-    9: arch.X86_64,
-}
-
-PROCESSOR_FEATURE = {
-    7: '3dnow',
-    3: 'mmx',
-    12: 'nx',
-    9: 'pae',
-    8: 'rdtsc',
-    20: 'slat',
-    13: 'sse3',
-    21: 'vmx',
-    6: 'sse',
-    10: 'sse2',
-    17: 'xsave',
-}
 
 WMI_JOB_STATUS_STARTED = 4096
 WMI_JOB_STATE_RUNNING = 4

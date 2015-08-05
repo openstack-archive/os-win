@@ -13,18 +13,13 @@
 #    under the License.
 
 import mock
-from oslo_config import cfg
+from oslotest import base
 
-from nova import test
 from oslo_windows import exceptions
-from nova.virt.hyperv import volumeutilsv2
-
-CONF = cfg.CONF
-CONF.import_opt('volume_attach_retry_count', 'nova.virt.hyperv.volumeops',
-                'hyperv')
+from oslo_windows.utils import volumeutilsv2
 
 
-class VolumeUtilsV2TestCase(test.NoDBTestCase):
+class VolumeUtilsV2TestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V VolumeUtilsV2 class."""
 
     _FAKE_PORTAL_ADDR = '10.1.1.1'
@@ -37,8 +32,6 @@ class VolumeUtilsV2TestCase(test.NoDBTestCase):
         self._volutilsv2 = volumeutilsv2.VolumeUtilsV2()
         self._volutilsv2._conn_storage = mock.MagicMock()
         self._volutilsv2._conn_wmi = mock.MagicMock()
-        self.flags(volume_attach_retry_count=4, group='hyperv')
-        self.flags(volume_attach_retry_interval=0, group='hyperv')
 
     def _test_login_target_portal(self, portal_connected):
         fake_portal = '%s:%s' % (self._FAKE_PORTAL_ADDR,
@@ -68,8 +61,11 @@ class VolumeUtilsV2TestCase(test.NoDBTestCase):
     def test_login_new_portal(self):
         self._test_login_target_portal(False)
 
-    def _test_login_target(self, target_connected=False, raise_exception=False,
-                           use_chap=False):
+    @mock.patch.object(volumeutilsv2, 'CONF')
+    def _test_login_target(self, mock_CONF, target_connected=False,
+                           raise_exception=False, use_chap=False):
+        mock_CONF.hyperv.volume_attach_retry_count = 4
+        mock_CONF.hyperv.volume_attach_retry_interval = 0
         fake_portal = '%s:%s' % (self._FAKE_PORTAL_ADDR,
                                  self._FAKE_PORTAL_PORT)
 

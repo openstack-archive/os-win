@@ -15,9 +15,9 @@
 import mock
 
 from oslo_windows import exceptions
-from nova.tests.unit.virt.hyperv import test_vhdutils
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vhdutilsv2
+from oslo_windows.tests.utils import test_vhdutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vhdutilsv2
 
 
 class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
@@ -168,7 +168,7 @@ class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
         else:
             self._vhdutils.get_vhd_info.return_value = self._fake_vhd_info
 
-    @mock.patch('nova.virt.hyperv.vhdutils.VHDUtils.get_vhd_format')
+    @mock.patch('oslo_windows.utils.vhdutils.VHDUtils.get_vhd_format')
     def test_get_vhdx_internal_size(self, mock_get_vhd_format):
         mock_get_vhd_format.return_value = constants.DISK_FORMAT_VHDX
         self._mock_get_vhd_info()

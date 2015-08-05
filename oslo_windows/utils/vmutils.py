@@ -33,8 +33,8 @@ from six.moves import range
 
 from oslo_windows._i18n import _, _LW
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import hostutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import hostutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

@@ -27,7 +27,7 @@ from oslo_log import log as logging
 from oslo_windows._i18n import _
 from oslo_windows import _utils
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
+from oslo_windows.utils import constants
 
 LOG = logging.getLogger(__name__)
 

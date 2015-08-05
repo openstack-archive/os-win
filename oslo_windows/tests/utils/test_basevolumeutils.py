@@ -15,16 +15,16 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
-from nova.virt.hyperv import basevolumeutils
+from oslo_windows.utils import basevolumeutils
 
 
 def _exception_thrower():
     raise Exception("Testing exception handling.")
 
 
-class BaseVolumeUtilsTestCase(test.NoDBTestCase):
+class BaseVolumeUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V BaseVolumeUtils class."""
 
     _FAKE_COMPUTER_NAME = "fake_computer_name"

@@ -18,7 +18,7 @@ import sys
 if sys.platform == 'win32':
     import wmi
 
-from nova.virt.hyperv import hostutils
+from oslo_windows.utils import hostutils
 
 
 class HostUtilsV2(hostutils.HostUtils):

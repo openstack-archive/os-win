@@ -14,14 +14,14 @@
 #    under the License.import mock
 
 import mock
+from oslotest import base
 
 import os
 
-from nova import test
-from nova.virt.hyperv import ioutils
+from oslo_windows.utils import ioutils
 
 
-class IOThreadTestCase(test.NoDBTestCase):
+class IOThreadTestCase(base.BaseTestCase):
     _FAKE_SRC = r'fake_source_file'
     _FAKE_DEST = r'fake_dest_file'
     _FAKE_MAX_BYTES = 1

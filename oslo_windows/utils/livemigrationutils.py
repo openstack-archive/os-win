@@ -22,8 +22,8 @@ from oslo_log import log as logging
 
 from oslo_windows._i18n import _, _LE
 from oslo_windows import exceptions
-from nova.virt.hyperv import vmutilsv2
-from nova.virt.hyperv import volumeutilsv2
+from oslo_windows.utils import vmutilsv2
+from oslo_windows.utils import volumeutilsv2
 
 LOG = logging.getLogger(__name__)
 

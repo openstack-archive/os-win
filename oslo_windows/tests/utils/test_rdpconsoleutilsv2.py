@@ -13,12 +13,12 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
-from nova.virt.hyperv import rdpconsoleutilsv2
+from oslo_windows.utils import rdpconsoleutilsv2
 
 
-class RDPConsoleUtilsV2TestCase(test.NoDBTestCase):
+class RDPConsoleUtilsV2TestCase(base.BaseTestCase):
     _FAKE_RDP_PORT = 1000
 
     def setUp(self):

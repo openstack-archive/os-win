@@ -14,12 +14,12 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
-from nova.virt.hyperv import hostutilsv2
+from oslo_windows.utils import hostutilsv2
 
 
-class HostUtilsV2TestCase(test.NoDBTestCase):
+class HostUtilsV2TestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V hostutilsv2 class."""
 
     def setUp(self):

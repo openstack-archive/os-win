@@ -14,8 +14,8 @@
 
 import mock
 
-from nova.tests.unit.virt.hyperv import test_networkutils
-from nova.virt.hyperv import networkutilsv2
+from oslo_windows.tests.utils import test_networkutils
+from oslo_windows.utils import networkutilsv2
 
 
 class NetworkUtilsV2TestCase(test_networkutils.NetworkUtilsTestCase):

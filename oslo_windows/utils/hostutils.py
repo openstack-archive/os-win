@@ -21,7 +21,7 @@ if sys.platform == 'win32':
     import wmi
 
 from oslo_windows._i18n import _
-from nova.virt.hyperv import constants
+from oslo_windows.utils import constants
 
 
 class HostUtils(object):

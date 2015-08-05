@@ -13,10 +13,10 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from nova import test
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import hostutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import hostutils
 
 
 class FakeCPUSpec(object):
@@ -29,7 +29,7 @@ class FakeCPUSpec(object):
     NumberOfLogicalProcessors = mock.sentinel.cpu_procs
 
 
-class HostUtilsTestCase(test.NoDBTestCase):
+class HostUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V hostutils class."""
 
     _FAKE_MEMORY_TOTAL = 1024
@@ -45,7 +45,7 @@ class HostUtilsTestCase(test.NoDBTestCase):
 
         super(HostUtilsTestCase, self).setUp()
 
-    @mock.patch('nova.virt.hyperv.hostutils.ctypes')
+    @mock.patch('oslo_windows.utils.hostutils.ctypes')
     def test_get_host_tick_count64(self, mock_ctypes):
         tick_count64 = "100"
         mock_ctypes.windll.kernel32.GetTickCount64.return_value = tick_count64

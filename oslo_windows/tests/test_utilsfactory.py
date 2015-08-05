@@ -19,18 +19,18 @@ Unit tests for the Hyper-V utils factory.
 
 import mock
 from oslo_config import cfg
+from oslotest import base
 
-from nova import test
 from oslo_windows import exceptions
-from nova.virt.hyperv import hostutils
-from nova.virt.hyperv import utilsfactory
-from nova.virt.hyperv import vmutils
-from nova.virt.hyperv import vmutilsv2
+from oslo_windows import utilsfactory
+from oslo_windows.utils import hostutils
+from oslo_windows.utils import vmutils
+from oslo_windows.utils import vmutilsv2
 
 CONF = cfg.CONF
 
 
-class TestHyperVUtilsFactory(test.NoDBTestCase):
+class TestHyperVUtilsFactory(base.BaseTestCase):
     def test_get_vmutils_force_v1_and_min_version(self):
         self._test_returned_class(None, True, True)
 

@@ -12,11 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from nova import test
-from nova.virt.hyperv import rdpconsoleutils
+from oslotest import base
+
+from oslo_windows.utils import rdpconsoleutils
 
 
-class RDPConsoleUtilsTestCase(test.NoDBTestCase):
+class RDPConsoleUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self._rdpconsoleutils = rdpconsoleutils.RDPConsoleUtils()
         super(RDPConsoleUtilsTestCase, self).setUp()

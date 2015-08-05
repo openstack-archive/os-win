@@ -14,14 +14,14 @@
 
 import mock
 from oslo_utils import units
+from oslotest import base
 
-from nova import test
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vhdutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vhdutils
 
 
-class VHDUtilsBaseTestCase(test.NoDBTestCase):
+class VHDUtilsBaseTestCase(base.BaseTestCase):
     "Base Class unit test classes of Hyper-V VHD Utils classes."
 
     _FAKE_VHD_PATH = "C:\\fake_path.vhdx"
@@ -233,7 +233,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         self.assertEqual(expected_vhd_size, real_size)
 
     def test_get_vhd_format_vhdx(self):
-        with mock.patch('nova.virt.hyperv.vhdutils.open',
+        with mock.patch('oslo_windows.utils.vhdutils.open',
                         mock.mock_open(read_data=vhdutils.VHDX_SIGNATURE),
                         create=True):
 
@@ -242,7 +242,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             self.assertEqual(constants.DISK_FORMAT_VHDX, format)
 
     def test_get_vhd_format_vhd(self):
-        with mock.patch('nova.virt.hyperv.vhdutils.open',
+        with mock.patch('oslo_windows.utils.vhdutils.open',
                         mock.mock_open(),
                         create=True) as mock_open:
             f = mock_open.return_value
@@ -260,7 +260,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             self.assertEqual(constants.DISK_FORMAT_VHD, format)
 
     def test_get_vhd_format_invalid_format(self):
-        with mock.patch('nova.virt.hyperv.vhdutils.open',
+        with mock.patch('oslo_windows.utils.vhdutils.open',
                         mock.mock_open(read_data='invalid'),
                         create=True) as mock_open:
             f = mock_open.return_value
@@ -271,7 +271,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
                               self._FAKE_VHD_PATH)
 
     def test_get_vhd_format_zero_length_file(self):
-        with mock.patch('nova.virt.hyperv.vhdutils.open',
+        with mock.patch('oslo_windows.utils.vhdutils.open',
                         mock.mock_open(read_data=''),
                         create=True) as mock_open:
             f = mock_open.return_value

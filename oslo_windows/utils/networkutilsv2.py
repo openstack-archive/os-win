@@ -26,7 +26,7 @@ if sys.platform == 'win32':
 
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
-from nova.virt.hyperv import networkutils
+from oslo_windows.utils import networkutils
 
 
 class NetworkUtilsV2(networkutils.NetworkUtils):

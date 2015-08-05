@@ -18,20 +18,20 @@ from oslo_log import log as logging
 
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
-from nova.virt.hyperv import hostutils
-from nova.virt.hyperv import hostutilsv2
-from nova.virt.hyperv import livemigrationutils
-from nova.virt.hyperv import networkutils
-from nova.virt.hyperv import networkutilsv2
-from nova.virt.hyperv import pathutils
-from nova.virt.hyperv import rdpconsoleutils
-from nova.virt.hyperv import rdpconsoleutilsv2
-from nova.virt.hyperv import vhdutils
-from nova.virt.hyperv import vhdutilsv2
-from nova.virt.hyperv import vmutils
-from nova.virt.hyperv import vmutilsv2
-from nova.virt.hyperv import volumeutils
-from nova.virt.hyperv import volumeutilsv2
+from oslo_windows.utils import hostutils
+from oslo_windows.utils import hostutilsv2
+from oslo_windows.utils import livemigrationutils
+from oslo_windows.utils import networkutils
+from oslo_windows.utils import networkutilsv2
+from oslo_windows.utils import pathutils
+from oslo_windows.utils import rdpconsoleutils
+from oslo_windows.utils import rdpconsoleutilsv2
+from oslo_windows.utils import vhdutils
+from oslo_windows.utils import vhdutilsv2
+from oslo_windows.utils import vmutils
+from oslo_windows.utils import vmutilsv2
+from oslo_windows.utils import volumeutils
+from oslo_windows.utils import volumeutilsv2
 
 hyper_opts = [
     cfg.BoolOpt('force_hyperv_utils_v1',

@@ -27,8 +27,8 @@ if sys.platform == 'win32':
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vmutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vmutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

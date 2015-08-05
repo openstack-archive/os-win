@@ -33,7 +33,7 @@ from six.moves import range
 from oslo_windows._i18n import _
 from oslo_windows import _utils
 from oslo_windows import exceptions
-from nova.virt.hyperv import basevolumeutils
+from oslo_windows.utils import basevolumeutils
 
 LOG = logging.getLogger(__name__)
 

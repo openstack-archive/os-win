@@ -33,8 +33,8 @@ from xml.etree import ElementTree
 
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vmutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vmutils
 
 
 VHD_HEADER_SIZE_FIX = 512

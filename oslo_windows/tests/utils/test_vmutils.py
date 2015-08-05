@@ -14,16 +14,16 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
 from six.moves import range
 
-from nova import test
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vmutils
+from oslo_windows.utils import constants
+from oslo_windows.utils import vmutils
 
 
-class VMUtilsTestCase(test.NoDBTestCase):
+class VMUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V VMUtils class."""
 
     _FAKE_VM_NAME = 'fake_vm'
@@ -175,7 +175,7 @@ class VMUtilsTestCase(test.NoDBTestCase):
             self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
             self.assertFalse(mock_check.called)
 
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils._get_vm_disks')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_vm_disks')
     def test_get_vm_storage_paths(self, mock_get_vm_disks):
         self._lookup_vm()
         mock_rasds = self._create_mock_disks()
@@ -255,7 +255,7 @@ class VMUtilsTestCase(test.NoDBTestCase):
         path = self._vmutils.get_vm_scsi_controller(self._FAKE_VM_NAME)
         self.assertEqual(self._FAKE_RES_PATH, path)
 
-    @mock.patch("nova.virt.hyperv.vmutils.VMUtils.get_attached_disks")
+    @mock.patch("oslo_windows.utils.vmutils.VMUtils.get_attached_disks")
     def test_get_free_controller_slot(self, mock_get_attached_disks):
         mock_disk = mock.MagicMock()
         mock_disk.AddressOnParent = 3
@@ -310,8 +310,8 @@ class VMUtilsTestCase(test.NoDBTestCase):
         mock_rasds.ResourceSubType = mock_subtype
         return mock_rasds
 
-    @mock.patch("nova.virt.hyperv.vmutils.VMUtils.get_free_controller_slot")
-    @mock.patch("nova.virt.hyperv.vmutils.VMUtils._get_vm_scsi_controller")
+    @mock.patch("oslo_windows.utils.vmutils.VMUtils.get_free_controller_slot")
+    @mock.patch("oslo_windows.utils.vmutils.VMUtils._get_vm_scsi_controller")
     def test_attach_scsi_drive(self, mock_get_vm_scsi_controller,
                                mock_get_free_controller_slot):
         mock_vm = self._lookup_vm()
@@ -657,7 +657,7 @@ class VMUtilsTestCase(test.NoDBTestCase):
             ['ElementName', 'Notes'],
             SettingType=self._vmutils._VIRTUAL_SYSTEM_CURRENT_SETTINGS)
 
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils.check_ret_val')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils.check_ret_val')
     def test_modify_virtual_system(self, mock_check_ret_val):
         mock_vs_man_svc = mock.MagicMock()
         mock_vmsetting = mock.MagicMock()
@@ -677,10 +677,10 @@ class VMUtilsTestCase(test.NoDBTestCase):
             SystemSettingData=mock_vmsetting.GetText_(1))
         mock_check_ret_val.assert_called_once_with(fake_ret_val, fake_job_path)
 
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils.check_ret_val')
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils._get_wmi_obj')
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils._modify_virtual_system')
-    @mock.patch('nova.virt.hyperv.vmutils.VMUtils._get_vm_setting_data')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils.check_ret_val')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_wmi_obj')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils._modify_virtual_system')
+    @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_vm_setting_data')
     def test_create_vm_obj(self, mock_get_vm_setting_data,
                            mock_modify_virtual_system,
                            mock_get_wmi_obj, mock_check_ret_val):

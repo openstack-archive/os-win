@@ -30,9 +30,9 @@ from oslo_utils import units
 
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
-from nova.virt.hyperv import constants
-from nova.virt.hyperv import vhdutils
-from nova.virt.hyperv import vmutilsv2
+from oslo_windows.utils import constants
+from oslo_windows.utils import vhdutils
+from oslo_windows.utils import vmutilsv2
 
 
 VHDX_BAT_ENTRY_SIZE = 8
