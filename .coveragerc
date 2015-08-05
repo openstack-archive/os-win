@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = windows
+omit = windows/tests/*,windows/openstack/*
+
+[report]
+ignore-errors = True
