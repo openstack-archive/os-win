@@ -71,16 +71,21 @@ class BaseVolumeUtilsTestCase(test.NoDBTestCase):
             initiator_name = self._volutils.get_iscsi_initiator()
             self.assertEqual(expected, initiator_name)
 
-    @mock.patch.object(basevolumeutils, 'driver')
-    def test_volume_in_mapping(self, mock_driver):
-        mock_driver.block_device_info_get_mapping.return_value = [
+    @mock.patch.object(basevolumeutils.BaseVolumeUtils, 'swap_is_usable')
+    @mock.patch.object(basevolumeutils.BaseVolumeUtils,
+                       'block_device_info_get_ephemerals')
+    @mock.patch.object(basevolumeutils.BaseVolumeUtils,
+                       'block_device_info_get_swap')
+    @mock.patch.object(basevolumeutils.BaseVolumeUtils,
+                       'block_device_info_get_mapping')
+    def test_volume_in_mapping(self, mock_bdi_get_mapping, mock_bdi_get_swap,
+                               mock_bdi_get_ephem, mock_swap_is_usable):
+        mock_bdi_get_mapping.return_value = [
             {'mount_device': self._FAKE_MOUNT_DEVICE}]
-        mock_driver.block_device_info_get_swap = mock.MagicMock(
-            return_value=self._FAKE_SWAP)
-        mock_driver.block_device_info_get_ephemerals = mock.MagicMock(
-            return_value=[{'device_name': self._FAKE_DEVICE_NAME}])
-
-        mock_driver.swap_is_usable = mock.MagicMock(return_value=True)
+        mock_bdi_get_swap.return_value = self._FAKE_SWAP
+        mock_bdi_get_ephem.return_value = [
+            {'device_name': self._FAKE_DEVICE_NAME}]
+        mock_swap_is_usable.return_value = True
 
         self.assertTrue(self._volutils.volume_in_mapping(
             self._FAKE_MOUNT_DEVICE, mock.sentinel.FAKE_BLOCK_DEVICE_INFO))
@@ -186,3 +191,54 @@ class BaseVolumeUtilsTestCase(test.NoDBTestCase):
         init_session.SessionId = mock.sentinel.FAKE_SESSION_ID
 
         return init_session
+
+    def test_block_device(self):
+        swap = {'device_name': '/dev/sdb',
+                'swap_size': 1}
+        ephemerals = [{'num': 0,
+                       'virtual_name': 'ephemeral0',
+                       'device_name': '/dev/sdc1',
+                       'size': 1}]
+        block_device_mapping = [{'mount_device': '/dev/sde',
+                                 'device_path': 'fake_device'}]
+        block_device_info = {
+            'root_device_name': '/dev/sda',
+            'swap': swap,
+            'ephemerals': ephemerals,
+            'block_device_mapping': block_device_mapping}
+
+        empty_block_device_info = {}
+
+        self.assertEqual(
+            self._volutils.block_device_info_get_swap(block_device_info), swap)
+        self.assertIsNone(self._volutils.block_device_info_get_swap(
+            empty_block_device_info)['device_name'])
+        self.assertEqual(self._volutils.block_device_info_get_swap(
+            empty_block_device_info)['swap_size'], 0)
+        self.assertIsNone(
+            self._volutils.block_device_info_get_swap(
+                {'swap': None})['device_name'])
+        self.assertEqual(
+            self._volutils.block_device_info_get_swap(
+                {'swap': None})['swap_size'], 0)
+        self.assertIsNone(
+            self._volutils.block_device_info_get_swap(None)['device_name'])
+        self.assertEqual(
+            self._volutils.block_device_info_get_swap(None)['swap_size'], 0)
+
+        self.assertEqual(
+            self._volutils.block_device_info_get_ephemerals(block_device_info),
+            ephemerals)
+        self.assertEqual(
+            self._volutils.block_device_info_get_ephemerals(
+                empty_block_device_info), [])
+        self.assertEqual(
+            self._volutils.block_device_info_get_ephemerals(None), [])
+
+    def test_swap_is_usable(self):
+        self.assertFalse(self._volutils.swap_is_usable(None))
+        self.assertFalse(self._volutils.swap_is_usable({'device_name': None}))
+        self.assertFalse(self._volutils.swap_is_usable(
+            {'device_name': '/dev/sdb', 'swap_size': 0}))
+        self.assertTrue(self._volutils.swap_is_usable(
+            {'device_name': '/dev/sdb', 'swap_size': 1}))

@@ -32,7 +32,6 @@ from oslo_log import log as logging
 
 from oslo_windows._i18n import _LI
 from oslo_windows import _utils
-from nova.virt import driver
 
 LOG = logging.getLogger(__name__)
 
@@ -82,16 +81,16 @@ class BaseVolumeUtils(object):
     def volume_in_mapping(self, mount_device, block_device_info):
         block_device_list = [_utils.strip_dev(vol['mount_device'])
                              for vol in
-                             driver.block_device_info_get_mapping(
+                             self.block_device_info_get_mapping(
                                  block_device_info)]
-        swap = driver.block_device_info_get_swap(block_device_info)
-        if driver.swap_is_usable(swap):
+        swap = self.block_device_info_get_swap(block_device_info)
+        if self.swap_is_usable(swap):
             block_device_list.append(
                 _utils.strip_dev(swap['device_name']))
         block_device_list += [_utils.strip_dev(
             ephemeral['device_name'])
             for ephemeral in
-            driver.block_device_info_get_ephemerals(block_device_info)]
+            self.block_device_info_get_ephemerals(block_device_info)]
 
         LOG.debug("block_device_list %s", block_device_list)
         return _utils.strip_dev(mount_device) in block_device_list
@@ -147,3 +146,25 @@ class BaseVolumeUtils(object):
             for device in devices:
                 if device.DeviceNumber == drive_number:
                     return (device.TargetName, device.ScsiLun)
+
+    @staticmethod
+    def block_device_info_get_mapping(block_device_info):
+        block_device_info = block_device_info or {}
+        block_device_mapping = (
+            block_device_info.get('block_device_mapping') or [])
+        return block_device_mapping
+
+    @staticmethod
+    def block_device_info_get_swap(block_device_info):
+        block_device_info = block_device_info or {}
+        return block_device_info.get('swap') or {'device_name': None,
+                                                 'swap_size': 0}
+    @staticmethod
+    def swap_is_usable(swap):
+        return swap and swap['device_name'] and swap['swap_size'] > 0
+
+    @staticmethod
+    def block_device_info_get_ephemerals(block_device_info):
+        block_device_info = block_device_info or {}
+        ephemerals = block_device_info.get('ephemerals') or []
+        return ephemerals
