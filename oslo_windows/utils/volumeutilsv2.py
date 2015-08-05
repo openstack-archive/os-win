@@ -29,8 +29,8 @@ from oslo_log import log as logging
 from six.moves import range
 
 from oslo_windows._i18n import _
+from oslo_windows import _utils
 from oslo_windows import exceptions
-from nova import utils
 from nova.virt.hyperv import basevolumeutils
 
 LOG = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class VolumeUtilsV2(basevolumeutils.BaseVolumeUtils):
 
     def _login_target_portal(self, target_portal):
         (target_address,
-         target_port) = utils.parse_server_string(target_portal)
+         target_port) = _utils.parse_server_string(target_portal)
 
         # Checking if the portal is already connected.
         portal = self._conn_storage.query("SELECT * FROM "

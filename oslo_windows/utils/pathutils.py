@@ -25,8 +25,8 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from oslo_windows._i18n import _
+from oslo_windows import _utils
 from oslo_windows import exceptions
-from nova import utils
 from nova.virt.hyperv import constants
 
 LOG = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class PathUtils(object):
         # It can be replaced with Win32 API calls to avoid the process
         # spawning overhead.
         LOG.debug('Copying file from %s to %s', src, dest)
-        output, ret = utils.execute('cmd.exe', '/C', 'copy', '/Y', src, dest)
+        output, ret = _utils.execute('cmd.exe', '/C', 'copy', '/Y', src, dest)
         if ret:
             raise IOError(_('The file copy from %(src)s to %(dest)s failed')
                            % {'src': src, 'dest': dest})

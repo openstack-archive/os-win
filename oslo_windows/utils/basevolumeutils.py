@@ -30,8 +30,8 @@ if sys.platform == 'win32':
 
 from oslo_log import log as logging
 
-from nova import block_device
 from oslo_windows._i18n import _LI
+from oslo_windows import _utils
 from nova.virt import driver
 
 LOG = logging.getLogger(__name__)
@@ -80,21 +80,21 @@ class BaseVolumeUtils(object):
         return initiator_name
 
     def volume_in_mapping(self, mount_device, block_device_info):
-        block_device_list = [block_device.strip_dev(vol['mount_device'])
+        block_device_list = [_utils.strip_dev(vol['mount_device'])
                              for vol in
                              driver.block_device_info_get_mapping(
                                  block_device_info)]
         swap = driver.block_device_info_get_swap(block_device_info)
         if driver.swap_is_usable(swap):
             block_device_list.append(
-                block_device.strip_dev(swap['device_name']))
-        block_device_list += [block_device.strip_dev(
+                _utils.strip_dev(swap['device_name']))
+        block_device_list += [_utils.strip_dev(
             ephemeral['device_name'])
             for ephemeral in
             driver.block_device_info_get_ephemerals(block_device_info)]
 
         LOG.debug("block_device_list %s", block_device_list)
-        return block_device.strip_dev(mount_device) in block_device_list
+        return _utils.strip_dev(mount_device) in block_device_list
 
     def _get_drive_number_from_disk_path(self, disk_path):
         drive_number = self._drive_number_regex.findall(disk_path)

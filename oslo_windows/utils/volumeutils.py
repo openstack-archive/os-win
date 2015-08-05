@@ -31,8 +31,8 @@ from oslo_log import log as logging
 from six.moves import range
 
 from oslo_windows._i18n import _
+from oslo_windows import _utils
 from oslo_windows import exceptions
-from nova import utils
 from nova.virt.hyperv import basevolumeutils
 
 LOG = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class VolumeUtils(basevolumeutils.BaseVolumeUtils):
         super(VolumeUtils, self).__init__()
 
     def execute(self, *args, **kwargs):
-        stdout_value, stderr_value = utils.execute(*args, **kwargs)
+        stdout_value, stderr_value = _utils.execute(*args, **kwargs)
         if stdout_value.find('The operation completed successfully') == -1:
             raise exceptions.HyperVException(
               _('An error has occurred when calling the iscsi initiator: %s')
@@ -55,7 +55,7 @@ class VolumeUtils(basevolumeutils.BaseVolumeUtils):
 
     def _login_target_portal(self, target_portal):
         (target_address,
-         target_port) = utils.parse_server_string(target_portal)
+         target_port) = _utils.parse_server_string(target_portal)
 
         output = self.execute('iscsicli.exe', 'ListTargetPortals')
         pattern = r'Address and Socket *: (.*)'

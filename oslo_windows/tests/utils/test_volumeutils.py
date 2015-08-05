@@ -134,7 +134,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
         else:
             output = 'The operation completed successfully'
 
-        with mock.patch('nova.utils.execute') as fake_execute:
+        with mock.patch('oslo_windows._utils.execute') as fake_execute:
             fake_execute.return_value = (output, None)
 
             if raise_exception:
@@ -151,7 +151,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
     def test_execute_exception(self):
         self._test_execute_wrapper(False)
 
-    @mock.patch.object(volumeutils, 'utils')
+    @mock.patch.object(volumeutils, '_utils')
     def test_logout_storage_target(self, mock_utils):
         mock_utils.execute.return_value = (self._FAKE_STDOUT_VALUE,
                                            mock.sentinel.FAKE_STDERR_VALUE)
