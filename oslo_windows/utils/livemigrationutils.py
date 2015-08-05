@@ -20,9 +20,8 @@ if sys.platform == 'win32':
 
 from oslo_log import log as logging
 
-from nova import exception
 from oslo_windows._i18n import _, _LE
-from nova.virt.hyperv import vmutils
+from oslo_windows import exceptions
 from nova.virt.hyperv import vmutilsv2
 from nova.virt.hyperv import volumeutilsv2
 
@@ -48,7 +47,7 @@ class LiveMigrationUtils(object):
                        % host)
             else:
                 msg = _('Live migration failed: %s') % ex.message
-            raise vmutils.HyperVException(msg)
+            raise exceptions.HyperVException(msg)
 
     def check_live_migration_config(self):
         conn_v2 = self._get_conn_v2()
@@ -58,10 +57,10 @@ class LiveMigrationUtils(object):
             wmi_result_class='Msvm_VirtualSystemMigrationServiceSettingData')
         vsmssd = vsmssds[0]
         if not vsmssd.EnableVirtualSystemMigration:
-            raise vmutils.HyperVException(
+            raise exceptions.HyperVException(
                 _('Live migration is not enabled on this host'))
         if not migration_svc.MigrationServiceListenerIPAddressList:
-            raise vmutils.HyperVException(
+            raise exceptions.HyperVException(
                 _('Live migration networks are not configured on this host'))
 
     def _get_vm(self, conn_v2, vm_name):
@@ -70,8 +69,8 @@ class LiveMigrationUtils(object):
         if not n:
             raise exception.NotFound(_('VM not found: %s') % vm_name)
         elif n > 1:
-            raise vmutils.HyperVException(_('Duplicate VM name found: %s')
-                                          % vm_name)
+            raise exceptions.HyperVException(_('Duplicate VM name found: %s')
+                                             % vm_name)
         return vms[0]
 
     def _destroy_planned_vm(self, conn_v2_remote, planned_vm):

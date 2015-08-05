@@ -16,7 +16,7 @@ import mock
 from oslo_config import cfg
 
 from nova import test
-from nova.virt.hyperv import vmutils
+from oslo_windows import exceptions
 from nova.virt.hyperv import volumeutilsv2
 
 CONF = cfg.CONF
@@ -102,7 +102,7 @@ class VolumeUtilsV2TestCase(test.NoDBTestCase):
             auth = {}
 
         if raise_exception:
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._volutilsv2.login_storage_target,
                               self._FAKE_LUN, self._FAKE_TARGET, fake_portal)
         else:

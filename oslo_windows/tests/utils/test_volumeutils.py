@@ -17,8 +17,8 @@
 import mock
 from oslo_config import cfg
 
+from oslo_windows import exceptions
 from nova.tests.unit.virt.hyperv import test_basevolumeutils
-from nova.virt.hyperv import vmutils
 from nova.virt.hyperv import volumeutils
 
 CONF = cfg.CONF
@@ -95,7 +95,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
                 ['', '', '', self._FAKE_TARGET, ''])
 
         if raise_exception:
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._volutils.login_storage_target,
                               self._FAKE_LUN, self._FAKE_TARGET,
                               fake_portal, username, password)
@@ -138,7 +138,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
             fake_execute.return_value = (output, None)
 
             if raise_exception:
-                self.assertRaises(vmutils.HyperVException,
+                self.assertRaises(exceptions.HyperVException,
                                   self._volutils.execute,
                                   *fake_cmd)
             else:

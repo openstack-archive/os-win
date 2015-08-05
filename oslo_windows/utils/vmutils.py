@@ -31,36 +31,13 @@ from oslo_utils import uuidutils
 import six
 from six.moves import range
 
-from nova import exception
 from oslo_windows._i18n import _, _LW
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import hostutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
-
-
-# TODO(alexpilotti): Move the exceptions to a separate module
-# TODO(alexpilotti): Add more domain exceptions
-class HyperVException(exception.NovaException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
-
-
-# TODO(alexpilotti): Add a storage exception base class
-class VHDResizeException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
-
-
-class HyperVAuthorizationException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
-
-
-class UnsupportedConfigDriveFormatException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
 
 
 class VMUtils(object):
@@ -151,8 +128,8 @@ class VMUtils(object):
              constants.VM_SUMMARY_UPTIME],
             settings_paths)
         if ret_val:
-            raise HyperVException(_('Cannot get VM summary data for: %s')
-                                  % vm_name)
+            raise exceptions.HyperVException(
+                _('Cannot get VM summary data for: %s') % vm_name)
 
         si = summary_info[0]
         memory_usage = None
@@ -180,7 +157,8 @@ class VMUtils(object):
 
         vm = self._lookup_vm(vm_name)
         if not vm:
-            raise exception.NotFound(_('VM not found: %s') % vm_name)
+            raise exceptions.HyperVException(
+                _('VM not found: %s') % vm_name)
         return vm
 
     def _lookup_vm(self, vm_name):
@@ -189,7 +167,8 @@ class VMUtils(object):
         if n == 0:
             return None
         elif n > 1:
-            raise HyperVException(_('Duplicate VM name found: %s') % vm_name)
+            raise exceptions.HyperVException(
+                _('Duplicate VM name found: %s') % vm_name)
         else:
             return vms[0]
 
@@ -580,8 +559,8 @@ class VMUtils(object):
         if ret_val == constants.WMI_JOB_STATUS_STARTED:
             return self._wait_for_job(job_path)
         elif ret_val not in success_values:
-            raise HyperVException(_('Operation failed with return value: %s')
-                                  % ret_val)
+            raise exceptions.HyperVException(
+                _('Operation failed with return value: %s') % ret_val)
 
     def _wait_for_job(self, job_path):
         """Poll WMI job state and wait for completion."""
@@ -596,27 +575,26 @@ class VMUtils(object):
                 err_sum_desc = job.ErrorSummaryDescription
                 err_desc = job.ErrorDescription
                 err_code = job.ErrorCode
-                raise HyperVException(_("WMI job failed with status "
-                                        "%(job_state)d. Error details: "
-                                        "%(err_sum_desc)s - %(err_desc)s - "
-                                        "Error code: %(err_code)d") %
-                                      {'job_state': job_state,
-                                       'err_sum_desc': err_sum_desc,
-                                       'err_desc': err_desc,
-                                       'err_code': err_code})
+                raise exceptions.HyperVException(
+                    _("WMI job failed with status %(job_state)d. "
+                      "Error details: %(err_sum_desc)s - %(err_desc)s - "
+                      "Error code: %(err_code)d") %
+                    {'job_state': job_state,
+                     'err_sum_desc': err_sum_desc,
+                     'err_desc': err_desc,
+                     'err_code': err_code})
             else:
                 (error, ret_val) = job.GetError()
                 if not ret_val and error:
-                    raise HyperVException(_("WMI job failed with status "
-                                            "%(job_state)d. Error details: "
-                                            "%(error)s") %
-                                          {'job_state': job_state,
-                                           'error': error})
+                    raise exceptions.HyperVException(
+                        _("WMI job failed with status %(job_state)d. "
+                          "Error details: %(error)s") %
+                        {'job_state': job_state,
+                         'error': error})
                 else:
-                    raise HyperVException(_("WMI job failed with status "
-                                            "%d. No error "
-                                            "description available") %
-                                          job_state)
+                    raise exceptions.HyperVException(
+                        _("WMI job failed with status %d. No error "
+                          "description available") % job_state)
         desc = job.Description
         elap = job.ElapsedTime
         LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
@@ -738,7 +716,8 @@ class VMUtils(object):
         for slot in range(constants.SCSI_CONTROLLER_SLOTS_NUMBER):
             if slot not in used_slots:
                 return slot
-        raise HyperVException(_("Exceeded the maximum number of slots"))
+        raise exceptions.HyperVException(
+            _("Exceeded the maximum number of slots"))
 
     def enable_vm_metrics_collection(self, vm_name):
         raise NotImplementedError(_("Metrics collection is not supported on "

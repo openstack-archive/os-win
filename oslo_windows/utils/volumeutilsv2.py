@@ -29,9 +29,9 @@ from oslo_log import log as logging
 from six.moves import range
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova import utils
 from nova.virt.hyperv import basevolumeutils
-from nova.virt.hyperv import vmutils
 
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
@@ -107,8 +107,8 @@ class VolumeUtilsV2(basevolumeutils.BaseVolumeUtils):
                           {'target_iqn': target_iqn,
                            'exc': exc,
                            'attempt': attempt})
-        raise vmutils.HyperVException(_('Failed to login target %s') %
-                                      target_iqn)
+        raise exceptions.HyperVException(_('Failed to login target %s') %
+                                         target_iqn)
 
     def logout_storage_target(self, target_iqn):
         """Logs out storage target through its session id."""

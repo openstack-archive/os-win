@@ -15,8 +15,8 @@
 import mock
 
 from nova import test
+from oslo_windows import exceptions
 from nova.virt.hyperv import networkutils
-from nova.virt.hyperv import vmutils
 
 
 class NetworkUtilsTestCase(test.NoDBTestCase):
@@ -47,7 +47,7 @@ class NetworkUtilsTestCase(test.NoDBTestCase):
     def test_get_external_vswitch_not_found(self):
         self._networkutils._conn.Msvm_VirtualEthernetSwitch.return_value = []
 
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._networkutils.get_external_vswitch,
                           mock.sentinel.FAKE_VSWITCH_NAME)
 

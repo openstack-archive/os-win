@@ -31,9 +31,9 @@ from oslo_log import log as logging
 from six.moves import range
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova import utils
 from nova.virt.hyperv import basevolumeutils
-from nova.virt.hyperv import vmutils
 
 LOG = logging.getLogger(__name__)
 
@@ -48,9 +48,9 @@ class VolumeUtils(basevolumeutils.BaseVolumeUtils):
     def execute(self, *args, **kwargs):
         stdout_value, stderr_value = utils.execute(*args, **kwargs)
         if stdout_value.find('The operation completed successfully') == -1:
-            raise vmutils.HyperVException(_('An error has occurred when '
-                                            'calling the iscsi initiator: %s')
-                                          % stdout_value)
+            raise exceptions.HyperVException(
+              _('An error has occurred when calling the iscsi initiator: %s')
+              % stdout_value)
         return stdout_value
 
     def _login_target_portal(self, target_portal):
@@ -96,7 +96,7 @@ class VolumeUtils(basevolumeutils.BaseVolumeUtils):
                                  auth_username, auth_password)
                 else:
                     return
-            except vmutils.HyperVException as exc:
+            except exceptions.HyperVException as exc:
                 LOG.debug("Attempt %(attempt)d to connect to target  "
                           "%(target_iqn)s failed. Retrying. "
                           "Exceptipn: %(exc)s ",
@@ -105,8 +105,8 @@ class VolumeUtils(basevolumeutils.BaseVolumeUtils):
                            'attempt': attempt})
                 time.sleep(CONF.hyperv.volume_attach_retry_interval)
 
-        raise vmutils.HyperVException(_('Failed to login target %s') %
-                                      target_iqn)
+        raise exceptions.HyperVException(_('Failed to login target %s') %
+                                         target_iqn)
 
     def logout_storage_target(self, target_iqn):
         """Logs out storage target through its session id."""

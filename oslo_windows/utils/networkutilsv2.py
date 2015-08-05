@@ -25,8 +25,8 @@ if sys.platform == 'win32':
     import wmi
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova.virt.hyperv import networkutils
-from nova.virt.hyperv import vmutils
 
 
 class NetworkUtilsV2(networkutils.NetworkUtils):
@@ -39,8 +39,8 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             vswitches = self._conn.Msvm_VirtualEthernetSwitch(
                 ElementName=vswitch_name)
             if not len(vswitches):
-                raise vmutils.HyperVException(_('vswitch "%s" not found')
-                                              % vswitch_name)
+                raise exceptions.HyperVException(_('vswitch "%s" not found')
+                                                 % vswitch_name)
         else:
             # Find the vswitch that is connected to the first physical nic.
             ext_port = self._conn.Msvm_ExternalEthernetPort(IsBound='TRUE')[0]
@@ -52,7 +52,8 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
                 wmi_result_class='Msvm_VirtualEthernetSwitch')
 
             if not len(vswitches):
-                raise vmutils.HyperVException(_('No external vswitch found'))
+                raise exceptions.HyperVException(
+                    _('No external vswitch found'))
 
         return vswitches[0].path_()
 

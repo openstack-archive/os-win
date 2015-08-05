@@ -17,6 +17,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova.virt.hyperv import hostutils
 from nova.virt.hyperv import hostutilsv2
 from nova.virt.hyperv import livemigrationutils
@@ -67,7 +68,7 @@ def _get_virt_utils_class(v1_class, v2_class):
     # (kernel version 6.3) or above.
     if (CONF.hyperv.force_hyperv_utils_v1 and
             utils.check_min_windows_version(6, 3)):
-        raise vmutils.HyperVException(
+        raise exceptions.HyperVException(
             _('The "force_hyperv_utils_v1" option cannot be set to "True" '
               'on Windows Server / Hyper-V Server 2012 R2 or above as the WMI '
               '"root/virtualization" namespace is no longer supported.'))

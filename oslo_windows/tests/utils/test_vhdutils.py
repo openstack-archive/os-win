@@ -16,9 +16,9 @@ import mock
 from oslo_utils import units
 
 from nova import test
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vhdutils
-from nova.virt.hyperv import vmutils
 
 
 class VHDUtilsBaseTestCase(test.NoDBTestCase):
@@ -266,7 +266,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             f = mock_open.return_value
             f.tell.return_value = 1024
 
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._vhdutils.get_vhd_format,
                               self._FAKE_VHD_PATH)
 
@@ -277,7 +277,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             f = mock_open.return_value
             f.tell.return_value = 0
 
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._vhdutils.get_vhd_format,
                               self._FAKE_VHD_PATH)
 

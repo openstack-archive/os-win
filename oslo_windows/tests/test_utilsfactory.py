@@ -21,6 +21,7 @@ import mock
 from oslo_config import cfg
 
 from nova import test
+from oslo_windows import exceptions
 from nova.virt.hyperv import hostutils
 from nova.virt.hyperv import utilsfactory
 from nova.virt.hyperv import vmutils
@@ -50,7 +51,7 @@ class TestHyperVUtilsFactory(test.NoDBTestCase):
             mock_check_min_windows_version.return_value = os_supports_v2
 
             if os_supports_v2 and force_v1:
-                self.assertRaises(vmutils.HyperVException,
+                self.assertRaises(exceptions.HyperVException,
                                   utilsfactory.get_vmutils)
             else:
                 actual_class = type(utilsfactory.get_vmutils())

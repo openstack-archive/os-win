@@ -14,10 +14,10 @@
 
 import mock
 
+from oslo_windows import exceptions
 from nova.tests.unit.virt.hyperv import test_vhdutils
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vhdutilsv2
-from nova.virt.hyperv import vmutils
 
 
 class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
@@ -134,7 +134,7 @@ class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
         self._vhdutils._get_vhd_info_xml = mock.Mock(
             return_value=fake_vhd_info_xml)
 
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vhdutils.reconnect_parent_vhd,
                           self._FAKE_VHD_PATH,
                           mock.sentinel.new_parent_path)

@@ -25,9 +25,9 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova import utils
 from nova.virt.hyperv import constants
-from nova.virt.hyperv import vmutils
 
 LOG = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class PathUtils(object):
             return path
         except WindowsError as ex:
             if ex.winerror == ERROR_INVALID_NAME:
-                raise vmutils.HyperVException(_(
+                raise exceptions.HyperVException(_(
                     "Cannot access \"%(instances_path)s\", make sure the "
                     "path exists and that you have the proper permissions. "
                     "In particular Nova-Compute must not be executed with the "
@@ -246,7 +246,7 @@ class PathUtils(object):
                 'Unable to mount SMBFS share: %(smbfs_share)s '
                 'WMI exception: %(wmi_exc)s'), {'smbfs_share': smbfs_share,
                                                 'wmi_exc': exc})
-            raise vmutils.HyperVException(err_msg)
+            raise exceptions.HyperVException(err_msg)
 
     def unmount_smb_share(self, smbfs_share, force=False):
         mappings = self._smb_conn.Msft_SmbMapping(RemotePath=smbfs_share)
@@ -267,5 +267,5 @@ class PathUtils(object):
                 # share, for which reason we'll simply ignore it in this
                 # case.
                 if force:
-                    raise vmutils.HyperVException(
+                    raise exceptions.HyperVException(
                         _("Could not unmount share: %s"), smbfs_share)

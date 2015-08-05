@@ -32,6 +32,7 @@ if sys.platform == 'win32':
 from xml.etree import ElementTree
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vmutils
 
@@ -63,8 +64,8 @@ class VHDUtils(object):
 
     def create_dynamic_vhd(self, path, max_internal_size, format):
         if format != constants.DISK_FORMAT_VHD:
-            raise vmutils.HyperVException(_("Unsupported disk format: %s") %
-                                          format)
+            raise exceptions.HyperVException(_("Unsupported disk format: %s") %
+                                             format)
 
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
 
@@ -159,9 +160,9 @@ class VHDUtils(object):
                 f.seek(blk_size_offset)
                 version = f.read(4)
         except IOError:
-            raise vmutils.HyperVException(_("Unable to obtain block size from"
-                                            " VHD %(vhd_path)s") %
-                                            {"vhd_path": vhd_path})
+            raise exceptions.HyperVException(_("Unable to obtain block size "
+                                               "from VHD %(vhd_path)s") %
+                                               {"vhd_path": vhd_path})
         return struct.unpack('>i', version)[0]
 
     def get_vhd_parent_path(self, vhd_path):
@@ -206,7 +207,7 @@ class VHDUtils(object):
                 if f.read(8) == VHD_SIGNATURE:
                     return constants.DISK_FORMAT_VHD
 
-        raise vmutils.HyperVException(_('Unsupported virtual disk format'))
+        raise exceptions.HyperVException(_('Unsupported virtual disk format'))
 
     def get_best_supported_vhd_format(self):
         return constants.DISK_FORMAT_VHD

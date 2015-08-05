@@ -24,7 +24,7 @@ if sys.platform == 'win32':
     import wmi
 
 from oslo_windows._i18n import _
-from nova.virt.hyperv import vmutils
+from oslo_windows import exceptions
 
 
 class NetworkUtils(object):
@@ -42,8 +42,8 @@ class NetworkUtils(object):
             vswitches = port.associators(wmi_result_class='Msvm_VirtualSwitch')
 
         if not len(vswitches):
-            raise vmutils.HyperVException(_('vswitch "%s" not found')
-                                          % vswitch_name)
+            raise exceptions.HyperVException(_('vswitch "%s" not found')
+                                             % vswitch_name)
         return vswitches[0].path_()
 
     def create_vswitch_port(self, vswitch_path, port_name):
@@ -55,11 +55,10 @@ class NetworkUtils(object):
             ScopeOfResidence="",
             VirtualSwitch=vswitch_path)
         if ret_val != 0:
-            raise vmutils.HyperVException(_("Failed to create vswitch port "
-                                            "%(port_name)s on switch "
-                                            "%(vswitch_path)s") %
-                                          {'port_name': port_name,
-                                           'vswitch_path': vswitch_path})
+            raise exceptions.HyperVException(
+                _("Failed to create vswitch port %(port_name)s on switch "
+                  "%(vswitch_path)s") % {'port_name': port_name,
+                                         'vswitch_path': vswitch_path})
         return new_port
 
     def vswitch_port_needed(self):

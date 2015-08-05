@@ -29,9 +29,9 @@ from xml.etree import ElementTree
 from oslo_utils import units
 
 from oslo_windows._i18n import _
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vhdutils
-from nova.virt.hyperv import vmutils
 from nova.virt.hyperv import vmutilsv2
 
 
@@ -62,8 +62,8 @@ class VHDUtilsV2(vhdutils.VHDUtils):
     def create_dynamic_vhd(self, path, max_internal_size, format):
         vhd_format = self._vhd_format_map.get(format)
         if not vhd_format:
-            raise vmutils.HyperVException(_("Unsupported disk format: %s") %
-                                          format)
+            raise exceptions.HyperVException(_("Unsupported disk format: %s") %
+                                             format)
 
         self._create_vhd(self._VHD_TYPE_DYNAMIC, vhd_format, path,
                          max_internal_size=max_internal_size)
@@ -109,7 +109,7 @@ class VHDUtilsV2(vhdutils.VHDUtils):
                      "parent path property.") %
                    {'child_vhd_path': child_vhd_path,
                     'parent_vhd_path': parent_vhd_path})
-            raise vmutils.HyperVException(msg)
+            raise exceptions.HyperVException(msg)
 
         vhd_info_xml = ElementTree.tostring(et)
 
@@ -170,12 +170,10 @@ class VHDUtilsV2(vhdutils.VHDUtils):
                         return max_internal_size - (max_internal_size % bs)
 
                 except IOError as ex:
-                    raise vmutils.HyperVException(_("Unable to obtain "
-                                                    "internal size from VHDX: "
-                                                    "%(vhd_path)s. Exception: "
-                                                    "%(ex)s") %
-                                                    {"vhd_path": vhd_path,
-                                                     "ex": ex})
+                    raise exceptions.HyperVException(
+                        _("Unable to obtain internal size from VHDX: "
+                          "%(vhd_path)s. Exception: %(ex)s") %
+                          {"vhd_path": vhd_path, "ex": ex})
 
     def _get_vhdx_current_header_offset(self, vhdx_file):
         sequence_numbers = []

@@ -17,8 +17,8 @@ import mock
 
 from six.moves import range
 
-from nova import exception
 from nova import test
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import vmutils
 
@@ -115,13 +115,13 @@ class VMUtilsTestCase(test.NoDBTestCase):
     def test_lookup_vm_multiple(self):
         mockvm = mock.MagicMock()
         self._vmutils._conn.Msvm_ComputerSystem.return_value = [mockvm, mockvm]
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils._lookup_vm_check,
                           self._FAKE_VM_NAME)
 
     def test_lookup_vm_none(self):
         self._vmutils._conn.Msvm_ComputerSystem.return_value = []
-        self.assertRaises(exception.NotFound,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils._lookup_vm_check,
                           self._FAKE_VM_NAME)
 
@@ -278,7 +278,7 @@ class VMUtilsTestCase(test.NoDBTestCase):
                 'get_attached_disks') as fake_get_attached_disks:
             fake_get_attached_disks.return_value = (
                 [fake_drive] * constants.SCSI_CONTROLLER_SLOTS_NUMBER)
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._vmutils.get_free_controller_slot,
                               mock.sentinel.scsi_controller_path)
 
@@ -421,7 +421,7 @@ class VMUtilsTestCase(test.NoDBTestCase):
         mock_wait_for_job.assert_called_once_with(self._FAKE_JOB_PATH)
 
     def test_check_ret_val_exception(self):
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils.check_ret_val,
                           self._FAKE_RET_VAL_BAD,
                           self._FAKE_JOB_PATH)
@@ -434,21 +434,21 @@ class VMUtilsTestCase(test.NoDBTestCase):
     def test_wait_for_job_exception_concrete_job(self):
         mock_job = self._prepare_wait_for_job()
         mock_job.path.return_value.Class = self._CONCRETE_JOB
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils._wait_for_job,
                           self._FAKE_JOB_PATH)
 
     def test_wait_for_job_exception_with_error(self):
         mock_job = self._prepare_wait_for_job()
         mock_job.GetError.return_value = (self._FAKE_ERROR, self._FAKE_RET_VAL)
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils._wait_for_job,
                           self._FAKE_JOB_PATH)
 
     def test_wait_for_job_exception_no_error(self):
         mock_job = self._prepare_wait_for_job()
         mock_job.GetError.return_value = (None, None)
-        self.assertRaises(vmutils.HyperVException,
+        self.assertRaises(exceptions.HyperVException,
                           self._vmutils._wait_for_job,
                           self._FAKE_JOB_PATH)
 

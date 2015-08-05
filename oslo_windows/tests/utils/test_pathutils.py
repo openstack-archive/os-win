@@ -17,9 +17,9 @@ import os
 import mock
 
 from nova.tests.unit.virt.hyperv import test_base
+from oslo_windows import exceptions
 from nova.virt.hyperv import constants
 from nova.virt.hyperv import pathutils
-from nova.virt.hyperv import vmutils
 
 
 class PathUtilsTestCase(test_base.HyperVBaseTestCase):
@@ -165,6 +165,6 @@ class PathUtilsTestCase(test_base.HyperVBaseTestCase):
             side_effect=WindowsError(pathutils.ERROR_INVALID_NAME))
         with mock.patch('__builtin__.WindowsError',
                         fake_windows_error, create=True):
-            self.assertRaises(vmutils.HyperVException,
+            self.assertRaises(exceptions.HyperVException,
                               self._pathutils._get_instances_sub_dir,
                               fake_dir_name)
