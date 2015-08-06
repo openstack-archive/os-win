@@ -4,9 +4,9 @@ oslo.windows
 
 Oslo Windows library for OpenStack projects.
 
-Please feel here a long description which must be at least 3 lines wrapped on
-80 cols, so that distribution package maintainers can use it in their packages.
-Note that this is a hard requirement.
+Library contains Windows / Hyper-V code commonly used in the OpenStack
+projects: nova, cinder, networking-hyperv. The library can be used in any
+other OpenStack projects where it is needed.
 
 * Free software: Apache license
 * Documentation: http://docs.openstack.org/developer/oslo.windows
