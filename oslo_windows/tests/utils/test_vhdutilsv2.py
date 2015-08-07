@@ -33,7 +33,7 @@ class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
         super(VHDUtilsV2TestCase, self).setUp()
         self._vhdutils = vhdutilsv2.VHDUtilsV2()
         self._vhdutils._conn = mock.MagicMock()
-        self._vhdutils._vmutils = mock.MagicMock()
+        self._vhdutils._jobutils = mock.MagicMock()
 
         self._fake_file_handle = mock.MagicMock()
 

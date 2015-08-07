@@ -31,8 +31,8 @@ from oslo_utils import units
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
 from oslo_windows.utils import constants
+from oslo_windows.utils import jobutils
 from oslo_windows.utils import vhdutils
-from oslo_windows.utils import vmutilsv2
 
 
 VHDX_BAT_ENTRY_SIZE = 8
@@ -55,7 +55,7 @@ class VHDUtilsV2(vhdutils.VHDUtils):
     }
 
     def __init__(self):
-        self._vmutils = vmutilsv2.VMUtilsV2()
+        self._jobutils = jobutils.JobUtilsV2()
         if sys.platform == 'win32':
             self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
 
@@ -93,7 +93,7 @@ class VHDUtilsV2(vhdutils.VHDUtils):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
         (job_path, ret_val) = image_man_svc.CreateVirtualHardDisk(
             VirtualDiskSettingData=vhd_info.GetText_(1))
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def reconnect_parent_vhd(self, child_vhd_path, parent_vhd_path):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
@@ -116,7 +116,7 @@ class VHDUtilsV2(vhdutils.VHDUtils):
         (job_path, ret_val) = image_man_svc.SetVirtualHardDiskSettingData(
             VirtualDiskSettingData=vhd_info_xml)
 
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_resize_method(self):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
@@ -213,7 +213,7 @@ class VHDUtilsV2(vhdutils.VHDUtils):
          ret_val,
          vhd_info_xml) = image_man_svc.GetVirtualHardDiskSettingData(vhd_path)
 
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         return vhd_info_xml.encode('utf8', 'xmlcharrefreplace')
 

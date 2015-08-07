@@ -28,6 +28,7 @@ if sys.platform == 'win32':
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
 from oslo_windows.utils import networkutils
+from oslo_windows.utils import jobutils
 
 
 class NetworkUtilsV2(networkutils.NetworkUtils):
@@ -77,6 +78,7 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
     _REJECT_ACLS_COUNT = 4
 
     def __init__(self):
+        self._jobutils = jobutils.JobUtilsV2()
         if sys.platform == 'win32':
             self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
 
@@ -134,45 +136,9 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
         port.Parent = vnic.path_()
         if not found:
             vm = self._get_vm_from_res_setting_data(vnic)
-            self._add_virt_resource(vm, port)
+            self._jobutils.add_virt_resource(port, vm)
         else:
-            self._modify_virt_resource(port)
-
-    def _modify_virt_resource(self, res_setting_data):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, out_set_data, ret_val) = vs_man_svc.ModifyResourceSettings(
-            ResourceSettings=[res_setting_data.GetText_(1)])
-        self._check_job_status(ret_val, job_path)
-
-    def _add_virt_resource(self, vm, res_setting_data):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, out_set_data, ret_val) = vs_man_svc.AddResourceSettings(
-            vm.path_(), [res_setting_data.GetText_(1)])
-        self._check_job_status(ret_val, job_path)
-
-    def _remove_virt_resource(self, res_setting_data):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job, ret_val) = vs_man_svc.RemoveResourceSettings(
-            ResourceSettings=[res_setting_data.path_()])
-        self._check_job_status(ret_val, job)
-
-    def _add_virt_feature(self, element, feature_resource):
-        self._add_multiple_virt_features(element, [feature_resource])
-
-    def _add_multiple_virt_features(self, element, feature_resources):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, out_set_data, ret_val) = vs_man_svc.AddFeatureSettings(
-            element.path_(), [f.GetText_(1) for f in feature_resources])
-        self._check_job_status(ret_val, job_path)
-
-    def _remove_virt_feature(self, feature_resource):
-        self._remove_multiple_virt_features([feature_resource])
-
-    def _remove_multiple_virt_features(self, feature_resources):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.RemoveFeatureSettings(
-            FeatureSettings=[f.path_() for f in feature_resources])
-        self._check_job_status(ret_val, job_path)
+            self._jobutils.modify_virt_resource(port)
 
     def disconnect_switch_port(self, switch_port_name, vnic_deleted,
                                delete_port):
@@ -183,10 +149,10 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             return
 
         if delete_port:
-            self._remove_virt_resource(sw_port)
+            self._jobutils.remove_virt_resource(sw_port)
         else:
             sw_port.EnabledState = self._STATE_DISABLED
-            self._modify_virt_resource(sw_port)
+            self._jobutils.modify_virt_resource(sw_port)
 
     def set_vswitch_port_vlan_id(self, vlan_id, switch_port_name):
         port_alloc, found = self._get_switch_port_allocation(switch_port_name)
@@ -194,7 +160,6 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             raise utils.HyperVException(
                 msg=_('Port Allocation not found: %s') % switch_port_name)
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         vlan_settings = self._get_vlan_setting_data_from_port_alloc(port_alloc)
         if vlan_settings:
             if (vlan_settings.OperationMode == self._OPERATION_MODE_ACCESS and
@@ -204,16 +169,12 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
 
             # Removing the feature because it cannot be modified
             # due to a wmi exception.
-            (job_path, ret_val) = vs_man_svc.RemoveFeatureSettings(
-                FeatureSettings=[vlan_settings.path_()])
-            self._check_job_status(ret_val, job_path)
+            self._jobutils.remove_virt_feature(vlan_settings)
 
         (vlan_settings, found) = self._get_vlan_setting_data(switch_port_name)
         vlan_settings.AccessVlanId = vlan_id
         vlan_settings.OperationMode = self._OPERATION_MODE_ACCESS
-        (job_path, out, ret_val) = vs_man_svc.AddFeatureSettings(
-            port_alloc.path_(), [vlan_settings.GetText_(1)])
-        self._check_job_status(ret_val, job_path)
+        self._jobutils.add_virt_feature(vlan_settings, port_alloc)
 
     def _get_vlan_setting_data_from_port_alloc(self, port_alloc):
         return self._get_first_item(port_alloc.associators(
@@ -265,7 +226,7 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
                 if not _acls:
                     acl = self._create_acl(
                         acl_dir, acl_type, self._ACL_ACTION_METER)
-                    self._add_virt_feature(port, acl)
+                    self._jobutils.add_virt_feature(acl, port)
 
     def enable_control_metrics(self, switch_port_name):
         port, found = self._get_switch_port_allocation(switch_port_name, False)
@@ -332,7 +293,7 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             remove_acls.extend(filtered_acls)
 
         if remove_acls:
-            self._remove_multiple_virt_features(remove_acls)
+            self._jobutils.remove_multiple_virt_features(remove_acls)
 
     def remove_all_security_rules(self, switch_port_name):
         port, found = self._get_switch_port_allocation(switch_port_name, False)
@@ -345,7 +306,7 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
                          a.Action is not self._ACL_ACTION_METER]
 
         if filtered_acls:
-            self._remove_multiple_virt_features(filtered_acls)
+            self._jobutils.remove_multiple_virt_features(filtered_acls)
 
     def _bind_security_rules(self, port, sg_rules):
         acls = port.associators(wmi_result_class=self._PORT_EXT_ACL_SET_DATA)
@@ -373,7 +334,7 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             greenthread.sleep()
 
         if add_acls:
-            self._add_multiple_virt_features(port, add_acls)
+            self._jobutils.add_multiple_virt_features(add_acls, port)
 
     def _create_acl(self, direction, acl_type, action):
         acl = self._get_default_setting_data(self._PORT_ALLOC_ACL_SET_DATA)

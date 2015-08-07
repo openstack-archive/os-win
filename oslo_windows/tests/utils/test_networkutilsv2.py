@@ -26,8 +26,6 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
     _FAKE_PORT_NAME = "fake_port_name"
     _FAKE_JOB_PATH = 'fake_job_path'
     _FAKE_RET_VAL = 0
-    _FAKE_VM_PATH = "fake_vm_path"
-    _FAKE_RES_DATA = "fake_res_data"
     _FAKE_RES_PATH = "fake_res_path"
     _FAKE_VSWITCH = "fake_vswitch"
     _FAKE_VLAN_ID = "fake_vlan_id"
@@ -49,6 +47,7 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
         super(NetworkUtilsV2TestCase, self).setUp()
         self.netutils = networkutilsv2.NetworkUtilsV2()
         self.netutils._conn = mock.MagicMock()
+        self.netutils._jobutils = mock.MagicMock()
 
     def test_get_external_vswitch(self):
         mock_vswitch = mock.MagicMock()
@@ -119,76 +118,20 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
                                               self._FAKE_PORT_NAME)
 
         if not found:
-            self.netutils._add_virt_resource.assert_called_with(mock_vm,
-                                                                mock_port)
+            mock_add_resource = self.netutils._jobutils.add_virt_resource
+            mock_add_resource.assert_called_once_with(mock_port, mock_vm)
         else:
-            self.netutils._modify_virt_resource.assert_called_with(mock_port)
+            mock_modify_resource = self.netutils._jobutils.modify_virt_resource
+            mock_modify_resource.assert_called_once_with(mock_port)
 
-    @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_modify_virt_resource')
-    def test_connect_vnic_to_vswitch_already_connected(self, mock_modify_res):
+    def test_connect_vnic_to_vswitch_already_connected(self):
         mock_port = self._mock_get_switch_port_alloc()
         mock_port.HostResource = [mock.sentinel.vswitch_path]
 
         self.netutils.connect_vnic_to_vswitch(mock.sentinel.switch_name,
                                               mock.sentinel.port_name)
 
-        self.assertFalse(mock_modify_res.called)
-
-    def test_add_virt_resource(self):
-        self._test_virt_method('AddResourceSettings', 3, '_add_virt_resource',
-                               True, self._FAKE_VM_PATH, [self._FAKE_RES_DATA])
-
-    def test_add_virt_feature(self):
-        self._test_virt_method('AddFeatureSettings', 3, '_add_virt_feature',
-                               True, self._FAKE_VM_PATH, [self._FAKE_RES_DATA])
-
-    def test_modify_virt_resource(self):
-        self._test_virt_method('ModifyResourceSettings', 3,
-                               '_modify_virt_resource', False,
-                               ResourceSettings=[self._FAKE_RES_DATA])
-
-    def test_remove_virt_resource(self):
-        self._test_virt_method('RemoveResourceSettings', 2,
-                               '_remove_virt_resource', False,
-                               ResourceSettings=[self._FAKE_RES_PATH])
-
-    def test_remove_virt_feature(self):
-        self._test_virt_method('RemoveFeatureSettings', 2,
-                               '_remove_virt_feature', False,
-                               FeatureSettings=[self._FAKE_RES_PATH])
-
-    def _test_virt_method(self, vsms_method_name, return_count,
-                          utils_method_name, with_mock_vm, *args, **kwargs):
-        mock_svc = self.netutils._conn.Msvm_VirtualSystemManagementService()[0]
-        vsms_method = getattr(mock_svc, vsms_method_name)
-        mock_rsd = self._mock_vsms_method(vsms_method, return_count)
-        if with_mock_vm:
-            mock_vm = mock.MagicMock()
-            mock_vm.path_.return_value = self._FAKE_VM_PATH
-            getattr(self.netutils, utils_method_name)(mock_vm, mock_rsd)
-        else:
-            getattr(self.netutils, utils_method_name)(mock_rsd)
-
-        if args:
-            vsms_method.assert_called_once_with(*args)
-        else:
-            vsms_method.assert_called_once_with(**kwargs)
-
-    def _mock_vsms_method(self, vsms_method, return_count):
-        args = None
-        if return_count == 3:
-            args = (self._FAKE_JOB_PATH, mock.MagicMock(), self._FAKE_RET_VAL)
-        else:
-            args = (self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-
-        vsms_method.return_value = args
-        mock_res_setting_data = mock.MagicMock()
-        mock_res_setting_data.GetText_.return_value = self._FAKE_RES_DATA
-        mock_res_setting_data.path_.return_value = self._FAKE_RES_PATH
-
-        self.netutils._check_job_status = mock.MagicMock()
-
-        return mock_res_setting_data
+        self.assertFalse(self.netutils._jobutils.modify_virt_resource.called)
 
     def _mock_get_switch_port_alloc(self, found=True):
         mock_port = mock.MagicMock()
@@ -208,20 +151,15 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
     def _test_disconnect_switch_port(self, delete_port):
         mock_sw_port = self._mock_get_switch_port_alloc()
 
-        if delete_port:
-            self.netutils._remove_virt_resource = mock.MagicMock()
-        else:
-            self.netutils._modify_virt_resource = mock.MagicMock()
-
         self.netutils.disconnect_switch_port(self._FAKE_PORT_NAME,
                                              True, delete_port)
 
         if delete_port:
-            self.netutils._remove_virt_resource.assert_called_once_with(
-                mock_sw_port)
+            mock_remove_resource = self.netutils._jobutils.remove_virt_resource
+            mock_remove_resource.assert_called_once_with(mock_sw_port)
         else:
-            self.netutils._modify_virt_resource.assert_called_once_with(
-                mock_sw_port)
+            mock_modify_resource = self.netutils._jobutils.modify_virt_resource
+            mock_modify_resource.assert_called_once_with(mock_sw_port)
 
     def test_get_vswitch(self):
         self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = [
@@ -237,25 +175,21 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
                           self._FAKE_VSWITCH_NAME)
 
     def test_set_vswitch_port_vlan_id(self):
-        self._mock_get_switch_port_alloc(found=True)
-        self.netutils._get_vlan_setting_data_from_port_alloc = mock.MagicMock()
-
-        mock_svc = self.netutils._conn.Msvm_VirtualSystemManagementService()[0]
-        mock_svc.RemoveFeatureSettings.return_value = (self._FAKE_JOB_PATH,
-                                                       self._FAKE_RET_VAL)
+        mock_port = self._mock_get_switch_port_alloc(found=True)
+        old_vlan_settings = mock.MagicMock()
+        self.netutils._get_vlan_setting_data_from_port_alloc = mock.MagicMock(
+            return_value=old_vlan_settings)
         mock_vlan_settings = mock.MagicMock()
         self.netutils._get_vlan_setting_data = mock.MagicMock(return_value=(
             mock_vlan_settings, True))
 
-        mock_svc.AddFeatureSettings.return_value = (self._FAKE_JOB_PATH,
-                                                    None,
-                                                    self._FAKE_RET_VAL)
-
         self.netutils.set_vswitch_port_vlan_id(self._FAKE_VLAN_ID,
                                                self._FAKE_PORT_NAME)
 
-        self.assertTrue(mock_svc.RemoveFeatureSettings.called)
-        self.assertTrue(mock_svc.AddFeatureSettings.called)
+        mock_remove_feature = self.netutils._jobutils.remove_virt_feature
+        mock_remove_feature.assert_called_once_with(old_vlan_settings)
+        mock_add_feature = self.netutils._jobutils.add_virt_feature
+        mock_add_feature.assert_called_once_with(mock_vlan_settings, mock_port)
 
     @mock.patch.object(networkutilsv2.NetworkUtilsV2,
                        '_get_vlan_setting_data_from_port_alloc')
@@ -268,9 +202,10 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
         self.netutils.set_vswitch_port_vlan_id(mock.sentinel.vlan_id,
                                                mock.sentinel.port_name)
 
-        mock_svc = self.netutils._conn.Msvm_VirtualSystemManagementService()[0]
-        self.assertFalse(mock_svc.RemoveFeatureSettings.called)
-        self.assertFalse(mock_svc.AddFeatureSettings.called)
+        mock_remove_feature = self.netutils._jobutils.remove_virt_feature
+        self.assertFalse(mock_remove_feature.called)
+        mock_add_feature = self.netutils._jobutils.add_virt_feature
+        self.assertFalse(mock_add_feature.called)
 
     def test_get_setting_data(self):
         self.netutils._get_first_item = mock.MagicMock(return_value=None)
@@ -291,15 +226,14 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
 
         with mock.patch.multiple(
             self.netutils,
-            _get_default_setting_data=mock.MagicMock(return_value=mock_acl),
-            _add_virt_feature=mock.MagicMock()):
+            _get_default_setting_data=mock.MagicMock(return_value=mock_acl)):
 
             self.netutils.enable_port_metrics_collection(self._FAKE_PORT_NAME)
 
-            actual_calls = len(self.netutils._add_virt_feature.mock_calls)
+            mock_add_feature = self.netutils._jobutils.add_virt_feature
+            actual_calls = len(mock_add_feature.mock_calls)
             self.assertEqual(4, actual_calls)
-            self.netutils._add_virt_feature.assert_called_with(
-                mock_port, mock_acl)
+            mock_add_feature.assert_called_with(mock_acl, mock_port)
 
     def test_enable_control_metrics_ok(self):
         mock_metrics_svc = self.netutils._conn.Msvm_MetricService()[0]
@@ -391,13 +325,11 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
         self.netutils.create_security_rules(self._FAKE_PORT_NAME, fake_rule)
         mock_bind.assert_called_once_with(m_port, fake_rule)
 
-    @mock.patch.object(networkutilsv2.NetworkUtilsV2,
-                       '_add_multiple_virt_features')
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_create_security_acl')
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_get_new_weights')
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_filter_security_acls')
     def test_bind_security_rules(self, mock_filtered_acls, mock_get_weights,
-                                 mock_create_acl, mock_add):
+                                 mock_create_acl):
         m_port = mock.MagicMock()
         m_acl = mock.MagicMock()
         m_port.associators.return_value = [m_acl]
@@ -410,7 +342,8 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
 
         mock_create_acl.assert_called_once_with(fake_rule,
                                                 mock.sentinel.FAKE_WEIGHT)
-        mock_add.assert_called_once_with(m_port, [m_acl])
+        mock_add_features = self.netutils._jobutils.add_multiple_virt_features
+        mock_add_features.assert_called_once_with([m_acl], m_port)
 
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_get_new_weights')
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_filter_security_acls')
@@ -426,24 +359,24 @@ class NetworkUtilsV2TestCase(base.BaseTestCase):
         mock_filtered_acls.assert_called_once_with(fake_rule, [m_acl])
         mock_get_weights.assert_called_once_with([fake_rule], [m_acl])
 
-    @mock.patch.object(networkutilsv2.NetworkUtilsV2,
-                       '_remove_multiple_virt_features')
     @mock.patch.object(networkutilsv2.NetworkUtilsV2, '_filter_security_acls')
-    def test_remove_security_rules(self, mock_filter, mock_remove_feature):
+    def test_remove_security_rules(self, mock_filter):
         mock_acl = self._setup_security_rule_test()[1]
         fake_rule = mock.MagicMock()
         mock_filter.return_value = [mock_acl]
 
         self.netutils.remove_security_rules(self._FAKE_PORT_NAME, [fake_rule])
-        mock_remove_feature.assert_called_once_with([mock_acl])
 
-    @mock.patch.object(networkutilsv2.NetworkUtilsV2,
-                       '_remove_multiple_virt_features')
-    def test_remove_all_security_rules(self, mock_remove_feature):
+        mock_remove_features = (
+            self.netutils._jobutils.remove_multiple_virt_features)
+        mock_remove_features.assert_called_once_with([mock_acl])
+
+    def test_remove_all_security_rules(self):
         mock_acl = self._setup_security_rule_test()[1]
         self.netutils.remove_all_security_rules(self._FAKE_PORT_NAME)
-        self.netutils._remove_multiple_virt_features.assert_called_once_with(
-            [mock_acl])
+        mock_remove_features = (
+            self.netutils._jobutils.remove_multiple_virt_features)
+        mock_remove_features.assert_called_once_with([mock_acl])
 
     @mock.patch.object(networkutilsv2.NetworkUtilsV2,
                        '_get_default_setting_data')

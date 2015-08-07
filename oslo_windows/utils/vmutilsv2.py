@@ -29,6 +29,7 @@ from oslo_log import log as logging
 
 from oslo_windows.utils import constants
 from oslo_windows.utils import vmutils
+from oslo_windows.utils import jobutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ class VMUtilsV2(vmutils.VMUtils):
 
     def __init__(self, host='.'):
         super(VMUtilsV2, self).__init__(host)
+        self._jobutils = jobutils.JobUtilsV2()
 
     def _init_hyperv_wmi_conn(self, host):
         self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
@@ -122,7 +124,7 @@ class VMUtilsV2(vmutils.VMUtils):
          ret_val) = vs_man_svc.DefineSystem(ResourceSettings=[],
                                             ReferenceConfiguration=None,
                                             SystemSettings=vs_data.GetText_(1))
-        job = self.check_ret_val(ret_val, job_path)
+        job = self._jobutils.check_ret_val(ret_val, job_path)
         if not vm_path and job:
             vm_path = job.associators(self._AFFECTED_JOB_ELEMENT_CLASS)[0]
         return self._get_wmi_obj(vm_path)
@@ -164,7 +166,7 @@ class VMUtilsV2(vmutils.VMUtils):
         drive.Address = drive_addr
         drive.AddressOnParent = drive_addr
         # Add the cloned disk drive object to the vm.
-        new_resources = self._add_virt_resource(drive, vm.path_())
+        new_resources = self._jobutils.add_virt_resource(drive, vm)
         drive_path = new_resources[0]
 
         if drive_type == constants.DISK:
@@ -178,7 +180,7 @@ class VMUtilsV2(vmutils.VMUtils):
         res.Parent = drive_path
         res.HostResource = [path]
 
-        self._add_virt_resource(res, vm.path_())
+        self._jobutils.add_virt_resource(res, vm)
 
     def attach_volume_to_controller(self, vm_name, controller_path, address,
                                     mounted_disk_path):
@@ -193,7 +195,7 @@ class VMUtilsV2(vmutils.VMUtils):
         diskdrive.Parent = controller_path
         diskdrive.HostResource = [mounted_disk_path]
 
-        self._add_virt_resource(diskdrive, vm.path_())
+        self._jobutils.add_virt_resource(diskdrive, vm)
 
     def _get_disk_resource_address(self, disk_resource):
         return disk_resource.AddressOnParent
@@ -206,7 +208,7 @@ class VMUtilsV2(vmutils.VMUtils):
         scsicontrl.VirtualSystemIdentifiers = ['{' + str(uuid.uuid4()) + '}']
 
         vm = self._lookup_vm_check(vm_name)
-        self._add_virt_resource(scsicontrl, vm.path_())
+        self._jobutils.add_virt_resource(scsicontrl, vm)
 
     def _get_disk_resource_disk_path(self, disk_resource):
         return disk_resource.HostResource
@@ -217,33 +219,7 @@ class VMUtilsV2(vmutils.VMUtils):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         # Remove the VM. It does not destroy any associated virtual disk.
         (job_path, ret_val) = vs_man_svc.DestroySystem(vm.path_())
-        self.check_ret_val(ret_val, job_path)
-
-    def _add_virt_resource(self, res_setting_data, vm_path):
-        """Adds a new resource to the VM."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_xml = [res_setting_data.GetText_(1)]
-        (job_path,
-         new_resources,
-         ret_val) = vs_man_svc.AddResourceSettings(vm_path, res_xml)
-        self.check_ret_val(ret_val, job_path)
-        return new_resources
-
-    def _modify_virt_resource(self, res_setting_data, vm_path):
-        """Updates a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path,
-         out_res_setting_data,
-         ret_val) = vs_man_svc.ModifyResourceSettings(
-            ResourceSettings=[res_setting_data.GetText_(1)])
-        self.check_ret_val(ret_val, job_path)
-
-    def _remove_virt_resource(self, res_setting_data, vm_path):
-        """Removes a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_path = [res_setting_data.path_()]
-        (job_path, ret_val) = vs_man_svc.RemoveResourceSettings(res_path)
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def get_vm_state(self, vm_name):
         settings = self.get_vm_summary_info(vm_name)
@@ -256,7 +232,7 @@ class VMUtilsV2(vmutils.VMUtils):
         (job_path, snp_setting_data, ret_val) = vs_snap_svc.CreateSnapshot(
             AffectedSystem=vm.path_(),
             SnapshotType=self._SNAPSHOT_FULL)
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         job_wmi_path = job_path.replace('\\', '/')
         job = wmi.WMI(moniker=job_wmi_path)
@@ -268,7 +244,7 @@ class VMUtilsV2(vmutils.VMUtils):
     def remove_vm_snapshot(self, snapshot_path):
         vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
         (job_path, ret_val) = vs_snap_svc.DestroySnapshot(snapshot_path)
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def set_nic_connection(self, vm_name, nic_name, vswitch_conn_data):
         nic_data = self._get_nic_data_by_name(nic_name)
@@ -280,7 +256,7 @@ class VMUtilsV2(vmutils.VMUtils):
         eth_port_data.Parent = nic_data.path_()
 
         vm = self._lookup_vm_check(vm_name)
-        self._add_virt_resource(eth_port_data, vm.path_())
+        self._jobutils.add_virt_resource(eth_port_data, vm)
 
     def enable_vm_metrics_collection(self, vm_name):
         metric_names = [self._METRIC_AGGR_CPU_AVG,

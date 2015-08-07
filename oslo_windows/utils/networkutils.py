@@ -28,6 +28,7 @@ from oslo_log import log as logging
 from oslo_windows._i18n import _, _LE
 from oslo_windows import exceptions
 from oslo_windows.utils import constants
+from oslo_windows.utils import jobutils
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class NetworkUtils(object):
     _VLAN_ENDPOINT_SET_DATA = 'Msvm_VLANEndpointSettingData'
 
     def __init__(self):
+        self._jobutils = jobutils.JobUtils()
         if sys.platform == 'win32':
             self._conn = wmi.WMI(moniker='//./root/virtualization')
 
@@ -164,7 +166,7 @@ class NetworkUtils(object):
                 port_path = self.create_vswitch_port(
                     vswitch_name, switch_port_name)
             vnic_settings.Connection = [port_path]
-            self._modify_virt_resource(vnic_settings)
+            self._jobutils.modify_virt_resource(vnic_settings)
 
     def _get_vm_from_res_setting_data(self, res_setting_data):
         sd = res_setting_data.associators(
@@ -172,61 +174,6 @@ class NetworkUtils(object):
         vm = sd[0].associators(
             wmi_result_class='Msvm_ComputerSystem')
         return vm[0]
-
-    def _modify_virt_resource(self, res_setting_data):
-        vm = self._get_vm_from_res_setting_data(res_setting_data)
-
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.ModifyVirtualSystemResources(
-            vm.Path_(), [res_setting_data.GetText_(1)])
-        self._check_job_status(ret_val, job_path)
-
-    def _check_job_status(self, ret_val, jobpath):
-        """Poll WMI job state for completion."""
-        if not ret_val:
-            return
-        elif ret_val not in [constants.WMI_JOB_STATUS_STARTED,
-                             constants.WMI_JOB_STATE_RUNNING]:
-            raise exceptions.HyperVException(
-                message=_('Job failed with error %d') % ret_val)
-
-        job_wmi_path = jobpath.replace('\\', '/')
-        job = wmi.WMI(moniker=job_wmi_path)
-
-        while job.JobState == constants.WMI_JOB_STATE_RUNNING:
-            time.sleep(0.1)
-            job = wmi.WMI(moniker=job_wmi_path)
-        if job.JobState != constants.WMI_JOB_STATE_COMPLETED:
-            job_state = job.JobState
-            if job.path().Class == "Msvm_ConcreteJob":
-                err_sum_desc = job.ErrorSummaryDescription
-                err_desc = job.ErrorDescription
-                err_code = job.ErrorCode
-                data = {'job_state': job_state,
-                        'err_sum_desc': err_sum_desc,
-                        'err_desc': err_desc,
-                        'err_code': err_code}
-                raise exceptions.HyperVException(
-                    _("WMI job failed with status %(job_state)d. "
-                      "Error details: %(err_sum_desc)s - %(err_desc)s - "
-                      "Error code: %(err_code)d") % data)
-            else:
-                (error, ret_val) = job.GetError()
-                if not ret_val and error:
-                    data = {'job_state': job_state,
-                            'error': error}
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %(job_state)d. "
-                          "Error details: %(error)s") % data)
-                else:
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %d. "
-                          "No error description available") % job_state)
-
-        desc = job.Description
-        elap = job.ElapsedTime
-        LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
-                  {'desc': desc, 'elap': elap})
 
     def disconnect_switch_port(self, switch_port_name, vnic_deleted,
                                delete_port):

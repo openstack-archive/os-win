@@ -31,7 +31,6 @@ class VMUtilsTestCase(base.BaseTestCase):
     _FAKE_VCPUS_NUM = 4
     _FAKE_JOB_PATH = 'fake_job_path'
     _FAKE_RET_VAL = 0
-    _FAKE_RET_VAL_BAD = -1
     _FAKE_PATH = "fake_path"
     _FAKE_CTRL_PATH = 'fake_ctrl_path'
     _FAKE_CTRL_ADDR = 0
@@ -51,12 +50,6 @@ class VMUtilsTestCase(base.BaseTestCase):
     _FAKE_RES_PATH = "fake_res_path"
     _FAKE_RES_NAME = 'fake_res_name'
     _FAKE_ADDRESS = "fake_address"
-    _FAKE_JOB_STATUS_DONE = 7
-    _FAKE_JOB_STATUS_BAD = -1
-    _FAKE_JOB_DESCRIPTION = "fake_job_description"
-    _FAKE_ERROR = "fake_error"
-    _FAKE_ELAPSED_TIME = 0
-    _CONCRETE_JOB = "Msvm_ConcreteJob"
     _FAKE_DYNAMIC_MEMORY_RATIO = 1.0
 
     _FAKE_SUMMARY_INFO = {'NumberOfProcessors': 4,
@@ -67,8 +60,6 @@ class VMUtilsTestCase(base.BaseTestCase):
     _DEFINE_SYSTEM = 'DefineVirtualSystem'
     _DESTROY_SYSTEM = 'DestroyVirtualSystem'
     _DESTROY_SNAPSHOT = 'RemoveVirtualSystemSnapshot'
-    _ADD_RESOURCE = 'AddVirtualSystemResources'
-    _REMOVE_RESOURCE = 'RemoveVirtualSystemResources'
     _SETTING_TYPE = 'SettingType'
     _VM_GEN = constants.VM_GEN_1
 
@@ -77,6 +68,7 @@ class VMUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn = mock.MagicMock()
+        self._vmutils._jobutils = mock.MagicMock()
 
         super(VMUtilsTestCase, self).setUp()
 
@@ -140,14 +132,12 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_vmsetting = mock.MagicMock()
         mock_vmsetting.associators.return_value = [mock_s]
 
-        self._vmutils._modify_virt_resource = mock.MagicMock()
-
         self._vmutils._set_vm_memory(mock_vm, mock_vmsetting,
                                      self._FAKE_MEMORY_MB,
                                      dynamic_memory_ratio)
 
-        self._vmutils._modify_virt_resource.assert_called_with(
-            mock_s, self._FAKE_VM_PATH)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_s, mock_vm)
 
         if dynamic_memory_ratio > 1:
             self.assertTrue(mock_s.DynamicMemoryEnabled)
@@ -160,20 +150,19 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_shutdown.InitiateShutdown.return_value = (self._FAKE_RET_VAL, )
         mock_vm.associators.return_value = [mock_shutdown]
 
-        with mock.patch.object(self._vmutils, 'check_ret_val') as mock_check:
-            self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
+        self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
 
-            mock_shutdown.InitiateShutdown.assert_called_once_with(
-                Force=False, Reason=mock.ANY)
-            mock_check.assert_called_once_with(self._FAKE_RET_VAL, None)
+        mock_shutdown.InitiateShutdown.assert_called_once_with(
+            Force=False, Reason=mock.ANY)
+        self._vmutils._jobutils.check_ret_val.assert_called_once_with(
+            self._FAKE_RET_VAL, None)
 
     def test_soft_shutdown_vm_no_component(self):
         mock_vm = self._lookup_vm()
         mock_vm.associators.return_value = []
 
-        with mock.patch.object(self._vmutils, 'check_ret_val') as mock_check:
-            self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
-            self.assertFalse(mock_check.called)
+        self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
+        self.assertFalse(self._vmutils._jobutils.check_ret_val.called)
 
     @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_vm_disks')
     def test_get_vm_storage_paths(self, mock_get_vm_disks):
@@ -336,15 +325,13 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_vm = self._lookup_vm()
         mock_rsd = mock_get_new_rsd.return_value
 
-        with mock.patch.object(self._vmutils,
-                               '_add_virt_resource') as mock_add_virt_res:
-            self._vmutils.attach_ide_drive(self._FAKE_VM_NAME,
-                                           self._FAKE_CTRL_PATH,
-                                           self._FAKE_CTRL_ADDR,
-                                           self._FAKE_DRIVE_ADDR)
+        self._vmutils.attach_ide_drive(self._FAKE_VM_NAME,
+                                       self._FAKE_CTRL_PATH,
+                                       self._FAKE_CTRL_ADDR,
+                                       self._FAKE_DRIVE_ADDR)
 
-            mock_add_virt_res.assert_called_with(mock_rsd,
-                                                 mock_vm.path_.return_value)
+        self._vmutils._jobutils.add_virt_resource.assert_called_with(
+            mock_rsd, mock_vm)
 
         mock_get_ide_ctrl.assert_called_with(mock_vm, self._FAKE_CTRL_ADDR)
         self.assertTrue(mock_get_new_rsd.called)
@@ -352,45 +339,42 @@ class VMUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
     def test_create_scsi_controller(self, mock_get_new_rsd):
         mock_vm = self._lookup_vm()
-        with mock.patch.object(self._vmutils,
-                               '_add_virt_resource') as mock_add_virt_res:
-            self._vmutils.create_scsi_controller(self._FAKE_VM_NAME)
 
-            mock_add_virt_res.assert_called_with(mock_get_new_rsd.return_value,
-                                                 mock_vm.path_.return_value)
+        self._vmutils.create_scsi_controller(self._FAKE_VM_NAME)
+
+        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+            mock_get_new_rsd.return_value, mock_vm)
 
     @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
     def test_attach_volume_to_controller(self, mock_get_new_rsd):
         mock_vm = self._lookup_vm()
-        with mock.patch.object(self._vmutils,
-                               '_add_virt_resource') as mock_add_virt_res:
-            self._vmutils.attach_volume_to_controller(
-                self._FAKE_VM_NAME, self._FAKE_CTRL_PATH, self._FAKE_CTRL_ADDR,
-                self._FAKE_MOUNTED_DISK_PATH)
 
-            mock_add_virt_res.assert_called_with(mock_get_new_rsd.return_value,
-                                                 mock_vm.path_.return_value)
+        self._vmutils.attach_volume_to_controller(
+            self._FAKE_VM_NAME, self._FAKE_CTRL_PATH, self._FAKE_CTRL_ADDR,
+            self._FAKE_MOUNTED_DISK_PATH)
 
-    @mock.patch.object(vmutils.VMUtils, '_modify_virt_resource')
+        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+            mock_get_new_rsd.return_value, mock_vm)
+
     @mock.patch.object(vmutils.VMUtils, '_get_nic_data_by_name')
-    def test_set_nic_connection(self, mock_get_nic_conn, mock_modify_virt_res):
-        self._lookup_vm()
+    def test_set_nic_connection(self, mock_get_nic_conn):
+        mock_vm = self._lookup_vm()
         mock_nic = mock_get_nic_conn.return_value
         self._vmutils.set_nic_connection(self._FAKE_VM_NAME, None, None)
 
-        mock_modify_virt_res.assert_called_with(mock_nic, self._FAKE_VM_PATH)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_nic, mock_vm)
 
     @mock.patch.object(vmutils.VMUtils, '_get_new_setting_data')
     def test_create_nic(self, mock_get_new_virt_res):
-        self._lookup_vm()
+        mock_vm = self._lookup_vm()
         mock_nic = mock_get_new_virt_res.return_value
 
-        with mock.patch.object(self._vmutils,
-                               '_add_virt_resource') as mock_add_virt_res:
-            self._vmutils.create_nic(
-                self._FAKE_VM_NAME, self._FAKE_RES_NAME, self._FAKE_ADDRESS)
+        self._vmutils.create_nic(
+            self._FAKE_VM_NAME, self._FAKE_RES_NAME, self._FAKE_ADDRESS)
 
-            mock_add_virt_res.assert_called_with(mock_nic, self._FAKE_VM_PATH)
+        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+            mock_nic, mock_vm)
 
     def test_set_vm_state(self):
         mock_vm = self._lookup_vm()
@@ -414,96 +398,12 @@ class VMUtilsTestCase(base.BaseTestCase):
         getattr(mock_svc, self._DESTROY_SYSTEM).assert_called_with(
             self._FAKE_VM_PATH)
 
-    @mock.patch.object(vmutils.VMUtils, '_wait_for_job')
-    def test_check_ret_val_ok(self, mock_wait_for_job):
-        self._vmutils.check_ret_val(constants.WMI_JOB_STATUS_STARTED,
-                                    self._FAKE_JOB_PATH)
-        mock_wait_for_job.assert_called_once_with(self._FAKE_JOB_PATH)
-
-    def test_check_ret_val_exception(self):
-        self.assertRaises(exceptions.HyperVException,
-                          self._vmutils.check_ret_val,
-                          self._FAKE_RET_VAL_BAD,
-                          self._FAKE_JOB_PATH)
-
-    def test_wait_for_job_done(self):
-        mockjob = self._prepare_wait_for_job(constants.WMI_JOB_STATE_COMPLETED)
-        job = self._vmutils._wait_for_job(self._FAKE_JOB_PATH)
-        self.assertEqual(mockjob, job)
-
-    def test_wait_for_job_exception_concrete_job(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.path.return_value.Class = self._CONCRETE_JOB
-        self.assertRaises(exceptions.HyperVException,
-                          self._vmutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-
-    def test_wait_for_job_exception_with_error(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.GetError.return_value = (self._FAKE_ERROR, self._FAKE_RET_VAL)
-        self.assertRaises(exceptions.HyperVException,
-                          self._vmutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-
-    def test_wait_for_job_exception_no_error(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.GetError.return_value = (None, None)
-        self.assertRaises(exceptions.HyperVException,
-                          self._vmutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-
-    def _prepare_wait_for_job(self, state=_FAKE_JOB_STATUS_BAD):
-        mock_job = mock.MagicMock()
-        mock_job.JobState = state
-        mock_job.Description = self._FAKE_JOB_DESCRIPTION
-        mock_job.ElapsedTime = self._FAKE_ELAPSED_TIME
-
-        self._vmutils._get_wmi_obj = mock.MagicMock(return_value=mock_job)
-        return mock_job
-
-    def test_add_virt_resource(self):
-        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
-        getattr(mock_svc, self._ADD_RESOURCE).return_value = (
-            self._FAKE_JOB_PATH, mock.MagicMock(), self._FAKE_RET_VAL)
-        mock_res_setting_data = mock.MagicMock()
-        mock_res_setting_data.GetText_.return_value = self._FAKE_RES_DATA
-
-        self._vmutils._add_virt_resource(mock_res_setting_data,
-                                         self._FAKE_VM_PATH)
-        self._assert_add_resources(mock_svc)
-
-    def test_modify_virt_resource(self):
-        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
-        mock_svc.ModifyVirtualSystemResources.return_value = (
-            self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-        mock_res_setting_data = mock.MagicMock()
-        mock_res_setting_data.GetText_.return_value = self._FAKE_RES_DATA
-
-        self._vmutils._modify_virt_resource(mock_res_setting_data,
-                                            self._FAKE_VM_PATH)
-
-        mock_svc.ModifyVirtualSystemResources.assert_called_with(
-            ResourceSettingData=[self._FAKE_RES_DATA],
-            ComputerSystem=self._FAKE_VM_PATH)
-
-    def test_remove_virt_resource(self):
-        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
-        getattr(mock_svc, self._REMOVE_RESOURCE).return_value = (
-            self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-        mock_res_setting_data = mock.MagicMock()
-        mock_res_setting_data.path_.return_value = self._FAKE_RES_PATH
-
-        self._vmutils._remove_virt_resource(mock_res_setting_data,
-                                            self._FAKE_VM_PATH)
-        self._assert_remove_resources(mock_svc)
-
     def test_set_disk_host_resource(self):
-        self._lookup_vm()
+        mock_vm = self._lookup_vm()
         mock_rasds = self._create_mock_disks()
 
         self._vmutils._get_vm_disks = mock.MagicMock(
             return_value=([mock_rasds[0]], [mock_rasds[1]]))
-        self._vmutils._modify_virt_resource = mock.MagicMock()
         self._vmutils._get_disk_resource_address = mock.MagicMock(
             return_value=self._FAKE_ADDRESS)
 
@@ -514,15 +414,14 @@ class VMUtilsTestCase(base.BaseTestCase):
             mock.sentinel.fake_new_mounted_disk_path)
         self._vmutils._get_disk_resource_address.assert_called_with(
             mock_rasds[0])
-        self._vmutils._modify_virt_resource.assert_called_with(
-            mock_rasds[0], self._FAKE_VM_PATH)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_rasds[0], mock_vm)
         self.assertEqual(
             mock.sentinel.fake_new_mounted_disk_path,
             mock_rasds[0].HostResource[0])
 
     @mock.patch.object(vmutils, 'wmi', create=True)
-    @mock.patch.object(vmutils.VMUtils, 'check_ret_val')
-    def test_take_vm_snapshot(self, mock_check_ret_val, mock_wmi):
+    def test_take_vm_snapshot(self, mock_wmi):
         self._lookup_vm()
 
         mock_svc = self._get_snapshot_service()
@@ -534,8 +433,8 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_svc.CreateVirtualSystemSnapshot.assert_called_with(
             self._FAKE_VM_PATH)
 
-        mock_check_ret_val.assert_called_once_with(self._FAKE_RET_VAL,
-                                                   self._FAKE_JOB_PATH)
+        self._vmutils._jobutils.check_ret_val.assert_called_once_with(
+            self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
     def test_remove_vm_snapshot(self):
         mock_svc = self._get_snapshot_service()
@@ -547,15 +446,13 @@ class VMUtilsTestCase(base.BaseTestCase):
             self._FAKE_SNAPSHOT_PATH)
 
     def test_detach_vm_disk(self):
-        self._lookup_vm()
+        mock_vm = self._lookup_vm()
         mock_disk = self._prepare_mock_disk()
 
-        with mock.patch.object(self._vmutils,
-                               '_remove_virt_resource') as mock_rm_virt_res:
-            self._vmutils.detach_vm_disk(self._FAKE_VM_NAME,
-                                         self._FAKE_HOST_RESOURCE)
-
-            mock_rm_virt_res.assert_called_with(mock_disk, self._FAKE_VM_PATH)
+        self._vmutils.detach_vm_disk(self._FAKE_VM_NAME,
+                                     self._FAKE_HOST_RESOURCE)
+        self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
+            mock_disk, mock_vm)
 
     def test_get_mounted_disk_resource_from_path(self):
         mock_disk_1 = mock.MagicMock()
@@ -586,14 +483,6 @@ class VMUtilsTestCase(base.BaseTestCase):
     def _get_snapshot_service(self):
         return self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
 
-    def _assert_add_resources(self, mock_svc):
-        getattr(mock_svc, self._ADD_RESOURCE).assert_called_with(
-            [self._FAKE_RES_DATA], self._FAKE_VM_PATH)
-
-    def _assert_remove_resources(self, mock_svc):
-        getattr(mock_svc, self._REMOVE_RESOURCE).assert_called_with(
-            [self._FAKE_RES_PATH], self._FAKE_VM_PATH)
-
     def test_get_active_instances(self):
         fake_vm = mock.MagicMock()
 
@@ -623,8 +512,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         fake_serial_port.Connection = [old_serial_connection]
         mock_rasds = [fake_serial_port]
         mock_vmsettings[0].associators.return_value = mock_rasds
-        self._vmutils._modify_virt_resource = mock.MagicMock()
-        fake_modify = self._vmutils._modify_virt_resource
+        fake_modify = self._vmutils._jobutils.modify_virt_resource
 
         ret_val = self._vmutils.get_vm_serial_port_connection(
             self._FAKE_VM_NAME, update_connection=new_connection)
@@ -632,7 +520,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         if new_connection:
             self.assertEqual(new_connection, ret_val)
             fake_modify.assert_called_once_with(fake_serial_port,
-                                                mock_vm.path_())
+                                                mock_vm)
         else:
             self.assertEqual(old_serial_connection, ret_val)
 
@@ -657,8 +545,7 @@ class VMUtilsTestCase(base.BaseTestCase):
             ['ElementName', 'Notes'],
             SettingType=self._vmutils._VIRTUAL_SYSTEM_CURRENT_SETTINGS)
 
-    @mock.patch('oslo_windows.utils.vmutils.VMUtils.check_ret_val')
-    def test_modify_virtual_system(self, mock_check_ret_val):
+    def test_modify_virtual_system(self):
         mock_vs_man_svc = mock.MagicMock()
         mock_vmsetting = mock.MagicMock()
         fake_path = 'fake path'
@@ -675,15 +562,15 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_vs_man_svc.ModifyVirtualSystem.assert_called_once_with(
             ComputerSystem=fake_path,
             SystemSettingData=mock_vmsetting.GetText_(1))
-        mock_check_ret_val.assert_called_once_with(fake_ret_val, fake_job_path)
+        self._vmutils._jobutils.check_ret_val.assert_called_once_with(
+            fake_ret_val, fake_job_path)
 
-    @mock.patch('oslo_windows.utils.vmutils.VMUtils.check_ret_val')
     @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_wmi_obj')
     @mock.patch('oslo_windows.utils.vmutils.VMUtils._modify_virtual_system')
     @mock.patch('oslo_windows.utils.vmutils.VMUtils._get_vm_setting_data')
     def test_create_vm_obj(self, mock_get_vm_setting_data,
                            mock_modify_virtual_system,
-                           mock_get_wmi_obj, mock_check_ret_val):
+                           mock_get_wmi_obj):
         mock_vs_man_svc = mock.MagicMock()
         mock_vs_gs_data = mock.MagicMock()
         fake_vm_path = 'fake vm path'
@@ -706,7 +593,8 @@ class VMUtilsTestCase(base.BaseTestCase):
         self.assertEqual(mock_vs_gs_data.ElementName, 'fake vm')
         mock_vs_man_svc.DefineVirtualSystem.assert_called_once_with(
             [], None, mock_vs_gs_data.GetText_(1))
-        mock_check_ret_val.assert_called_once_with(fake_ret_val, fake_job_path)
+        self._vmutils._jobutils.check_ret_val.assert_called_once_with(
+            fake_ret_val, fake_job_path)
         self.assertEqual(mock.sentinel.instance_path,
                          mock_vs_gs_data.ExternalDataRoot)
         self.assertEqual(mock.sentinel.instance_path,

@@ -86,7 +86,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         super(VHDUtilsTestCase, self).setUp()
         self._vhdutils = vhdutils.VHDUtils()
         self._vhdutils._conn = mock.MagicMock()
-        self._vhdutils._vmutils = mock.MagicMock()
+        self._vhdutils._jobutils = mock.MagicMock()
 
         self._fake_vhd_info = {
             'ParentPath': self._FAKE_PARENT_PATH,
@@ -127,7 +127,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         mock_img_svc.CreateDynamicVirtualHardDisk.assert_called_once_with(
             Path=self._FAKE_VHD_PATH,
             MaxInternalSize=self._FAKE_MAX_INTERNAL_SIZE)
-        self._vhdutils._vmutils.check_ret_val.assert_called_once_with(
+        self._vhdutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
     def test_reconnect_parent_vhd(self):
@@ -141,7 +141,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             ChildPath=self._FAKE_VHD_PATH,
             ParentPath=self._FAKE_PARENT_PATH,
             Force=True)
-        self._vhdutils._vmutils.check_ret_val.assert_called_once_with(
+        self._vhdutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
     def test_merge_vhd(self):
@@ -154,7 +154,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         mock_img_svc.MergeVirtualHardDisk.assert_called_once_with(
             SourcePath=self._FAKE_VHD_PATH,
             DestinationPath=self._FAKE_VHD_PATH)
-        self._vhdutils._vmutils.check_ret_val.assert_called_once_with(
+        self._vhdutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
     def test_resize_vhd(self):
@@ -171,7 +171,7 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         mock_img_svc.ExpandVirtualHardDisk.assert_called_once_with(
             Path=self._FAKE_VHD_PATH,
             MaxInternalSize=self._FAKE_MAX_INTERNAL_SIZE)
-        self._vhdutils._vmutils.check_ret_val.assert_called_once_with(
+        self._vhdutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
     def _mocked_get_internal_vhd_size(self, root_vhd_size, vhd_type):

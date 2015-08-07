@@ -34,7 +34,7 @@ from xml.etree import ElementTree
 from oslo_windows._i18n import _
 from oslo_windows import exceptions
 from oslo_windows.utils import constants
-from oslo_windows.utils import vmutils
+from oslo_windows.utils import jobutils
 
 
 VHD_HEADER_SIZE_FIX = 512
@@ -51,7 +51,7 @@ VHDX_SIGNATURE = 'vhdxfile'
 class VHDUtils(object):
 
     def __init__(self):
-        self._vmutils = vmutils.VMUtils()
+        self._jobutils = jobutils.JobUtils()
         if sys.platform == 'win32':
             self._conn = wmi.WMI(moniker='//./root/virtualization')
 
@@ -60,7 +60,7 @@ class VHDUtils(object):
 
         (job_path, ret_val) = image_man_svc.ValidateVirtualHardDisk(
             Path=vhd_path)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def create_dynamic_vhd(self, path, max_internal_size, format):
         if format != constants.DISK_FORMAT_VHD:
@@ -71,14 +71,14 @@ class VHDUtils(object):
 
         (job_path, ret_val) = image_man_svc.CreateDynamicVirtualHardDisk(
             Path=path, MaxInternalSize=max_internal_size)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def create_differencing_vhd(self, path, parent_path):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
 
         (job_path, ret_val) = image_man_svc.CreateDifferencingVirtualHardDisk(
             Path=path, ParentPath=parent_path)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def reconnect_parent_vhd(self, child_vhd_path, parent_vhd_path):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
@@ -87,7 +87,7 @@ class VHDUtils(object):
             ChildPath=child_vhd_path,
             ParentPath=parent_vhd_path,
             Force=True)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def merge_vhd(self, src_vhd_path, dest_vhd_path):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
@@ -95,7 +95,7 @@ class VHDUtils(object):
         (job_path, ret_val) = image_man_svc.MergeVirtualHardDisk(
             SourcePath=src_vhd_path,
             DestinationPath=dest_vhd_path)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_resize_method(self):
         image_man_svc = self._conn.Msvm_ImageManagementService()[0]
@@ -112,7 +112,7 @@ class VHDUtils(object):
 
         (job_path, ret_val) = resize(
             Path=vhd_path, MaxInternalSize=new_internal_max_size)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def get_internal_vhd_size_by_file_size(self, vhd_path, new_vhd_file_size):
         """Fixed VHD size = Data Block size + 512 bytes
@@ -174,7 +174,7 @@ class VHDUtils(object):
         (vhd_info,
          job_path,
          ret_val) = image_man_svc.GetVirtualHardDiskInfo(vhd_path)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         vhd_info_dict = {}
 

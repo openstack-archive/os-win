@@ -35,6 +35,7 @@ from oslo_windows._i18n import _, _LW
 from oslo_windows import exceptions
 from oslo_windows.utils import constants
 from oslo_windows.utils import hostutils
+from oslo_windows.utils import jobutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ class VMUtils(object):
                             constants.HYPERV_VM_STATE_SUSPENDED: 32769}
 
     def __init__(self, host='.'):
+        self._jobutils = jobutils.JobUtils()
         self._enabled_states_map = {v: k for k, v in
                                     six.iteritems(self._vm_power_states_map)}
         if sys.platform == 'win32':
@@ -206,7 +208,7 @@ class VMUtils(object):
         # Start with the minimum memory
         mem_settings.VirtualQuantity = reserved_mem
 
-        self._modify_virt_resource(mem_settings, vm.path_())
+        self._jobutils.modify_virt_resource(mem_settings, vm)
 
     def _set_vm_vcpus(self, vm, vmsetting, vcpus_num, limit_cpu_features):
         procsetting = vmsetting.associators(
@@ -217,7 +219,7 @@ class VMUtils(object):
         procsetting.Limit = 100000  # static assignment to 100%
         procsetting.LimitProcessorFeatures = limit_cpu_features
 
-        self._modify_virt_resource(procsetting, vm.path_())
+        self._jobutils.modify_virt_resource(procsetting, vm)
 
     def update_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
                   dynamic_memory_ratio):
@@ -263,7 +265,7 @@ class VMUtils(object):
          job_path,
          ret_val) = vs_man_svc.DefineVirtualSystem([], None,
                                                    vs_gs_data.GetText_(1))
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         vm = self._get_wmi_obj(vm_path)
 
@@ -278,7 +280,7 @@ class VMUtils(object):
         (job_path, ret_val) = vs_man_svc.ModifyVirtualSystem(
             ComputerSystem=vm_path,
             SystemSettingData=vmsetting.GetText_(1))[1:]
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def get_vm_scsi_controller(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -384,7 +386,7 @@ class VMUtils(object):
         drive.Parent = ctrller_path
         drive.Address = drive_addr
         # Add the cloned disk drive object to the vm.
-        new_resources = self._add_virt_resource(drive, vm.path_())
+        new_resources = self._jobutils.add_virt_resource(drive, vm)
         drive_path = new_resources[0]
 
         if drive_type == constants.DISK:
@@ -398,7 +400,7 @@ class VMUtils(object):
         res.Connection = [path]
 
         # Add the new vhd object as a virtual hard disk to the vm.
-        self._add_virt_resource(res, vm.path_())
+        self._jobutils.add_virt_resource(res, vm)
 
     def create_scsi_controller(self, vm_name):
         """Create an iscsi controller ready to mount volumes."""
@@ -408,7 +410,7 @@ class VMUtils(object):
             self._SCSI_CTRL_RES_SUB_TYPE)
 
         scsicontrl.VirtualSystemIdentifiers = ['{' + str(uuid.uuid4()) + '}']
-        self._add_virt_resource(scsicontrl, vm.path_())
+        self._jobutils.add_virt_resource(scsicontrl, vm)
 
     def attach_volume_to_controller(self, vm_name, controller_path, address,
                                     mounted_disk_path):
@@ -422,7 +424,7 @@ class VMUtils(object):
         diskdrive.Address = address
         diskdrive.Parent = controller_path
         diskdrive.HostResource = [mounted_disk_path]
-        self._add_virt_resource(diskdrive, vm.path_())
+        self._jobutils.add_virt_resource(diskdrive, vm)
 
     def _get_disk_resource_address(self, disk_resource):
         return disk_resource.Address
@@ -443,7 +445,7 @@ class VMUtils(object):
                               {'old': disk_resource.HostResource[0],
                                'new': mounted_disk_path})
                     disk_resource.HostResource = [mounted_disk_path]
-                    self._modify_virt_resource(disk_resource, vm.path_())
+                    self._jobutils.modify_virt_resource(disk_resource, vm)
                 disk_found = True
                 break
         if not disk_found:
@@ -458,7 +460,7 @@ class VMUtils(object):
         nic_data.Connection = [vswitch_conn_data]
 
         vm = self._lookup_vm_check(vm_name)
-        self._modify_virt_resource(nic_data, vm.path_())
+        self._jobutils.modify_virt_resource(nic_data, vm)
 
     def _get_nic_data_by_name(self, name):
         return self._conn.Msvm_SyntheticEthernetPortSettingData(
@@ -479,7 +481,7 @@ class VMUtils(object):
         # Add the new nic to the vm
         vm = self._lookup_vm_check(vm_name)
 
-        self._add_virt_resource(new_nic_data, vm.path_())
+        self._jobutils.add_virt_resource(new_nic_data, vm)
 
     def soft_shutdown_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -494,7 +496,7 @@ class VMUtils(object):
         reason = 'Soft shutdown requested by OpenStack Nova.'
         (ret_val, ) = shutdown_component[0].InitiateShutdown(Force=False,
                                                              Reason=reason)
-        self.check_ret_val(ret_val, None)
+        self._jobutils.check_ret_val(ret_val, None)
 
     def set_vm_state(self, vm_name, req_state):
         """Set the desired state of the VM."""
@@ -503,7 +505,7 @@ class VMUtils(object):
          ret_val) = vm.RequestStateChange(self._vm_power_states_map[req_state])
         # Invalid state for current operation (32775) typically means that
         # the VM is already in the state requested
-        self.check_ret_val(ret_val, job_path, [0, 32775])
+        self._jobutils.check_ret_val(ret_val, job_path, [0, 32775])
         LOG.debug("Successfully changed vm state of %(vm_name)s "
                   "to %(req_state)s",
                   {'vm_name': vm_name, 'req_state': req_state})
@@ -553,82 +555,10 @@ class VMUtils(object):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         # Remove the VM. Does not destroy disks.
         (job_path, ret_val) = vs_man_svc.DestroyVirtualSystem(vm.path_())
-        self.check_ret_val(ret_val, job_path)
-
-    def check_ret_val(self, ret_val, job_path, success_values=[0]):
-        if ret_val == constants.WMI_JOB_STATUS_STARTED:
-            return self._wait_for_job(job_path)
-        elif ret_val not in success_values:
-            raise exceptions.HyperVException(
-                _('Operation failed with return value: %s') % ret_val)
-
-    def _wait_for_job(self, job_path):
-        """Poll WMI job state and wait for completion."""
-        job = self._get_wmi_obj(job_path)
-
-        while job.JobState == constants.WMI_JOB_STATE_RUNNING:
-            time.sleep(0.1)
-            job = self._get_wmi_obj(job_path)
-        if job.JobState != constants.WMI_JOB_STATE_COMPLETED:
-            job_state = job.JobState
-            if job.path().Class == "Msvm_ConcreteJob":
-                err_sum_desc = job.ErrorSummaryDescription
-                err_desc = job.ErrorDescription
-                err_code = job.ErrorCode
-                raise exceptions.HyperVException(
-                    _("WMI job failed with status %(job_state)d. "
-                      "Error details: %(err_sum_desc)s - %(err_desc)s - "
-                      "Error code: %(err_code)d") %
-                    {'job_state': job_state,
-                     'err_sum_desc': err_sum_desc,
-                     'err_desc': err_desc,
-                     'err_code': err_code})
-            else:
-                (error, ret_val) = job.GetError()
-                if not ret_val and error:
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %(job_state)d. "
-                          "Error details: %(error)s") %
-                        {'job_state': job_state,
-                         'error': error})
-                else:
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %d. No error "
-                          "description available") % job_state)
-        desc = job.Description
-        elap = job.ElapsedTime
-        LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
-                  {'desc': desc, 'elap': elap})
-        return job
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_wmi_obj(self, path):
         return wmi.WMI(moniker=path.replace('\\', '/'))
-
-    def _add_virt_resource(self, res_setting_data, vm_path):
-        """Adds a new resource to the VM."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_xml = [res_setting_data.GetText_(1)]
-        (job_path,
-         new_resources,
-         ret_val) = vs_man_svc.AddVirtualSystemResources(res_xml, vm_path)
-        self.check_ret_val(ret_val, job_path)
-        return new_resources
-
-    def _modify_virt_resource(self, res_setting_data, vm_path):
-        """Updates a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.ModifyVirtualSystemResources(
-            ResourceSettingData=[res_setting_data.GetText_(1)],
-            ComputerSystem=vm_path)
-        self.check_ret_val(ret_val, job_path)
-
-    def _remove_virt_resource(self, res_setting_data, vm_path):
-        """Removes a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_path = [res_setting_data.path_()]
-        (job_path, ret_val) = vs_man_svc.RemoveVirtualSystemResources(res_path,
-                                                                      vm_path)
-        self.check_ret_val(ret_val, job_path)
 
     def take_vm_snapshot(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -637,7 +567,7 @@ class VMUtils(object):
 
         (job_path, ret_val,
          snp_setting_data) = vs_man_svc.CreateVirtualSystemSnapshot(vm.path_())
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         job_wmi_path = job_path.replace('\\', '/')
         job = wmi.WMI(moniker=job_wmi_path)
@@ -650,7 +580,7 @@ class VMUtils(object):
 
         (job_path, ret_val) = vs_man_svc.RemoveVirtualSystemSnapshot(
             snapshot_path)
-        self.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def detach_vm_disk(self, vm_name, disk_path, is_physical=True):
         vm = self._lookup_vm_check(vm_name)
@@ -663,9 +593,9 @@ class VMUtils(object):
                                       "WHERE __PATH = '%s'" %
                                       disk_resource.Parent)[0]
 
-            self._remove_virt_resource(disk_resource, vm.path_())
+            self._jobutils.remove_virt_resource(disk_resource, vm)
             if not is_physical:
-                self._remove_virt_resource(parent, vm.path_())
+                self._jobutils.remove_virt_resource(parent, vm)
 
     def _get_mounted_disk_resource_from_path(self, disk_path, is_physical):
         if is_physical:
@@ -736,7 +666,7 @@ class VMUtils(object):
 
         if update_connection:
             serial_port.Connection = [update_connection]
-            self._modify_virt_resource(serial_port, vm.path_())
+            self._jobutils.modify_virt_resource(serial_port, vm)
 
         if len(serial_port.Connection) > 0:
             return serial_port.Connection[0]
