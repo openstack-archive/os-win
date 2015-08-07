@@ -24,6 +24,8 @@ from oslotest import base
 from oslo_windows import exceptions
 from oslo_windows import utilsfactory
 from oslo_windows.utils import hostutils
+from oslo_windows.utils import networkutils
+from oslo_windows.utils import networkutilsv2
 from oslo_windows.utils import vmutils
 from oslo_windows.utils import vmutilsv2
 
@@ -56,3 +58,32 @@ class TestHyperVUtilsFactory(base.BaseTestCase):
             else:
                 actual_class = type(utilsfactory.get_vmutils())
                 self.assertEqual(actual_class, expected_class)
+
+    def test_get_networkutils_v2_r2(self):
+        self._test_networkutils(expected_class=networkutilsv2.NetworkUtilsV2R2,
+                                force_v1=True,
+                                os_version='6.3.0')
+
+    def test_get_networkutils_v2(self):
+        self._test_networkutils(expected_class=networkutilsv2.NetworkUtilsV2,
+                                force_v1=False,
+                                os_version='6.2.0')
+
+    def test_get_networkutils_v1_old_version(self):
+        self._test_networkutils(expected_class=networkutils.NetworkUtils,
+                                force_v1=False,
+                                os_version='6.1.0')
+
+    def test_get_networkutils_v1_forced(self):
+        self._test_networkutils(expected_class=networkutils.NetworkUtils,
+                                force_v1=True,
+                                os_version='6.2.0')
+
+    @mock.patch.object(utilsfactory.utils, 'get_windows_version')
+    def _test_networkutils(self, mock_get_win_version, expected_class,
+                           force_v1, os_version):
+        CONF.hyperv.force_hyperv_utils_v1 = force_v1
+        mock_get_win_version.return_value = os_version
+
+        actual_class = type(utilsfactory.get_networkutils())
+        self.assertEqual(actual_class, expected_class)

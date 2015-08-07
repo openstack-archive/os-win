@@ -16,7 +16,7 @@
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from oslo_windows._i18n import _
+from oslo_windows._i18n import _, _LW  # noqa
 from oslo_windows import exceptions
 from oslo_windows.utils import hostutils
 from oslo_windows.utils import hostutilsv2
@@ -84,8 +84,17 @@ def get_vhdutils():
 
 
 def get_networkutils():
-    return _get_virt_utils_class(networkutils.NetworkUtils,
-                           networkutilsv2.NetworkUtilsV2)()
+    force_v1_flag = CONF.hyperv.force_hyperv_utils_v1
+    if utils.check_min_windows_version(6, 3):
+        if force_v1_flag:
+            LOG.warning(_LW('V1 virtualization namespace no longer supported '
+                            'on Windows Server / Hyper-V Server 2012 R2 or '
+                            'above.'))
+        cls = networkutilsv2.NetworkUtilsV2R2
+    else:
+        cls = _get_virt_utils_class(networkutils.NetworkUtils,
+                                    networkutilsv2.NetworkUtilsV2)
+    return cls()
 
 
 def get_hostutils():

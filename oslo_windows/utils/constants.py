@@ -66,3 +66,12 @@ IMAGE_PROP_VM_GEN_2 = "hyperv-gen2"
 
 VM_GEN_1 = 1
 VM_GEN_2 = 2
+
+
+# Special vlan_id value in ovs_vlan_allocations table indicating flat network
+FLAT_VLAN_ID = -1
+TRUNK_ENDPOINT_MODE = 5
+
+TYPE_FLAT = 'flat'
+TYPE_LOCAL = 'local'
+TYPE_VLAN = 'vlan'
