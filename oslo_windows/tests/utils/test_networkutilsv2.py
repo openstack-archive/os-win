@@ -13,12 +13,13 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
-from oslo_windows.tests.utils import test_networkutils
+from oslo_windows import exceptions
 from oslo_windows.utils import networkutilsv2
 
 
-class NetworkUtilsV2TestCase(test_networkutils.NetworkUtilsTestCase):
+class NetworkUtilsV2TestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V NetworkUtilsV2 class."""
 
     _MSVM_VIRTUAL_SWITCH = 'Msvm_VirtualEthernetSwitch'
@@ -27,6 +28,34 @@ class NetworkUtilsV2TestCase(test_networkutils.NetworkUtilsTestCase):
         super(NetworkUtilsV2TestCase, self).setUp()
         self._networkutils = networkutilsv2.NetworkUtilsV2()
         self._networkutils._conn = mock.MagicMock()
+
+    def test_get_external_vswitch(self):
+        mock_vswitch = mock.MagicMock()
+        mock_vswitch.path_.return_value = mock.sentinel.FAKE_VSWITCH_PATH
+        getattr(self._networkutils._conn,
+                self._MSVM_VIRTUAL_SWITCH).return_value = [mock_vswitch]
+
+        switch_path = self._networkutils.get_external_vswitch(
+            mock.sentinel.FAKE_VSWITCH_NAME)
+
+        self.assertEqual(mock.sentinel.FAKE_VSWITCH_PATH, switch_path)
+
+    def test_get_external_vswitch_not_found(self):
+        self._networkutils._conn.Msvm_VirtualEthernetSwitch.return_value = []
+
+        self.assertRaises(exceptions.HyperVException,
+                          self._networkutils.get_external_vswitch,
+                          mock.sentinel.FAKE_VSWITCH_NAME)
+
+    def test_get_external_vswitch_no_name(self):
+        mock_vswitch = mock.MagicMock()
+        mock_vswitch.path_.return_value = mock.sentinel.FAKE_VSWITCH_PATH
+
+        mock_ext_port = self._networkutils._conn.Msvm_ExternalEthernetPort()[0]
+        self._prepare_external_port(mock_vswitch, mock_ext_port)
+
+        switch_path = self._networkutils.get_external_vswitch(None)
+        self.assertEqual(mock.sentinel.FAKE_VSWITCH_PATH, switch_path)
 
     def _prepare_external_port(self, mock_vswitch, mock_ext_port):
         mock_lep = mock_ext_port.associators()[0]
