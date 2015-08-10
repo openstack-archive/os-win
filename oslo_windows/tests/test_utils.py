@@ -26,10 +26,6 @@ from oslo_windows import _utils
 
 class UtilsTestCase(base.BaseTestCase):
 
-    def test_strip_dev(self):
-        self.assertEqual(_utils.strip_dev('/dev/sda'), 'sda')
-        self.assertEqual(_utils.strip_dev('sda'), 'sda')
-
     @mock.patch('oslo_concurrency.processutils.execute')
     def test_execute(self, mock_execute):
         _utils.execute(mock.sentinel.cmd, kwarg=mock.sentinel.kwarg)

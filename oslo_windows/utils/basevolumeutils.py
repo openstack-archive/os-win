@@ -78,23 +78,6 @@ class BaseVolumeUtils(object):
                 initiator_name += '.' + computer_system.Domain.lower()
         return initiator_name
 
-    def volume_in_mapping(self, mount_device, block_device_info):
-        block_device_list = [_utils.strip_dev(vol['mount_device'])
-                             for vol in
-                             self.block_device_info_get_mapping(
-                                 block_device_info)]
-        swap = self.block_device_info_get_swap(block_device_info)
-        if self.swap_is_usable(swap):
-            block_device_list.append(
-                _utils.strip_dev(swap['device_name']))
-        block_device_list += [_utils.strip_dev(
-            ephemeral['device_name'])
-            for ephemeral in
-            self.block_device_info_get_ephemerals(block_device_info)]
-
-        LOG.debug("block_device_list %s", block_device_list)
-        return _utils.strip_dev(mount_device) in block_device_list
-
     def _get_drive_number_from_disk_path(self, disk_path):
         drive_number = self._drive_number_regex.findall(disk_path)
         if drive_number:
@@ -146,25 +129,3 @@ class BaseVolumeUtils(object):
             for device in devices:
                 if device.DeviceNumber == drive_number:
                     return (device.TargetName, device.ScsiLun)
-
-    @staticmethod
-    def block_device_info_get_mapping(block_device_info):
-        block_device_info = block_device_info or {}
-        block_device_mapping = (
-            block_device_info.get('block_device_mapping') or [])
-        return block_device_mapping
-
-    @staticmethod
-    def block_device_info_get_swap(block_device_info):
-        block_device_info = block_device_info or {}
-        return block_device_info.get('swap') or {'device_name': None,
-                                                 'swap_size': 0}
-    @staticmethod
-    def swap_is_usable(swap):
-        return swap and swap['device_name'] and swap['swap_size'] > 0
-
-    @staticmethod
-    def block_device_info_get_ephemerals(block_device_info):
-        block_device_info = block_device_info or {}
-        ephemerals = block_device_info.get('ephemerals') or []
-        return ephemerals

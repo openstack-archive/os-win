@@ -15,7 +15,6 @@
 #    under the License.
 
 import netaddr
-import re
 
 from oslo_concurrency import processutils
 from oslo_log import log as logging
@@ -23,13 +22,6 @@ from oslo_log import log as logging
 from oslo_windows._i18n import _LE
 
 LOG = logging.getLogger(__name__)
-
-_dev = re.compile('^/dev/')
-
-
-def strip_dev(device_name):
-    """remove leading '/dev/'."""
-    return _dev.sub('', device_name) if device_name else device_name
 
 
 def execute(*cmd, **kwargs):
