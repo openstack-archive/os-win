@@ -159,7 +159,7 @@ class VMUtils(object):
 
         vm = self._lookup_vm(vm_name)
         if not vm:
-            raise exceptions.HyperVException(
+            raise exceptions.HyperVVMNotFoundException(
                 _('VM not found: %s') % vm_name)
         return vm
 

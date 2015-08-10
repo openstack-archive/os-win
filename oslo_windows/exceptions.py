@@ -37,3 +37,8 @@ class HyperVAuthorizationException(HyperVException):
 class UnsupportedConfigDriveFormatException(HyperVException):
     def __init__(self, message=None):
         super(HyperVException, self).__init__(message)
+
+
+class HyperVVMNotFoundException(HyperVException):
+    def __init__(self, message=None):
+        super(HyperVVMNotFoundException, self).__init__(message)

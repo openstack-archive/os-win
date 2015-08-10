@@ -113,7 +113,7 @@ class VMUtilsTestCase(base.BaseTestCase):
 
     def test_lookup_vm_none(self):
         self._vmutils._conn.Msvm_ComputerSystem.return_value = []
-        self.assertRaises(exceptions.HyperVException,
+        self.assertRaises(exceptions.HyperVVMNotFoundException,
                           self._vmutils._lookup_vm_check,
                           self._FAKE_VM_NAME)
 
