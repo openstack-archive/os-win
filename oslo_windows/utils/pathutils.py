@@ -43,7 +43,6 @@ hyperv_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(hyperv_opts, 'hyperv')
-CONF.import_opt('instances_path', 'nova.compute.manager')
 
 ERROR_INVALID_NAME = 123
 ERROR_DIR_IS_NOT_EMPTY = 145

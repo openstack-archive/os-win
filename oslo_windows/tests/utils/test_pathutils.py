@@ -153,8 +153,10 @@ class PathUtilsTestCase(base.BaseTestCase):
         mock_rmtree.assert_has_calls([mock.call(mock.sentinel.FAKE_PATH),
                                       mock.call(mock.sentinel.FAKE_PATH)])
 
+    @mock.patch.object(pathutils, 'CONF')
     @mock.patch('os.path.join')
-    def test_get_instances_sub_dir(self, fake_path_join):
+    def test_get_instances_sub_dir(self, fake_path_join, mock_conf):
+        mock_conf.hyperv.instances_dir = '\\'
 
         class WindowsError(Exception):
             def __init__(self, winerror=None):
