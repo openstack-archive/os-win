@@ -208,6 +208,13 @@ class VMUtilsTestCase(base.BaseTestCase):
 
         return [mock_rasd1, mock_rasd2]
 
+    def test_check_admin_permissions(self):
+        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService
+        mock_svc.return_value = False
+
+        self.assertRaises(exceptions.HyperVAuthorizationException,
+                          self._vmutils.check_admin_permissions)
+
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')

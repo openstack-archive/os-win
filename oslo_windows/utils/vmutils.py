@@ -233,7 +233,7 @@ class VMUtils(object):
             msg = _("The Windows account running nova-compute on this Hyper-V"
                     " host doesn't have the required permissions to create or"
                     " operate the virtual machine.")
-            raise HyperVAuthorizationException(msg)
+            raise exceptions.HyperVAuthorizationException(msg)
 
     def create_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
                   dynamic_memory_ratio, vm_gen, instance_path, notes=None):
