@@ -1,7 +1,7 @@
-=======
- Usage
-=======
+========
+Usage
+========
 
-To use oslo.windows in a project::
+To use os-windows in a project::
 
-    import oslo_windows
+    import os_windows

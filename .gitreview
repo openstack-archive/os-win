@@ -1,4 +1,4 @@
 [gerrit]
 host=review.openstack.org
 port=29418
-project=openstack/oslo.windows.git
+project=openstack/os-windows.git

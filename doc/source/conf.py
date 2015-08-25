@@ -37,8 +37,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'oslo.windows'
-copyright = u'2014, OpenStack Foundation'
+project = u'os-windows'
+copyright = u'2015, Cloudbase Solutions Srl'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True
