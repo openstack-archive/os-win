@@ -4,9 +4,9 @@ Installation
 
 At the command line::
 
-    $ pip install os-windows
+    $ pip install os-win
 
 Or, if you have virtualenvwrapper installed::
 
-    $ mkvirtualenv os-windows
-    $ pip install os-windows
+    $ mkvirtualenv os-win
+    $ pip install os-win

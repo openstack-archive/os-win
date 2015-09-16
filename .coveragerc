@@ -1,7 +1,7 @@
 [run]
 branch = True
-source = os_windows
-omit = os_windows/openstack/*
+source = os_win
+omit = os_win/openstack/*
 
 [report]
 ignore-errors = True

@@ -37,7 +37,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'os-windows'
+project = u'os-win'
 copyright = u'2015, Cloudbase Solutions Srl'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.

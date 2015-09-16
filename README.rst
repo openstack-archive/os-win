@@ -1,5 +1,5 @@
 ===============================
-os-windows
+os-win
 ===============================
 
 Windows / Hyper-V library for OpenStack projects.
@@ -9,9 +9,9 @@ projects: nova, cinder, networking-hyperv. The library can be used in any
 other OpenStack projects where it is needed.
 
 * Free software: Apache license
-* Documentation: http://docs.openstack.org/developer/os-windows
-* Source: http://git.openstack.org/cgit/openstack/os-windows
-* Bugs: http://bugs.launchpad.net/os-windows
+* Documentation: http://docs.openstack.org/developer/os-win
+* Source: http://git.openstack.org/cgit/openstack/os-win
+* Bugs: http://bugs.launchpad.net/os-win
 
 Features
 --------

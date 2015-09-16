@@ -2,6 +2,6 @@
 Usage
 ========
 
-To use os-windows in a project::
+To use os-win in a project::
 
-    import os_windows
+    import os_win
