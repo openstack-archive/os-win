@@ -246,18 +246,6 @@ class VMUtilsV2(vmutils.VMUtils):
         (job_path, ret_val) = vs_snap_svc.DestroySnapshot(snapshot_path)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def set_nic_connection(self, vm_name, nic_name, vswitch_conn_data):
-        nic_data = self._get_nic_data_by_name(nic_name)
-
-        eth_port_data = self._get_new_setting_data(
-            self._ETHERNET_PORT_ALLOCATION_SETTING_DATA_CLASS)
-
-        eth_port_data.HostResource = [vswitch_conn_data]
-        eth_port_data.Parent = nic_data.path_()
-
-        vm = self._lookup_vm_check(vm_name)
-        self._jobutils.add_virt_resource(eth_port_data, vm)
-
     def enable_vm_metrics_collection(self, vm_name):
         metric_names = [self._METRIC_AGGR_CPU_AVG,
                         self._METRIC_AGGR_MEMORY_AVG]

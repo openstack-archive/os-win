@@ -454,13 +454,6 @@ class VMUtils(object):
                         {'controller_path': controller_path,
                          'address': address})
 
-    def set_nic_connection(self, vm_name, nic_name, vswitch_conn_data):
-        nic_data = self._get_nic_data_by_name(nic_name)
-        nic_data.Connection = [vswitch_conn_data]
-
-        vm = self._lookup_vm_check(vm_name)
-        self._jobutils.modify_virt_resource(nic_data, vm)
-
     def _get_nic_data_by_name(self, name):
         return self._conn.Msvm_SyntheticEthernetPortSettingData(
             ElementName=name)[0]

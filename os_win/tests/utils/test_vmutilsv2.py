@@ -62,16 +62,6 @@ class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
-    @mock.patch.object(vmutilsv2.VMUtilsV2, '_get_new_setting_data')
-    @mock.patch.object(vmutilsv2.VMUtilsV2, '_get_nic_data_by_name')
-    def test_set_nic_connection(self, mock_get_nic_data, mock_get_new_sd):
-        mock_vm = self._lookup_vm()
-        fake_eth_port = mock_get_new_sd.return_value
-
-        self._vmutils.set_nic_connection(self._FAKE_VM_NAME, None, None)
-        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
-            fake_eth_port, mock_vm)
-
     @mock.patch('os_win.utils.vmutils.VMUtils._get_vm_disks')
     def test_enable_vm_metrics_collection(self, mock_get_vm_disks):
         self._lookup_vm()

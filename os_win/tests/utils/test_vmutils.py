@@ -363,15 +363,6 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
             mock_get_new_rsd.return_value, mock_vm)
 
-    @mock.patch.object(vmutils.VMUtils, '_get_nic_data_by_name')
-    def test_set_nic_connection(self, mock_get_nic_conn):
-        mock_vm = self._lookup_vm()
-        mock_nic = mock_get_nic_conn.return_value
-        self._vmutils.set_nic_connection(self._FAKE_VM_NAME, None, None)
-
-        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
-            mock_nic, mock_vm)
-
     @mock.patch.object(vmutils.VMUtils, '_get_new_setting_data')
     def test_create_nic(self, mock_get_new_virt_res):
         mock_vm = self._lookup_vm()
