@@ -27,7 +27,6 @@ from oslo_log import log as logging
 
 from os_windows._i18n import _, _LE
 from os_windows import exceptions
-from os_windows.utils import constants
 from os_windows.utils import jobutils
 
 LOG = logging.getLogger(__name__)

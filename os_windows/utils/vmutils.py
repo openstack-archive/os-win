@@ -19,7 +19,6 @@ Utility class for VM related operations on Hyper-V.
 """
 
 import sys
-import time
 import uuid
 
 if sys.platform == 'win32':

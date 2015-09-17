@@ -89,7 +89,10 @@ class JobUtilsTestCase(base.BaseTestCase):
         mock_job.Description = self._FAKE_JOB_DESCRIPTION
         mock_job.ElapsedTime = self._FAKE_ELAPSED_TIME
 
-        jobutils.wmi.WMI = mock.MagicMock(return_value=mock_job)
+        wmi_patcher = mock.patch.object(jobutils, 'wmi', create=True)
+        mock_wmi = wmi_patcher.start()
+        self.addCleanup(wmi_patcher.stop)
+        mock_wmi.WMI.return_value = mock_job
         return mock_job
 
     def test_add_virt_resource(self):

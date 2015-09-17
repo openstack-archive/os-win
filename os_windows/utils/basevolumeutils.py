@@ -31,7 +31,6 @@ if sys.platform == 'win32':
 from oslo_log import log as logging
 
 from os_windows._i18n import _LI
-from os_windows import _utils
 
 LOG = logging.getLogger(__name__)
 

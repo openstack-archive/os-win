@@ -27,8 +27,8 @@ if sys.platform == 'win32':
 
 from os_windows._i18n import _
 from os_windows import exceptions
-from os_windows.utils import networkutils
 from os_windows.utils import jobutils
+from os_windows.utils import networkutils
 
 
 class NetworkUtilsV2(networkutils.NetworkUtils):
@@ -157,8 +157,8 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
     def set_vswitch_port_vlan_id(self, vlan_id, switch_port_name):
         port_alloc, found = self._get_switch_port_allocation(switch_port_name)
         if not found:
-            raise utils.HyperVException(
-                msg=_('Port Allocation not found: %s') % switch_port_name)
+            raise exceptions.HyperVException(
+                _('Port Allocation not found: %s') % switch_port_name)
 
         vlan_settings = self._get_vlan_setting_data_from_port_alloc(port_alloc)
         if vlan_settings:
@@ -268,8 +268,8 @@ class NetworkUtilsV2(networkutils.NetworkUtils):
             [self._VM_SUMMARY_ENABLED_STATE],
             [v.path_() for v in vmsettings])
         if ret_val or not summary_info:
-            raise utils.HyperVException(msg=_('Cannot get VM summary data '
-                                              'for: %s') % port.ElementName)
+            raise exceptions.HyperVException(_('Cannot get VM summary data '
+                                               'for: %s') % port.ElementName)
 
         return summary_info[0].EnabledState is self._HYPERV_VM_STATE_ENABLED
 

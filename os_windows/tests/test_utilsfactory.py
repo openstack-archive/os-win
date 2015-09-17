@@ -22,12 +22,12 @@ from oslo_config import cfg
 from oslotest import base
 
 from os_windows import exceptions
-from os_windows import utilsfactory
 from os_windows.utils import hostutils
 from os_windows.utils import networkutils
 from os_windows.utils import networkutilsv2
 from os_windows.utils import vmutils
 from os_windows.utils import vmutilsv2
+from os_windows import utilsfactory
 
 CONF = cfg.CONF
 
@@ -82,7 +82,7 @@ class TestHyperVUtilsFactory(base.BaseTestCase):
     @mock.patch.object(utilsfactory.utils, 'get_windows_version')
     def _test_networkutils(self, mock_get_win_version, expected_class,
                            force_v1, os_version):
-        CONF.hyperv.force_hyperv_utils_v1 = force_v1
+        CONF.set_override('force_hyperv_utils_v1', force_v1, 'hyperv')
         mock_get_win_version.return_value = os_version
 
         actual_class = type(utilsfactory.get_networkutils())

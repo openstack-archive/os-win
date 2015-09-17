@@ -28,8 +28,8 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from os_windows.utils import constants
-from os_windows.utils import vmutils
 from os_windows.utils import jobutils
+from os_windows.utils import vmutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

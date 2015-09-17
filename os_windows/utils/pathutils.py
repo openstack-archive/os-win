@@ -50,7 +50,25 @@ ERROR_DIR_IS_NOT_EMPTY = 145
 
 class PathUtils(object):
     def __init__(self):
-        self._smb_conn = wmi.WMI(moniker=r"root\Microsoft\Windows\SMB")
+        if sys.platform == 'win32':
+            self._set_smb_conn()
+
+    @property
+    def _smb_conn(self):
+        if self._smb_conn_attr:
+            return self._smb_conn_attr
+        raise exceptions.HyperVException(_("The SMB WMI namespace is not "
+                                           "available on this OS version."))
+
+    def _set_smb_conn(self):
+        # The following namespace is not available prior to Windows
+        # Server 2012. utilsfactory is not used in order to avoid a
+        # circular dependency.
+        try:
+            self._smb_conn_attr = wmi.WMI(
+                moniker=r"root\Microsoft\Windows\SMB")
+        except wmi.x_wmi:
+            self._smb_conn_attr = None
 
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
