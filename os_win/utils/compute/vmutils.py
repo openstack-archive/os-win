@@ -36,6 +36,7 @@ from os_win._i18n import _, _LW
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import jobutils
+from os_win.utils.metrics import metricsutils
 from os_win.utils import pathutils
 
 CONF = cfg.CONF
@@ -72,9 +73,6 @@ class VMUtils(object):
     _VIRTUAL_SYSTEM_SUBTYPE_GEN2 = 'Microsoft:Hyper-V:SubType:2'
 
     _SNAPSHOT_FULL = 2
-    _METRIC_ENABLED = 2
-    _METRIC_AGGR_CPU_AVG = 'Aggregated Average CPU Utilization'
-    _METRIC_AGGR_MEMORY_AVG = 'Aggregated Average Memory Utilization'
 
     _VM_ENABLED_STATE_PROP = "EnabledState"
 
@@ -92,6 +90,7 @@ class VMUtils(object):
     def __init__(self, host='.'):
         self._vs_man_svc_attr = None
         self._jobutils = jobutils.JobUtils()
+        self._metricsutils = metricsutils.MetricsUtils()
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
                                     six.iteritems(self._vm_power_states_map)}
@@ -649,31 +648,10 @@ class VMUtils(object):
         self._jobutils.check_ret_val(ret_val, job_path)
 
     def enable_vm_metrics_collection(self, vm_name):
-        metric_names = [self._METRIC_AGGR_CPU_AVG,
-                        self._METRIC_AGGR_MEMORY_AVG]
-
-        vm = self._lookup_vm_check(vm_name)
-        metric_svc = self._conn.Msvm_MetricService()[0]
-        (disks, volumes) = self._get_vm_disks(vm)
-        filtered_disks = [d for d in disks if
-                          d.ResourceSubType is not self._DVD_DISK_RES_SUB_TYPE]
-
-        # enable metrics for disk.
-        for disk in filtered_disks:
-            self._enable_metrics(metric_svc, disk)
-
-        for metric_name in metric_names:
-            metric_def = self._conn.CIM_BaseMetricDefinition(Name=metric_name)
-            if not metric_def:
-                LOG.debug("Metric not found: %s", metric_name)
-            else:
-                self._enable_metrics(metric_svc, vm, metric_def[0].path_())
-
-    def _enable_metrics(self, metric_svc, element, definition_path=None):
-        metric_svc.ControlMetrics(
-            Subject=element.path_(),
-            Definition=definition_path,
-            MetricCollectionEnabled=self._METRIC_ENABLED)
+        # TODO(claudiub): nova still calls this method, causing VMs to fail to
+        # spawn if metrics collection is enabled. Remove this when the nova
+        # compute HyperVDriver properly calls the metricsutils method instead.
+        self._metricsutils.enable_vm_metrics_collection(vm_name)
 
     def get_vm_dvd_disk_paths(self, vm_name):
         vm = self._lookup_vm_check(vm_name)

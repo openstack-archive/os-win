@@ -316,39 +316,6 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             self.assertEqual(4, actual_calls)
             mock_add_feature.assert_called_with(mock_acl, mock_port)
 
-    def test_enable_control_metrics_ok(self):
-        mock_metrics_svc = self.netutils._conn.Msvm_MetricService()[0]
-        mock_metrics_def_source = self.netutils._conn.CIM_BaseMetricDefinition
-        mock_metric_def = mock.MagicMock()
-        mock_port = self._mock_get_switch_port_alloc()
-
-        mock_metrics_def_source.return_value = [mock_metric_def]
-        m_call = mock.call(
-            Subject=mock_port.path_.return_value,
-            Definition=mock_metric_def.path_.return_value,
-            MetricCollectionEnabled=self.netutils._METRIC_ENABLED)
-
-        self.netutils.enable_control_metrics(self._FAKE_PORT_NAME)
-
-        mock_metrics_svc.ControlMetrics.assert_has_calls([m_call, m_call])
-
-    def test_enable_control_metrics_no_port(self):
-        mock_metrics_svc = self.netutils._conn.Msvm_MetricService()[0]
-        self._mock_get_switch_port_alloc(found=False)
-
-        self.netutils.enable_control_metrics(self._FAKE_PORT_NAME)
-        self.assertEqual(0, mock_metrics_svc.ControlMetrics.call_count)
-
-    def test_enable_control_metrics_no_def(self):
-        mock_metrics_svc = self.netutils._conn.Msvm_MetricService()[0]
-        mock_metrics_def_source = self.netutils._conn.CIM_BaseMetricDefinition
-
-        self._mock_get_switch_port_alloc()
-        mock_metrics_def_source.return_value = None
-
-        self.netutils.enable_control_metrics(self._FAKE_PORT_NAME)
-        self.assertEqual(0, mock_metrics_svc.ControlMetrics.call_count)
-
     @mock.patch.object(networkutils.NetworkUtils, '_is_port_vm_started')
     def test_can_enable_control_metrics_true(self, mock_is_started):
         mock_acl = mock.MagicMock()

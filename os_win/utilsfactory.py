@@ -76,6 +76,11 @@ utils_map = {
             'max_version': None,
             'path': 'os_win.utils.compute.livemigrationutils.'
                     'LiveMigrationUtils'}},
+    'metricsutils': {
+        'MetricsUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.metrics.metricsutils.MetricsUtils'}},
     'networkutils': {
         'NetworkUtils': {
             'min_version': 6.2,
@@ -141,6 +146,10 @@ def get_vmutils(host='.'):
 
 def get_vhdutils():
     return _get_class(class_type='vhdutils')
+
+
+def get_metricsutils():
+    return _get_class(class_type='metricsutils')
 
 
 def get_networkutils():

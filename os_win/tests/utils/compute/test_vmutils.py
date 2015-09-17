@@ -69,6 +69,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn = mock.MagicMock()
         self._vmutils._jobutils = mock.MagicMock()
+        self._vmutils._metricsutils = mock.MagicMock()
         self._vmutils._pathutils = mock.MagicMock()
 
     def test_vs_man_svc(self):
@@ -579,40 +580,10 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         getattr(mock_svc, self._DESTROY_SNAPSHOT).assert_called_with(
             self._FAKE_SNAPSHOT_PATH)
 
-    @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
-    def test_enable_vm_metrics_collection(self, mock_get_vm_disks):
-        self._lookup_vm()
-        mock_svc = self._vmutils._conn.Msvm_MetricService()[0]
-
-        metric_def = mock.MagicMock()
-        mock_disk = mock.MagicMock()
-        mock_disk.path_.return_value = self._FAKE_RES_PATH
-        mock_get_vm_disks.return_value = ([mock_disk], [mock_disk])
-
-        fake_metric_def_paths = ['fake_0', 'fake_0', None]
-        fake_metric_resource_paths = [self._FAKE_VM_PATH,
-                                      self._FAKE_VM_PATH,
-                                      self._FAKE_RES_PATH]
-
-        metric_def.path_.side_effect = fake_metric_def_paths
-        self._vmutils._conn.CIM_BaseMetricDefinition.return_value = [
-            metric_def]
-
-        self._vmutils.enable_vm_metrics_collection(self._FAKE_VM_NAME)
-
-        calls = [mock.call(Name=def_name)
-                 for def_name in [self._vmutils._METRIC_AGGR_CPU_AVG,
-                                  self._vmutils._METRIC_AGGR_MEMORY_AVG]]
-        self._vmutils._conn.CIM_BaseMetricDefinition.assert_has_calls(calls)
-
-        calls = []
-        for i in range(len(fake_metric_def_paths)):
-            calls.append(mock.call(
-                Subject=fake_metric_resource_paths[i],
-                Definition=fake_metric_def_paths[i],
-                MetricCollectionEnabled=self._vmutils._METRIC_ENABLED))
-
-        mock_svc.ControlMetrics.assert_has_calls(calls, any_order=True)
+    def test_enable_vm_metrics_collection(self):
+        self._vmutils.enable_vm_metrics_collection(mock.sentinel.vm_name)
+        method = self._vmutils._metricsutils.enable_vm_metrics_collection
+        method.assert_called_once_with(mock.sentinel.vm_name)
 
     def test_get_vm_dvd_disk_paths(self):
         mock_vm = self._lookup_vm()

@@ -26,6 +26,7 @@ class FakeCPUSpec(object):
     Architecture = mock.sentinel.cpu_arch
     Name = mock.sentinel.cpu_name
     Manufacturer = mock.sentinel.cpu_man
+    MaxClockSpeed = mock.sentinel.max_clock_speed
     NumberOfCores = mock.sentinel.cpu_cores
     NumberOfLogicalProcessors = mock.sentinel.cpu_procs
 

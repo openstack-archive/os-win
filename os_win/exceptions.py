@@ -34,7 +34,7 @@ class OSWinException(Exception):
 
 
 class NotFound(OSWinException):
-    msg_fmt = _("Resource could not be found.")
+    msg_fmt = _("Resource could not be found: %(resource)s")
 
 
 class HyperVException(OSWinException):

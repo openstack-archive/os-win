@@ -73,6 +73,7 @@ class HostUtils(object):
             cpu_info = {'Architecture': cpu.Architecture,
                         'Name': cpu.Name,
                         'Manufacturer': cpu.Manufacturer,
+                        'MaxClockSpeed': cpu.MaxClockSpeed,
                         'NumberOfCores': cpu.NumberOfCores,
                         'NumberOfLogicalProcessors':
                         cpu.NumberOfLogicalProcessors}
