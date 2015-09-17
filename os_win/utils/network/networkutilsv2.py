@@ -28,7 +28,7 @@ if sys.platform == 'win32':
 from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import jobutils
-from os_win.utils import networkutils
+from os_win.utils.network import networkutils
 
 
 class NetworkUtilsV2(networkutils.NetworkUtils):

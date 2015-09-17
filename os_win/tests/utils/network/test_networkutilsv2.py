@@ -16,7 +16,7 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
-from os_win.utils import networkutilsv2
+from os_win.utils.network import networkutilsv2
 
 
 class NetworkUtilsV2TestCase(base.BaseTestCase):

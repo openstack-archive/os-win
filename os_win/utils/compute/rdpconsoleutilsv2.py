@@ -15,7 +15,7 @@
 
 import sys
 
-from os_win.utils import rdpconsoleutils
+from os_win.utils.compute import rdpconsoleutils
 
 if sys.platform == 'win32':
     import wmi

@@ -17,7 +17,7 @@
 import mock
 from oslotest import base
 
-from os_win.utils import basevolumeutils
+from os_win.utils.storage import basevolumeutils
 
 
 def _exception_thrower():

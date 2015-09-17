@@ -22,8 +22,8 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
 from os_win import exceptions
-from os_win.utils import vmutilsv2
-from os_win.utils import volumeutilsv2
+from os_win.utils.compute import vmutilsv2
+from os_win.utils.storage import volumeutilsv2
 
 LOG = logging.getLogger(__name__)
 

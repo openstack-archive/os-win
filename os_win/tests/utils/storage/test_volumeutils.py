@@ -17,8 +17,8 @@
 import mock
 
 from os_win import exceptions
-from os_win.tests.utils import test_basevolumeutils
-from os_win.utils import volumeutils
+from os_win.tests.utils.storage import test_basevolumeutils
+from os_win.utils.storage import volumeutils
 
 
 class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):

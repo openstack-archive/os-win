@@ -16,7 +16,7 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
-from os_win.utils import volumeutilsv2
+from os_win.utils.storage import volumeutilsv2
 
 
 class VolumeUtilsV2TestCase(base.BaseTestCase):
