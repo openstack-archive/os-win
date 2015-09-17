@@ -16,12 +16,14 @@
 import mock
 from oslotest import base
 
+from os_win import exceptions
 from os_win.utils import livemigrationutils
 
 
 class LiveMigrationUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V LiveMigrationUtils class."""
 
+    _FAKE_VM_NAME = 'fake_vm_name'
     _FAKE_RET_VAL = 0
 
     _RESOURCE_TYPE_VHD = 31
@@ -50,6 +52,31 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
 
         self.liveutils.check_live_migration_config()
         self.assertTrue(mock_migr_svc.associators.called)
+
+    def test_get_vm(self):
+        expected_vm = mock.MagicMock()
+        mock_conn_v2 = mock.MagicMock()
+        mock_conn_v2.Msvm_ComputerSystem.return_value = [expected_vm]
+
+        found_vm = self.liveutils._get_vm(mock_conn_v2, self._FAKE_VM_NAME)
+
+        self.assertEqual(expected_vm, found_vm)
+
+    def test_get_vm_duplicate(self):
+        mock_vm = mock.MagicMock()
+        mock_conn_v2 = mock.MagicMock()
+        mock_conn_v2.Msvm_ComputerSystem.return_value = [mock_vm, mock_vm]
+
+        self.assertRaises(exceptions.HyperVException, self.liveutils._get_vm,
+                          mock_conn_v2, self._FAKE_VM_NAME)
+
+    def test_get_vm_not_found(self):
+        mock_conn_v2 = mock.MagicMock()
+        mock_conn_v2.Msvm_ComputerSystem.return_value = []
+
+        self.assertRaises(exceptions.HyperVVMNotFoundException,
+                          self.liveutils._get_vm,
+                          mock_conn_v2, self._FAKE_VM_NAME)
 
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_destroy_planned_vm')
