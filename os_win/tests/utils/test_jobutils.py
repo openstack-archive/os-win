@@ -77,11 +77,46 @@ class JobUtilsTestCase(base.BaseTestCase):
                           self.jobutils._wait_for_job,
                           self._FAKE_JOB_PATH)
 
+    def test_wait_for_job_killed(self):
+        mockjob = self._prepare_wait_for_job(constants.JOB_STATE_KILLED)
+        job = self.jobutils._wait_for_job(self._FAKE_JOB_PATH)
+        self.assertEqual(mockjob, job)
+
     def test_wait_for_job_ok(self):
         mock_job = self._prepare_wait_for_job(
             constants.WMI_JOB_STATE_COMPLETED)
         job = self.jobutils._wait_for_job(self._FAKE_JOB_PATH)
         self.assertEqual(mock_job, job)
+
+    def test_stop_jobs(self):
+        mock_job1 = mock.MagicMock(Cancellable=True)
+        mock_job2 = mock.MagicMock(Cancellable=True)
+        mock_job3 = mock.MagicMock(Cancellable=True)
+        mock_job1.JobState = 2
+        mock_job2.JobState = 3
+        mock_job3.JobState = constants.JOB_STATE_KILLED
+
+        mock_vm = mock.MagicMock()
+        mock_vm_jobs = [mock_job1, mock_job2, mock_job3]
+        mock_vm.associators.return_value = mock_vm_jobs
+
+        self.jobutils.stop_jobs(mock_vm)
+
+        mock_job1.RequestStateChange.assert_called_once_with(
+            self.jobutils._KILL_JOB_STATE_CHANGE_REQUEST)
+        mock_job2.RequestStateChange.assert_called_once_with(
+            self.jobutils._KILL_JOB_STATE_CHANGE_REQUEST)
+        self.assertFalse(mock_job3.RequestStateChange.called)
+
+    def test_is_job_completed_true(self):
+        job = mock.MagicMock(JobState=constants.JOB_STATE_COMPLETED)
+
+        self.assertTrue(self.jobutils._is_job_completed(job))
+
+    def test_is_job_completed_false(self):
+        job = mock.MagicMock(JobState=constants.WMI_JOB_STATE_RUNNING)
+
+        self.assertFalse(self.jobutils._is_job_completed(job))
 
     def _prepare_wait_for_job(self, state=_FAKE_JOB_STATUS_BAD):
         mock_job = mock.MagicMock()

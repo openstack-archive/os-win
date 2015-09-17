@@ -37,6 +37,15 @@ class JobUtils(object):
 
     _WMI_NAMESPACE = '//%s/root/virtualization'
 
+    _CONCRETE_JOB_CLASS = "Msvm_ConcreteJob"
+
+    _KILL_JOB_STATE_CHANGE_REQUEST = 5
+
+    _completed_job_states = [constants.JOB_STATE_COMPLETED,
+                             constants.JOB_STATE_TERMINATED,
+                             constants.JOB_STATE_KILLED,
+                             constants.JOB_STATE_COMPLETED_WITH_WARNINGS]
+
     def __init__(self, host='.'):
         if sys.platform == 'win32':
             self._init_hyperv_wmi_conn(host)
@@ -61,6 +70,11 @@ class JobUtils(object):
         while job.JobState == constants.WMI_JOB_STATE_RUNNING:
             time.sleep(0.1)
             job = wmi.WMI(moniker=job_wmi_path)
+
+        if job.JobState == constants.JOB_STATE_KILLED:
+            LOG.debug("WMI job killed with status %s.", job.JobState)
+            return job
+
         if job.JobState != constants.WMI_JOB_STATE_COMPLETED:
             job_state = job.JobState
             if job.path().Class == "Msvm_ConcreteJob":
@@ -92,6 +106,18 @@ class JobUtils(object):
         LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
                   {'desc': desc, 'elap': elap})
         return job
+
+    def stop_jobs(self, element):
+        jobs = element.associators(wmi_result_class=self._CONCRETE_JOB_CLASS)
+
+        for job in jobs:
+            if job and job.Cancellable and not self._is_job_completed(job):
+                job.RequestStateChange(self._KILL_JOB_STATE_CHANGE_REQUEST)
+
+        return jobs
+
+    def _is_job_completed(self, job):
+        return job.JobState in self._completed_job_states
 
     def add_virt_resource(self, virt_resource, parent):
         """Adds a new resource to the VM."""
