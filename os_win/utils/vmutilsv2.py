@@ -28,6 +28,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from os_win.utils import constants
+from os_win.utils import hostutils
 from os_win.utils import jobutils
 from os_win.utils import vmutils
 
@@ -72,6 +73,12 @@ class VMUtilsV2(vmutils.VMUtils):
     def __init__(self, host='.'):
         super(VMUtilsV2, self).__init__(host)
         self._jobutils = jobutils.JobUtilsV2()
+        if sys.platform == 'win32':
+            # A separate WMI class for VM serial ports has been introduced
+            # in Windows 10 / Windows Server 2016
+            if hostutils.HostUtils().check_min_windows_version(10, 0):
+                self._SERIAL_PORT_SETTING_DATA_CLASS = (
+                    "Msvm_SerialPortSettingData")
 
     def _init_hyperv_wmi_conn(self, host):
         self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
