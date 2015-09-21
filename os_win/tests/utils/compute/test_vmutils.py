@@ -19,8 +19,8 @@ from oslotest import base
 from six.moves import range
 
 from os_win import exceptions
+from os_win.utils.compute import vmutils
 from os_win.utils import constants
-from os_win.utils import vmutils
 
 
 class VMUtilsTestCase(base.BaseTestCase):
@@ -164,7 +164,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
         self.assertFalse(self._vmutils._jobutils.check_ret_val.called)
 
-    @mock.patch('os_win.utils.vmutils.VMUtils._get_vm_disks')
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
     def test_get_vm_storage_paths(self, mock_get_vm_disks):
         self._lookup_vm()
         mock_rasds = self._create_mock_disks()
@@ -251,7 +251,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         path = self._vmutils.get_vm_scsi_controller(self._FAKE_VM_NAME)
         self.assertEqual(self._FAKE_RES_PATH, path)
 
-    @mock.patch("os_win.utils.vmutils.VMUtils.get_attached_disks")
+    @mock.patch.object(vmutils.VMUtils, 'get_attached_disks')
     def test_get_free_controller_slot(self, mock_get_attached_disks):
         mock_disk = mock.MagicMock()
         mock_disk.AddressOnParent = 3
@@ -306,8 +306,8 @@ class VMUtilsTestCase(base.BaseTestCase):
         mock_rasds.ResourceSubType = mock_subtype
         return mock_rasds
 
-    @mock.patch("os_win.utils.vmutils.VMUtils.get_free_controller_slot")
-    @mock.patch("os_win.utils.vmutils.VMUtils._get_vm_scsi_controller")
+    @mock.patch.object(vmutils.VMUtils, 'get_free_controller_slot')
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_scsi_controller')
     def test_attach_scsi_drive(self, mock_get_vm_scsi_controller,
                                mock_get_free_controller_slot):
         mock_vm = self._lookup_vm()
@@ -566,9 +566,9 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             fake_ret_val, fake_job_path)
 
-    @mock.patch('os_win.utils.vmutils.VMUtils._get_wmi_obj')
-    @mock.patch('os_win.utils.vmutils.VMUtils._modify_virtual_system')
-    @mock.patch('os_win.utils.vmutils.VMUtils._get_vm_setting_data')
+    @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
+    @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
     def test_create_vm_obj(self, mock_get_vm_setting_data,
                            mock_modify_virtual_system,
                            mock_get_wmi_obj):

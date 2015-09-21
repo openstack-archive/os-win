@@ -32,7 +32,7 @@ from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import constants
 from os_win.utils import jobutils
-from os_win.utils import vhdutils
+from os_win.utils.storage import vhdutils
 
 
 VHDX_BAT_ENTRY_SIZE = 8

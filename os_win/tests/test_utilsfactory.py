@@ -22,11 +22,11 @@ from oslo_config import cfg
 from oslotest import base
 
 from os_win import exceptions
+from os_win.utils.compute import vmutils
+from os_win.utils.compute import vmutilsv2
 from os_win.utils import hostutils
-from os_win.utils import networkutils
-from os_win.utils import networkutilsv2
-from os_win.utils import vmutils
-from os_win.utils import vmutilsv2
+from os_win.utils.network import networkutils
+from os_win.utils.network import networkutilsv2
 from os_win import utilsfactory
 
 CONF = cfg.CONF

@@ -17,7 +17,7 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
-from os_win.utils import livemigrationutils
+from os_win.utils.compute import livemigrationutils
 
 
 class LiveMigrationUtilsTestCase(base.BaseTestCase):

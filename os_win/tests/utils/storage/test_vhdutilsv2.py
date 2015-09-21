@@ -15,9 +15,9 @@
 import mock
 
 from os_win import exceptions
-from os_win.tests.utils import test_vhdutils
+from os_win.tests.utils.storage import test_vhdutils
 from os_win.utils import constants
-from os_win.utils import vhdutilsv2
+from os_win.utils.storage import vhdutilsv2
 
 
 class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
@@ -168,7 +168,7 @@ class VHDUtilsV2TestCase(test_vhdutils.VHDUtilsBaseTestCase):
         else:
             self._vhdutils.get_vhd_info.return_value = self._fake_vhd_info
 
-    @mock.patch('os_win.utils.vhdutils.VHDUtils.get_vhd_format')
+    @mock.patch.object(vhdutilsv2.VHDUtilsV2, 'get_vhd_format')
     def test_get_vhdx_internal_size(self, mock_get_vhd_format):
         mock_get_vhd_format.return_value = constants.DISK_FORMAT_VHDX
         self._mock_get_vhd_info()

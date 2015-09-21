@@ -18,20 +18,20 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LW  # noqa
 from os_win import exceptions
+from os_win.utils.compute import livemigrationutils
+from os_win.utils.compute import rdpconsoleutils
+from os_win.utils.compute import rdpconsoleutilsv2
+from os_win.utils.compute import vmutils
+from os_win.utils.compute import vmutilsv2
 from os_win.utils import hostutils
 from os_win.utils import hostutilsv2
-from os_win.utils import livemigrationutils
-from os_win.utils import networkutils
-from os_win.utils import networkutilsv2
+from os_win.utils.network import networkutils
+from os_win.utils.network import networkutilsv2
 from os_win.utils import pathutils
-from os_win.utils import rdpconsoleutils
-from os_win.utils import rdpconsoleutilsv2
-from os_win.utils import vhdutils
-from os_win.utils import vhdutilsv2
-from os_win.utils import vmutils
-from os_win.utils import vmutilsv2
-from os_win.utils import volumeutils
-from os_win.utils import volumeutilsv2
+from os_win.utils.storage import vhdutils
+from os_win.utils.storage import vhdutilsv2
+from os_win.utils.storage import volumeutils
+from os_win.utils.storage import volumeutilsv2
 
 hyper_opts = [
     cfg.BoolOpt('force_hyperv_utils_v1',

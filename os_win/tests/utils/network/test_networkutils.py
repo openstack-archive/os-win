@@ -17,7 +17,7 @@ from oslotest import base
 
 from os_win import exceptions
 from os_win.utils import constants
-from os_win.utils import networkutils
+from os_win.utils.network import networkutils
 
 
 class NetworkUtilsTestCase(base.BaseTestCase):

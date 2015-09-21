@@ -27,10 +27,10 @@ if sys.platform == 'win32':
 from oslo_config import cfg
 from oslo_log import log as logging
 
+from os_win.utils.compute import vmutils
 from os_win.utils import constants
 from os_win.utils import hostutils
 from os_win.utils import jobutils
-from os_win.utils import vmutils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

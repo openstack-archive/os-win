@@ -33,7 +33,7 @@ from six.moves import range
 from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
-from os_win.utils import basevolumeutils
+from os_win.utils.storage import basevolumeutils
 
 LOG = logging.getLogger(__name__)
 

@@ -18,7 +18,7 @@ from oslotest import base
 
 import os
 
-from os_win.utils import ioutils
+from os_win.utils.io import ioutils
 
 
 class IOThreadTestCase(base.BaseTestCase):

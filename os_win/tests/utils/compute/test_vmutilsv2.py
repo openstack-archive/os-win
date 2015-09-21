@@ -14,9 +14,9 @@
 
 import mock
 
-from os_win.tests.utils import test_vmutils
+from os_win.tests.utils.compute import test_vmutils
+from os_win.utils.compute import vmutilsv2
 from os_win.utils import constants
-from os_win.utils import vmutilsv2
 
 
 class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
@@ -74,7 +74,7 @@ class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
 
-    @mock.patch('os_win.utils.vmutils.VMUtils._get_vm_disks')
+    @mock.patch.object(vmutilsv2.VMUtilsV2, '_get_vm_disks')
     def test_enable_vm_metrics_collection(self, mock_get_vm_disks):
         self._lookup_vm()
         mock_svc = self._vmutils._conn.Msvm_MetricService()[0]
@@ -130,7 +130,7 @@ class VMUtilsV2TestCase(test_vmutils.VMUtilsTestCase):
     def _get_fake_instance_notes(self):
         return [self._FAKE_VM_UUID]
 
-    @mock.patch('os_win.utils.vmutilsv2.VMUtilsV2._get_wmi_obj')
+    @mock.patch.object(vmutilsv2.VMUtilsV2, '_get_wmi_obj')
     def _test_create_vm_obj(self, mock_get_wmi_obj, vm_path,
                             dynamic_memory_ratio=1.0):
         mock_vs_man_svc = mock.MagicMock()

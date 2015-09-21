@@ -18,7 +18,7 @@ from oslotest import base
 
 from os_win import exceptions
 from os_win.utils import constants
-from os_win.utils import vhdutils
+from os_win.utils.storage import vhdutils
 
 
 class VHDUtilsBaseTestCase(base.BaseTestCase):
@@ -233,18 +233,20 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
         self.assertEqual(expected_vhd_size, real_size)
 
     def test_get_vhd_format_vhdx(self):
-        with mock.patch('os_win.utils.vhdutils.open',
-                        mock.mock_open(read_data=vhdutils.VHDX_SIGNATURE),
-                        create=True):
+        with mock.patch.object(
+                vhdutils, 'open',
+                mock.mock_open(read_data=vhdutils.VHDX_SIGNATURE),
+                create=True):
 
             format = self._vhdutils.get_vhd_format(self._FAKE_VHD_PATH)
 
             self.assertEqual(constants.DISK_FORMAT_VHDX, format)
 
     def test_get_vhd_format_vhd(self):
-        with mock.patch('os_win.utils.vhdutils.open',
-                        mock.mock_open(),
-                        create=True) as mock_open:
+        with mock.patch.object(
+                vhdutils, 'open',
+                mock.mock_open(read_data=vhdutils.VHD_SIGNATURE),
+                create=True) as mock_open:
             f = mock_open.return_value
             f.tell.return_value = 1024
             readdata = ['notthesig', vhdutils.VHD_SIGNATURE]
@@ -260,9 +262,9 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
             self.assertEqual(constants.DISK_FORMAT_VHD, format)
 
     def test_get_vhd_format_invalid_format(self):
-        with mock.patch('os_win.utils.vhdutils.open',
-                        mock.mock_open(read_data='invalid'),
-                        create=True) as mock_open:
+        with mock.patch.object(vhdutils, 'open',
+                               mock.mock_open(read_data='invalid'),
+                               create=True) as mock_open:
             f = mock_open.return_value
             f.tell.return_value = 1024
 
@@ -271,9 +273,9 @@ class VHDUtilsTestCase(VHDUtilsBaseTestCase):
                               self._FAKE_VHD_PATH)
 
     def test_get_vhd_format_zero_length_file(self):
-        with mock.patch('os_win.utils.vhdutils.open',
-                        mock.mock_open(read_data=''),
-                        create=True) as mock_open:
+        with mock.patch.object(vhdutils, 'open',
+                               mock.mock_open(read_data=''),
+                               create=True) as mock_open:
             f = mock_open.return_value
             f.tell.return_value = 0
 
