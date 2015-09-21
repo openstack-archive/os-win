@@ -737,3 +737,10 @@ class VMUtilsTestCase(base.BaseTestCase):
                 fields=[self._vmutils._VM_ENABLED_STATE_PROP])
 
             self.assertEqual(watcher.return_value, listener)
+
+    def test_stop_vm_jobs(self):
+        mock_vm = self._lookup_vm()
+
+        self._vmutils.stop_vm_jobs(mock.sentinel.vm_name)
+
+        self._vmutils._jobutils.stop_jobs.assert_called_once_with(mock_vm)

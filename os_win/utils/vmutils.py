@@ -722,3 +722,7 @@ class VMUtils(object):
     def get_vm_power_state(self, vm_enabled_state):
         return self._enabled_states_map.get(vm_enabled_state,
                                             constants.HYPERV_VM_STATE_OTHER)
+
+    def stop_vm_jobs(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+        self._jobutils.stop_jobs(vm)
