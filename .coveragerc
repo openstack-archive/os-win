@@ -4,4 +4,4 @@ source = os_win
 omit = os_win/openstack/*
 
 [report]
-ignore-errors = True
+ignore_errors = True
