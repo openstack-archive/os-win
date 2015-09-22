@@ -30,8 +30,7 @@ from os_win.utils.network import networkutilsv2
 from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
-from os_win.utils.storage import vhdutils
-from os_win.utils.storage import vhdutilsv2
+from os_win.utils.storage.virtdisk import vhdutils
 
 hyper_opts = [
     cfg.BoolOpt('force_hyperv_utils_v1',
@@ -81,7 +80,7 @@ def get_vmutils(host='.'):
 
 
 def get_vhdutils():
-    return _get_virt_utils_class(vhdutils.VHDUtils, vhdutilsv2.VHDUtilsV2)()
+    return vhdutils.VHDUtils()
 
 
 def get_networkutils():
