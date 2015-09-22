@@ -476,6 +476,17 @@ class VMUtils(object):
 
         self._jobutils.add_virt_resource(new_nic_data, vm)
 
+    def destroy_nic(self, vm_name, nic_name):
+        """Destroys the NIC with the given nic_name from the given VM.
+
+        :param vm_name: The name of the VM which has the NIC to be destroyed.
+        :param nic_name: The NIC's ElementName.
+        """
+        nic_data = self._get_nic_data_by_name(nic_name)
+
+        vm = self._lookup_vm_check(vm_name)
+        self._jobutils.remove_virt_resource(nic_data, vm)
+
     def soft_shutdown_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
         shutdown_component = vm.associators(
@@ -722,6 +733,9 @@ class VMUtils(object):
     def get_vm_power_state(self, vm_enabled_state):
         return self._enabled_states_map.get(vm_enabled_state,
                                             constants.HYPERV_VM_STATE_OTHER)
+
+    def get_vm_generation(self, vm_name):
+        return constants.VM_GEN_1
 
     def stop_vm_jobs(self, vm_name):
         vm = self._lookup_vm_check(vm_name)

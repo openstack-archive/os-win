@@ -374,6 +374,17 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
             mock_nic, mock_vm)
 
+    @mock.patch.object(vmutils.VMUtils, '_get_nic_data_by_name')
+    def test_destroy_nic(self, mock_get_nic_data_by_name):
+        mock_vm = self._lookup_vm()
+        mock_nic_data = mock_get_nic_data_by_name.return_value
+
+        self._vmutils.destroy_nic(self._FAKE_VM_NAME,
+                                  mock.sentinel.FAKE_NIC_NAME)
+
+        self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
+            mock_nic_data, mock_vm)
+
     def test_set_vm_state(self):
         mock_vm = self._lookup_vm()
         mock_vm.RequestStateChange.return_value = (
@@ -737,6 +748,10 @@ class VMUtilsTestCase(base.BaseTestCase):
                 fields=[self._vmutils._VM_ENABLED_STATE_PROP])
 
             self.assertEqual(watcher.return_value, listener)
+
+    def test_get_vm_generation_gen1(self):
+        ret = self._vmutils.get_vm_generation(mock.sentinel.FAKE_VM_NAME)
+        self.assertEqual(constants.VM_GEN_1, ret)
 
     def test_stop_vm_jobs(self):
         mock_vm = self._lookup_vm()
