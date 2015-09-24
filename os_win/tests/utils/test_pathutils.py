@@ -31,28 +31,6 @@ class PathUtilsTestCase(base.BaseTestCase):
         self.fake_instance_name = 'fake_instance_name'
 
         self._pathutils = pathutils.PathUtils()
-        self._pathutils._smb_conn_attr = mock.MagicMock()
-
-    @mock.patch.object(pathutils, 'wmi', create=True)
-    def _test_smb_conn(self, mock_wmi, smb_available=True):
-        mock_wmi.x_wmi = Exception
-        mock_wmi.WMI.side_effect = None if smb_available else Exception
-
-        self._pathutils._set_smb_conn()
-
-        if smb_available:
-            expected_conn = mock_wmi.WMI.return_value
-            self.assertEqual(expected_conn, self._pathutils._smb_conn)
-        else:
-            self.assertRaises(exceptions.HyperVException,
-                              getattr,
-                              self._pathutils, '_smb_conn')
-
-    def test_smb_conn_available(self):
-        self._test_smb_conn()
-
-    def test_smb_conn_unavailable(self):
-        self._test_smb_conn(smb_available=False)
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
     @mock.patch.object(os.path, 'isfile')
@@ -98,65 +76,6 @@ class PathUtilsTestCase(base.BaseTestCase):
         configdrive_path = self._pathutils.lookup_configdrive_path(
             self.fake_instance_name)
         self.assertIsNone(configdrive_path)
-
-    @mock.patch.object(pathutils.PathUtils, 'unmount_smb_share')
-    @mock.patch('os.path.exists')
-    def _test_check_smb_mapping(self, mock_exists, mock_unmount_smb_share,
-                                existing_mappings=True, share_available=False):
-        mock_exists.return_value = share_available
-
-        fake_mappings = (
-            [mock.sentinel.smb_mapping] if existing_mappings else [])
-
-        self._pathutils._smb_conn.Msft_SmbMapping.return_value = (
-            fake_mappings)
-
-        ret_val = self._pathutils.check_smb_mapping(
-            mock.sentinel.share_path)
-
-        self.assertEqual(existing_mappings and share_available, ret_val)
-        if existing_mappings and not share_available:
-            mock_unmount_smb_share.assert_called_once_with(
-                mock.sentinel.share_path, force=True)
-
-    def test_check_mapping(self):
-        self._test_check_smb_mapping()
-
-    def test_remake_unavailable_mapping(self):
-        self._test_check_smb_mapping(existing_mappings=True,
-                                     share_available=False)
-
-    def test_available_mapping(self):
-        self._test_check_smb_mapping(existing_mappings=True,
-                                     share_available=True)
-
-    def test_mount_smb_share(self):
-        fake_create = self._pathutils._smb_conn.Msft_SmbMapping.Create
-        self._pathutils.mount_smb_share(mock.sentinel.share_path,
-                                        mock.sentinel.username,
-                                        mock.sentinel.password)
-        fake_create.assert_called_once_with(
-            RemotePath=mock.sentinel.share_path,
-            UserName=mock.sentinel.username,
-            Password=mock.sentinel.password)
-
-    def _test_unmount_smb_share(self, force=False):
-        fake_mapping = mock.Mock()
-        smb_mapping_class = self._pathutils._smb_conn.Msft_SmbMapping
-        smb_mapping_class.return_value = [fake_mapping]
-
-        self._pathutils.unmount_smb_share(mock.sentinel.share_path,
-                                          force)
-
-        smb_mapping_class.assert_called_once_with(
-            RemotePath=mock.sentinel.share_path)
-        fake_mapping.Remove.assert_called_once_with(Force=force)
-
-    def test_soft_unmount_smb_share(self):
-        self._test_unmount_smb_share()
-
-    def test_force_unmount_smb_share(self):
-        self._test_unmount_smb_share(force=True)
 
     @mock.patch('shutil.rmtree')
     @mock.patch('time.sleep')

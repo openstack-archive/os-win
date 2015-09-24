@@ -15,11 +15,7 @@
 
 import os
 import shutil
-import sys
 import time
-
-if sys.platform == 'win32':
-    import wmi
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -49,27 +45,6 @@ ERROR_DIR_IS_NOT_EMPTY = 145
 
 
 class PathUtils(object):
-    def __init__(self):
-        if sys.platform == 'win32':
-            self._set_smb_conn()
-
-    @property
-    def _smb_conn(self):
-        if self._smb_conn_attr:
-            return self._smb_conn_attr
-        raise exceptions.HyperVException(_("The SMB WMI namespace is not "
-                                           "available on this OS version."))
-
-    def _set_smb_conn(self):
-        # The following namespace is not available prior to Windows
-        # Server 2012. utilsfactory is not used in order to avoid a
-        # circular dependency.
-        try:
-            self._smb_conn_attr = wmi.WMI(
-                moniker=r"root\Microsoft\Windows\SMB")
-        except wmi.x_wmi:
-            self._smb_conn_attr = None
-
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
         import __builtin__
@@ -237,52 +212,3 @@ class PathUtils(object):
                                              remote_server)
         console_log_path = os.path.join(instance_dir, 'console.log')
         return console_log_path, console_log_path + '.1'
-
-    def check_smb_mapping(self, smbfs_share):
-        mappings = self._smb_conn.Msft_SmbMapping(RemotePath=smbfs_share)
-
-        if not mappings:
-            return False
-
-        if os.path.exists(smbfs_share):
-            LOG.debug('Share already mounted: %s', smbfs_share)
-            return True
-        else:
-            LOG.debug('Share exists but is unavailable: %s ', smbfs_share)
-            self.unmount_smb_share(smbfs_share, force=True)
-            return False
-
-    def mount_smb_share(self, smbfs_share, username=None, password=None):
-        try:
-            LOG.debug('Mounting share: %s', smbfs_share)
-            self._smb_conn.Msft_SmbMapping.Create(RemotePath=smbfs_share,
-                                                  UserName=username,
-                                                  Password=password)
-        except wmi.x_wmi as exc:
-            err_msg = (_(
-                'Unable to mount SMBFS share: %(smbfs_share)s '
-                'WMI exception: %(wmi_exc)s') % {'smbfs_share': smbfs_share,
-                                                 'wmi_exc': exc})
-            raise exceptions.HyperVException(err_msg)
-
-    def unmount_smb_share(self, smbfs_share, force=False):
-        mappings = self._smb_conn.Msft_SmbMapping(RemotePath=smbfs_share)
-        if not mappings:
-            LOG.debug('Share %s is not mounted. Skipping unmount.',
-                      smbfs_share)
-
-        for mapping in mappings:
-            # Due to a bug in the WMI module, getting the output of
-            # methods returning None will raise an AttributeError
-            try:
-                mapping.Remove(Force=force)
-            except AttributeError:
-                pass
-            except wmi.x_wmi:
-                # If this fails, a 'Generic Failure' exception is raised.
-                # This happens even if we unforcefully unmount an in-use
-                # share, for which reason we'll simply ignore it in this
-                # case.
-                if force:
-                    raise exceptions.HyperVException(
-                        _("Could not unmount share: %s") % smbfs_share)

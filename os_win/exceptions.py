@@ -51,3 +51,7 @@ class HyperVAuthorizationException(HyperVException):
 
 class HyperVVMNotFoundException(HyperVException):
     msg_fmt = _("VM not found: %(vm_name)s")
+
+
+class SMBException(OSWinException):
+    pass
