@@ -159,7 +159,8 @@ class PathUtilsTestCase(base.BaseTestCase):
         self._test_unmount_smb_share(force=True)
 
     @mock.patch('shutil.rmtree')
-    def test_rmtree(self, mock_rmtree):
+    @mock.patch('time.sleep')
+    def test_rmtree(self, mock_sleep, mock_rmtree):
         class WindowsError(Exception):
             def __init__(self, winerror=None):
                 self.winerror = winerror
@@ -171,6 +172,7 @@ class PathUtilsTestCase(base.BaseTestCase):
                         fake_windows_error, create=True):
             self._pathutils.rmtree(mock.sentinel.FAKE_PATH)
 
+        mock_sleep.assert_called_once_with(1)
         mock_rmtree.assert_has_calls([mock.call(mock.sentinel.FAKE_PATH),
                                       mock.call(mock.sentinel.FAKE_PATH)])
 
