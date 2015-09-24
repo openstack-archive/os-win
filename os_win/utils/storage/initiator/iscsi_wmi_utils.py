@@ -31,17 +31,17 @@ from six.moves import range  # noqa
 from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
-from os_win.utils.storage import basevolumeutils
+from os_win.utils.storage.initiator import base_iscsi_utils
 
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 
 
-class VolumeUtilsV2(basevolumeutils.BaseVolumeUtils):
+class ISCSIInitiatorWMIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
     _CHAP_AUTH_TYPE = 'ONEWAYCHAP'
 
     def __init__(self, host='.'):
-        super(VolumeUtilsV2, self).__init__(host)
+        super(ISCSIInitiatorWMIUtils, self).__init__(host)
 
         storage_namespace = '//%s/root/microsoft/windows/storage' % host
         if sys.platform == 'win32':

@@ -23,7 +23,7 @@ from oslo_log import log as logging
 from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils.compute import vmutilsv2
-from os_win.utils.storage import volumeutilsv2
+from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class LiveMigrationUtils(object):
 
     def __init__(self):
         self._vmutils = vmutilsv2.VMUtilsV2()
-        self._volutils = volumeutilsv2.VolumeUtilsV2()
+        self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
         try:
@@ -121,15 +121,16 @@ class LiveMigrationUtils(object):
         return dict(ide_paths.items() + scsi_paths.items())
 
     def _get_remote_disk_data(self, vmutils_remote, disk_paths, dest_host):
-        volutils_remote = volumeutilsv2.VolumeUtilsV2(dest_host)
+        remote_iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils(
+            dest_host)
 
         disk_paths_remote = {}
         for (rasd_rel_path, disk_path) in disk_paths.items():
-            target = self._volutils.get_target_from_disk_path(disk_path)
+            target = self._iscsi_initiator.get_target_from_disk_path(disk_path)
             if target:
                 (target_iqn, target_lun) = target
 
-                dev_num = volutils_remote.get_device_number_for_target(
+                dev_num = remote_iscsi_initiator.get_device_number_for_target(
                     target_iqn, target_lun)
                 disk_path_remote = (
                     vmutils_remote.get_mounted_disk_by_drive_number(dev_num))

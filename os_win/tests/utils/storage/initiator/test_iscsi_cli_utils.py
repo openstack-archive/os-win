@@ -15,14 +15,14 @@
 #    under the License.
 
 import mock
+from oslotest import base
 
 from os_win import exceptions
-from os_win.tests.utils.storage import test_basevolumeutils
-from os_win.utils.storage import volumeutils
+from os_win.utils.storage.initiator import iscsi_cli_utils
 
 
-class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
-    """Unit tests for the Hyper-V VolumeUtils class."""
+class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
+    """Unit tests for the Hyper-V ISCSIInitiatorCLIUtils class."""
 
     _FAKE_PORTAL_ADDR = '10.1.1.1'
     _FAKE_PORTAL_PORT = '3260'
@@ -32,8 +32,8 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
     _FAKE_STDOUT_VALUE = 'The operation completed successfully'
 
     def setUp(self):
-        super(VolumeUtilsTestCase, self).setUp()
-        self._volutils = volumeutils.VolumeUtils()
+        super(ISCSIInitiatorCLIUtilsTestCase, self).setUp()
+        self._volutils = iscsi_cli_utils.ISCSIInitiatorCLIUtils()
         self._volutils._conn_wmi = mock.MagicMock()
         self._volutils._conn_cimv2 = mock.MagicMock()
 
@@ -66,7 +66,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
     def test_login_new_portal(self):
         self._test_login_target_portal(False)
 
-    @mock.patch.object(volumeutils, 'CONF')
+    @mock.patch.object(iscsi_cli_utils, 'CONF')
     def _test_login_target(self, mock_CONF, target_connected=False,
                            raise_exception=False, use_chap=False):
         mock_CONF.hyperv.volume_attach_retry_count = 4
@@ -147,7 +147,7 @@ class VolumeUtilsTestCase(test_basevolumeutils.BaseVolumeUtilsTestCase):
     def test_execute_exception(self):
         self._test_execute_wrapper(False)
 
-    @mock.patch.object(volumeutils, '_utils')
+    @mock.patch.object(iscsi_cli_utils, '_utils')
     def test_logout_storage_target(self, mock_utils):
         mock_utils.execute.return_value = (self._FAKE_STDOUT_VALUE,
                                            mock.sentinel.FAKE_STDERR_VALUE)

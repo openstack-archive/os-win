@@ -33,17 +33,17 @@ from six.moves import range  # noqa
 from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
-from os_win.utils.storage import basevolumeutils
+from os_win.utils.storage.initiator import base_iscsi_utils
 
 LOG = logging.getLogger(__name__)
 
 CONF = cfg.CONF
 
 
-class VolumeUtils(basevolumeutils.BaseVolumeUtils):
+class ISCSIInitiatorCLIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
 
     def __init__(self):
-        super(VolumeUtils, self).__init__()
+        super(ISCSIInitiatorCLIUtils, self).__init__()
 
     def execute(self, *args, **kwargs):
         stdout_value, stderr_value = _utils.execute(*args, **kwargs)

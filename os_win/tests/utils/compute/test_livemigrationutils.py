@@ -34,7 +34,7 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self.liveutils = livemigrationutils.LiveMigrationUtils()
         self.liveutils._vmutils = mock.MagicMock()
-        self.liveutils._volutils = mock.MagicMock()
+        self.liveutils._iscsi_initiator = mock.MagicMock()
 
         self._conn = mock.MagicMock()
         self.liveutils._get_conn_v2 = mock.MagicMock(return_value=self._conn)
@@ -150,15 +150,18 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
         self.assertEqual(scsi_path, result)
         mock_get_controller_paths.assert_called_once_with(scsi_ctrl)
 
-    @mock.patch.object(livemigrationutils.volumeutilsv2, 'VolumeUtilsV2')
-    def test_get_remote_disk_data(self, mock_vol_utils_class):
-        mock_vol_utils_remote = mock_vol_utils_class.return_value
+    @mock.patch.object(livemigrationutils.iscsi_wmi_utils,
+                       'ISCSIInitiatorWMIUtils')
+    def test_get_remote_disk_data(self, mock_iscsi_initiator_class):
+        m_remote_iscsi_init = mock_iscsi_initiator_class.return_value
+        m_local_iscsi_init = self.liveutils._iscsi_initiator
+
         mock_vm_utils = mock.MagicMock()
         disk_paths = {
             mock.sentinel.FAKE_RASD_PATH: mock.sentinel.FAKE_DISK_PATH}
-        self.liveutils._volutils.get_target_from_disk_path.return_value = (
+        m_local_iscsi_init.get_target_from_disk_path.return_value = (
             mock.sentinel.FAKE_IQN, mock.sentinel.FAKE_LUN)
-        mock_vol_utils_remote.get_device_number_for_target.return_value = (
+        m_remote_iscsi_init.get_device_number_for_target.return_value = (
             mock.sentinel.FAKE_DEV_NUM)
         mock_vm_utils.get_mounted_disk_by_drive_number.return_value = (
             mock.sentinel.FAKE_DISK_PATH)
@@ -166,9 +169,9 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
         disk_paths = self.liveutils._get_remote_disk_data(
             mock_vm_utils, disk_paths, mock.sentinel.FAKE_HOST)
 
-        self.liveutils._volutils.get_target_from_disk_path.assert_called_with(
+        m_local_iscsi_init.get_target_from_disk_path.assert_called_with(
             mock.sentinel.FAKE_DISK_PATH)
-        mock_vol_utils_remote.get_device_number_for_target.assert_called_with(
+        m_remote_iscsi_init.get_device_number_for_target.assert_called_with(
             mock.sentinel.FAKE_IQN, mock.sentinel.FAKE_LUN)
         mock_vm_utils.get_mounted_disk_by_drive_number.assert_called_once_with(
             mock.sentinel.FAKE_DEV_NUM)

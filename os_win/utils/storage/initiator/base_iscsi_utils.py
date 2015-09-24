@@ -35,7 +35,7 @@ from os_win._i18n import _LI
 LOG = logging.getLogger(__name__)
 
 
-class BaseVolumeUtils(object):
+class BaseISCSIInitiatorUtils(object):
     _FILE_DEVICE_DISK = 7
 
     def __init__(self, host='.'):

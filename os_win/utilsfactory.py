@@ -28,10 +28,10 @@ from os_win.utils import hostutilsv2
 from os_win.utils.network import networkutils
 from os_win.utils.network import networkutilsv2
 from os_win.utils import pathutils
+from os_win.utils.storage.initiator import iscsi_cli_utils
+from os_win.utils.storage.initiator import iscsi_wmi_utils
 from os_win.utils.storage import vhdutils
 from os_win.utils.storage import vhdutilsv2
-from os_win.utils.storage import volumeutils
-from os_win.utils.storage import volumeutilsv2
 
 hyper_opts = [
     cfg.BoolOpt('force_hyperv_utils_v1',
@@ -107,9 +107,11 @@ def get_pathutils():
     return pathutils.PathUtils()
 
 
-def get_volumeutils():
-    return _get_class(volumeutils.VolumeUtils, volumeutilsv2.VolumeUtilsV2,
-                      CONF.hyperv.force_volumeutils_v1)()
+def get_iscsi_initiator_utils(use_iscsi_cli=False):
+    use_iscsi_cli = use_iscsi_cli or CONF.hyperv.force_volumeutils_v1
+    return _get_class(iscsi_cli_utils.ISCSIInitiatorCLIUtils,
+                      iscsi_wmi_utils.ISCSIInitiatorWMIUtils,
+                      use_iscsi_cli)()
 
 
 def get_livemigrationutils():

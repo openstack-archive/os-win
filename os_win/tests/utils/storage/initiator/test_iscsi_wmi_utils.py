@@ -16,11 +16,11 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
-from os_win.utils.storage import volumeutilsv2
+from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 
-class VolumeUtilsV2TestCase(base.BaseTestCase):
-    """Unit tests for the Hyper-V VolumeUtilsV2 class."""
+class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
+    """Unit tests for the Hyper-V ISCSIInitiatorWMIUtils class."""
 
     _FAKE_PORTAL_ADDR = '10.1.1.1'
     _FAKE_PORTAL_PORT = '3260'
@@ -28,8 +28,8 @@ class VolumeUtilsV2TestCase(base.BaseTestCase):
     _FAKE_TARGET = 'iqn.2010-10.org.openstack:fake_target'
 
     def setUp(self):
-        super(VolumeUtilsV2TestCase, self).setUp()
-        self._volutilsv2 = volumeutilsv2.VolumeUtilsV2()
+        super(ISCSIInitiatorWMIUtilsTestCase, self).setUp()
+        self._volutilsv2 = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
         self._volutilsv2._conn_storage = mock.MagicMock()
         self._volutilsv2._conn_wmi = mock.MagicMock()
 
@@ -61,7 +61,7 @@ class VolumeUtilsV2TestCase(base.BaseTestCase):
     def test_login_new_portal(self):
         self._test_login_target_portal(False)
 
-    @mock.patch.object(volumeutilsv2, 'CONF')
+    @mock.patch.object(iscsi_wmi_utils, 'CONF')
     def _test_login_target(self, mock_CONF, target_connected=False,
                            raise_exception=False, use_chap=False):
         mock_CONF.hyperv.volume_attach_retry_count = 4
@@ -146,7 +146,8 @@ class VolumeUtilsV2TestCase(base.BaseTestCase):
         mock_session.Unregister.assert_called_once_with()
         mock_target.Disconnect.assert_called_once_with()
 
-    @mock.patch.object(volumeutilsv2.VolumeUtilsV2, 'logout_storage_target')
+    @mock.patch.object(iscsi_wmi_utils.ISCSIInitiatorWMIUtils,
+                       'logout_storage_target')
     def test_execute_log_out(self, mock_logout_target):
         sess_class = self._volutilsv2._conn_wmi.MSiSCSIInitiator_SessionClass
 
