@@ -32,8 +32,17 @@ FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
 
 
 class Win32Utils(object):
+    def __init__(self):
+        self._kernel32_lib_func_opts = dict(error_ret_vals=[0],
+                                            error_on_nonzero_ret_val=False,
+                                            ret_val_is_err_code=False)
+
     def run_and_check_output(self, func, *args, **kwargs):
         """Convenience helper method for running Win32 API methods."""
+        kernel32_lib_func = kwargs.pop('kernel32_lib_func', False)
+        if kernel32_lib_func:
+            kwargs.update(self._kernel32_lib_func_opts)
+
         ignored_error_codes = kwargs.pop('ignored_error_codes', [])
 
         # A list of return values signaling that the operation failed.

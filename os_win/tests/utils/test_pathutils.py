@@ -25,7 +25,18 @@ class PathUtilsTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(PathUtilsTestCase, self).setUp()
+        self._setup_lib_mocks()
+
         self._pathutils = pathutils.PathUtils()
+        self._pathutils._win32_utils = mock.Mock()
+        self._mock_run = self._pathutils._win32_utils.run_and_check_output
+
+        self.addCleanup(mock.patch.stopall)
+
+    def _setup_lib_mocks(self):
+        mock.patch.multiple(pathutils,
+                            ctypes=mock.DEFAULT, kernel32=mock.DEFAULT,
+                            create=True).start()
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
     @mock.patch.object(os.path, 'isfile')
@@ -81,3 +92,53 @@ class PathUtilsTestCase(base.BaseTestCase):
 
         mock_exists.assert_called_once_with(fake_dir)
         mock_rmtree.assert_called_once_with(fake_dir)
+
+    @mock.patch('os.path.isdir')
+    @mock.patch('os.path.islink')
+    def _test_check_symlink(self, mock_is_symlink, mock_is_dir,
+                            is_symlink=True, python_version=(2, 7),
+                            is_dir=True):
+        fake_path = r'c:\\fake_path'
+        if is_symlink:
+            f_attr = 0x400
+        else:
+            f_attr = 0x80
+
+        mock_is_dir.return_value = is_dir
+        mock_is_symlink.return_value = is_symlink
+        self._mock_run.return_value = f_attr
+
+        with mock.patch('sys.version_info', python_version):
+            ret_value = self._pathutils.is_symlink(fake_path)
+
+        if python_version >= (3, 2):
+            mock_is_symlink.assert_called_once_with(fake_path)
+        else:
+            self._mock_run.assert_called_once_with(
+                pathutils.kernel32.GetFileAttributesW,
+                fake_path,
+                kernel32_lib_func=True)
+
+        self.assertEqual(is_symlink, ret_value)
+
+    def test_is_symlink(self):
+        self._test_check_symlink()
+
+    def test_is_not_symlink(self):
+        self._test_check_symlink(is_symlink=False)
+
+    def test_is_symlink_python_gt_3_2(self):
+        self._test_check_symlink(python_version=(3, 3))
+
+    def test_create_sym_link(self):
+        tg_is_dir = False
+        self._pathutils.create_sym_link(mock.sentinel.path,
+                                        mock.sentinel.target,
+                                        target_is_dir=tg_is_dir)
+
+        self._mock_run.assert_called_once_with(
+            pathutils.kernel32.CreateSymbolicLinkW,
+            mock.sentinel.path,
+            mock.sentinel.target,
+            tg_is_dir,
+            kernel32_lib_func=True)

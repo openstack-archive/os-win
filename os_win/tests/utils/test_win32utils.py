@@ -103,6 +103,12 @@ class Win32UtilsTestCase(base.BaseTestCase):
         self._test_run_and_check_output(ret_val=ret_val,
                                         ignored_error_codes=ignored_err_codes)
 
+    def test_run_and_check_output_kernel32_lib_func(self):
+        ret_val = 0
+        self._test_run_and_check_output(ret_val=ret_val,
+                                        expected_exc=exceptions.Win32Exception,
+                                        kernel32_lib_func=True)
+
     def test_get_error_message(self):
         err_msg = self._win32_utils.get_error_message(mock.sentinel.err_code)
 

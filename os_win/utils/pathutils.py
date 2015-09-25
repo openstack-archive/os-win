@@ -13,14 +13,21 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
 import os
 import shutil
+import sys
 import time
 
+if sys.platform == 'win32':
+    kernel32 = ctypes.windll.kernel32
+
 from oslo_log import log as logging
+import six
 
 from os_win._i18n import _
 from os_win import _utils
+from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
 
@@ -28,6 +35,11 @@ ERROR_DIR_IS_NOT_EMPTY = 145
 
 
 class PathUtils(object):
+    _FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
+
+    def __init__(self):
+        self._win32_utils = win32utils.Win32Utils()
+
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
         import __builtin__
@@ -97,3 +109,34 @@ class PathUtils(object):
         if self.exists(path):
             LOG.debug('Removing directory: %s', path)
             self.rmtree(path)
+
+    def is_symlink(self, path):
+        if sys.version_info >= (3, 2):
+            return os.path.islink(path)
+
+        file_attr = self._win32_utils.run_and_check_output(
+            kernel32.GetFileAttributesW,
+            six.text_type(path),
+            kernel32_lib_func=True)
+
+        return bool(os.path.isdir(path) and (
+            file_attr & self._FILE_ATTRIBUTE_REPARSE_POINT))
+
+    def create_sym_link(self, link, target, target_is_dir=True):
+        """If target_is_dir is True, a junction will be created.
+
+        NOTE: Juctions only work on same filesystem.
+        """
+        create_symlink = kernel32.CreateSymbolicLinkW
+        create_symlink.argtypes = (
+            ctypes.c_wchar_p,
+            ctypes.c_wchar_p,
+            ctypes.c_ulong,
+        )
+        create_symlink.restype = ctypes.c_ubyte
+
+        self._win32_utils.run_and_check_output(create_symlink,
+                                               link,
+                                               target,
+                                               target_is_dir,
+                                               kernel32_lib_func=True)
