@@ -131,20 +131,29 @@ class JobUtilsTestCase(base.BaseTestCase):
         return mock_job
 
     def test_add_virt_resource(self):
-        self._test_virt_method('AddVirtualSystemResources', 3,
-                               'add_virt_resource', True,
-                               [mock.sentinel.res_data], mock.sentinel.vm_path)
+        self._test_virt_method('AddResourceSettings', 3, 'add_virt_resource',
+                               True, mock.sentinel.vm_path,
+                               [mock.sentinel.res_data])
 
     def test_modify_virt_resource(self):
-        self._test_virt_method('ModifyVirtualSystemResources', 2,
+        self._test_virt_method('ModifyResourceSettings', 3,
                                'modify_virt_resource', True,
-                               ResourceSettingData=[mock.sentinel.res_data],
-                               ComputerSystem=mock.sentinel.vm_path)
+                               ResourceSettings=[mock.sentinel.res_data])
 
     def test_remove_virt_resource(self):
-        self._test_virt_method('RemoveVirtualSystemResources', 2,
+        self._test_virt_method('RemoveResourceSettings', 2,
                                'remove_virt_resource', True,
-                               [mock.sentinel.res_path], mock.sentinel.vm_path)
+                               ResourceSettings=[mock.sentinel.res_path])
+
+    def test_add_virt_feature(self):
+        self._test_virt_method('AddFeatureSettings', 3, 'add_virt_feature',
+                               True, mock.sentinel.vm_path,
+                               [mock.sentinel.res_data])
+
+    def test_remove_virt_feature(self):
+        self._test_virt_method('RemoveFeatureSettings', 2,
+                               'remove_virt_feature', False,
+                               FeatureSettings=[mock.sentinel.res_path])
 
     def _test_virt_method(self, vsms_method_name, return_count,
                           utils_method_name, with_mock_vm, *args, **kwargs):
@@ -179,37 +188,3 @@ class JobUtilsTestCase(base.BaseTestCase):
         self.jobutils.check_ret_val = mock.MagicMock()
 
         return mock_res_setting_data
-
-
-class JobUtilsV2TestCase(JobUtilsTestCase):
-    """Unit tests for the Hyper-V JobUtils class."""
-
-    def setUp(self):
-        super(JobUtilsV2TestCase, self).setUp()
-        self.jobutils = jobutils.JobUtilsV2()
-        self.jobutils._conn = mock.MagicMock()
-
-    def test_add_virt_resource(self):
-        self._test_virt_method('AddResourceSettings', 3, 'add_virt_resource',
-                               True, mock.sentinel.vm_path,
-                               [mock.sentinel.res_data])
-
-    def test_modify_virt_resource(self):
-        self._test_virt_method('ModifyResourceSettings', 3,
-                               'modify_virt_resource', True,
-                               ResourceSettings=[mock.sentinel.res_data])
-
-    def test_remove_virt_resource(self):
-        self._test_virt_method('RemoveResourceSettings', 2,
-                               'remove_virt_resource', True,
-                               ResourceSettings=[mock.sentinel.res_path])
-
-    def test_add_virt_feature(self):
-        self._test_virt_method('AddFeatureSettings', 3, 'add_virt_feature',
-                               True, mock.sentinel.vm_path,
-                               [mock.sentinel.res_data])
-
-    def test_remove_virt_feature(self):
-        self._test_virt_method('RemoveFeatureSettings', 2,
-                               'remove_virt_feature', False,
-                               FeatureSettings=[mock.sentinel.res_path])

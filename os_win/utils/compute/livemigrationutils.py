@@ -22,7 +22,7 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
 from os_win import exceptions
-from os_win.utils.compute import vmutilsv2
+from os_win.utils.compute import vmutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ LOG = logging.getLogger(__name__)
 class LiveMigrationUtils(object):
 
     def __init__(self):
-        self._vmutils = vmutilsv2.VMUtilsV2()
+        self._vmutils = vmutils.VMUtils()
         self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
@@ -233,7 +233,7 @@ class LiveMigrationUtils(object):
         planned_vm = None
         disk_paths = self._get_physical_disk_paths(vm_name)
         if disk_paths:
-            vmutils_remote = vmutilsv2.VMUtilsV2(dest_host)
+            vmutils_remote = vmutils.VMUtils(dest_host)
             disk_paths_remote = self._get_remote_disk_data(vmutils_remote,
                                                            disk_paths,
                                                            dest_host)

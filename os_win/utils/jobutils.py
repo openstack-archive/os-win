@@ -35,7 +35,7 @@ LOG = logging.getLogger(__name__)
 
 class JobUtils(object):
 
-    _WMI_NAMESPACE = '//%s/root/virtualization'
+    _WMI_NAMESPACE = '//%s/root/virtualization/v2'
 
     _CONCRETE_JOB_CLASS = "Msvm_ConcreteJob"
 
@@ -118,38 +118,6 @@ class JobUtils(object):
 
     def _is_job_completed(self, job):
         return job.JobState in self._completed_job_states
-
-    def add_virt_resource(self, virt_resource, parent):
-        """Adds a new resource to the VM."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_xml = [virt_resource.GetText_(1)]
-        (job_path,
-         new_resources,
-         ret_val) = vs_man_svc.AddVirtualSystemResources(res_xml,
-                                                         parent.path_())
-        self.check_ret_val(ret_val, job_path)
-        return new_resources
-
-    def modify_virt_resource(self, virt_resource, parent):
-        """Updates a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.ModifyVirtualSystemResources(
-            ResourceSettingData=[virt_resource.GetText_(1)],
-            ComputerSystem=parent.path_())
-        self.check_ret_val(ret_val, job_path)
-
-    def remove_virt_resource(self, virt_resource, parent):
-        """Removes a VM resource."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        res_path = [virt_resource.path_()]
-        (job_path, ret_val) = vs_man_svc.RemoveVirtualSystemResources(
-            res_path, parent.path_())
-        self.check_ret_val(ret_val, job_path)
-
-
-class JobUtilsV2(JobUtils):
-
-    _WMI_NAMESPACE = '//%s/root/virtualization/v2'
 
     def add_virt_resource(self, virt_resource, parent):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]

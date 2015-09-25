@@ -15,7 +15,9 @@
 #    under the License.
 
 """
-Utility class for VM related operations on Hyper-V.
+Utility class for VM related operations.
+Based on the "root/virtualization/v2" namespace available starting with
+Hyper-V Server / Windows Server 2012.
 """
 
 import sys
@@ -43,14 +45,14 @@ LOG = logging.getLogger(__name__)
 class VMUtils(object):
 
     # These constants can be overridden by inherited classes
-    _PHYS_DISK_RES_SUB_TYPE = 'Microsoft Physical Disk Drive'
-    _DISK_DRIVE_RES_SUB_TYPE = 'Microsoft Synthetic Disk Drive'
-    _DVD_DRIVE_RES_SUB_TYPE = 'Microsoft Synthetic DVD Drive'
-    _HARD_DISK_RES_SUB_TYPE = 'Microsoft Virtual Hard Disk'
-    _DVD_DISK_RES_SUB_TYPE = 'Microsoft Virtual CD/DVD Disk'
-    _IDE_CTRL_RES_SUB_TYPE = 'Microsoft Emulated IDE Controller'
-    _SCSI_CTRL_RES_SUB_TYPE = 'Microsoft Synthetic SCSI Controller'
-    _SERIAL_PORT_RES_SUB_TYPE = 'Microsoft Serial Port'
+    _PHYS_DISK_RES_SUB_TYPE = 'Microsoft:Hyper-V:Physical Disk Drive'
+    _DISK_DRIVE_RES_SUB_TYPE = 'Microsoft:Hyper-V:Synthetic Disk Drive'
+    _DVD_DRIVE_RES_SUB_TYPE = 'Microsoft:Hyper-V:Synthetic DVD Drive'
+    _HARD_DISK_RES_SUB_TYPE = 'Microsoft:Hyper-V:Virtual Hard Disk'
+    _DVD_DISK_RES_SUB_TYPE = 'Microsoft:Hyper-V:Virtual CD/DVD Disk'
+    _IDE_CTRL_RES_SUB_TYPE = 'Microsoft:Hyper-V:Emulated IDE Controller'
+    _SCSI_CTRL_RES_SUB_TYPE = 'Microsoft:Hyper-V:Synthetic SCSI Controller'
+    _SERIAL_PORT_RES_SUB_TYPE = 'Microsoft:Hyper-V:Serial Port'
 
     _SETTINGS_DEFINE_STATE_CLASS = 'Msvm_SettingsDefineState'
     _VIRTUAL_SYSTEM_SETTING_DATA_CLASS = 'Msvm_VirtualSystemSettingData'
@@ -58,24 +60,33 @@ class VMUtils(object):
     _PROCESSOR_SETTING_DATA_CLASS = 'Msvm_ProcessorSettingData'
     _MEMORY_SETTING_DATA_CLASS = 'Msvm_MemorySettingData'
     _SERIAL_PORT_SETTING_DATA_CLASS = _RESOURCE_ALLOC_SETTING_DATA_CLASS
-    _STORAGE_ALLOC_SETTING_DATA_CLASS = _RESOURCE_ALLOC_SETTING_DATA_CLASS
-    _SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS = \
-    'Msvm_SyntheticEthernetPortSettingData'
+    _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
+    _SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS = (
+        'Msvm_EthernetPortAllocationSettingData')
     _AFFECTED_JOB_ELEMENT_CLASS = "Msvm_AffectedJobElement"
     _COMPUTER_SYSTEM_CLASS = "Msvm_ComputerSystem"
+
+    _VIRTUAL_SYSTEM_SUBTYPE = 'VirtualSystemSubType'
+    _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
+    _VIRTUAL_SYSTEM_SUBTYPE_GEN2 = 'Microsoft:Hyper-V:SubType:2'
+
+    _SNAPSHOT_FULL = 2
+    _METRIC_ENABLED = 2
+    _METRIC_AGGR_CPU_AVG = 'Aggregated Average CPU Utilization'
+    _METRIC_AGGR_MEMORY_AVG = 'Aggregated Average Memory Utilization'
 
     _VM_ENABLED_STATE_PROP = "EnabledState"
 
     _SHUTDOWN_COMPONENT = "Msvm_ShutdownComponent"
     _VIRTUAL_SYSTEM_CURRENT_SETTINGS = 3
-    _AUTOMATIC_STARTUP_ACTION_NONE = 0
+    _AUTOMATIC_STARTUP_ACTION_NONE = 2
 
     _vm_power_states_map = {constants.HYPERV_VM_STATE_ENABLED: 2,
                             constants.HYPERV_VM_STATE_DISABLED: 3,
                             constants.HYPERV_VM_STATE_SHUTTING_DOWN: 4,
-                            constants.HYPERV_VM_STATE_REBOOT: 10,
-                            constants.HYPERV_VM_STATE_PAUSED: 32768,
-                            constants.HYPERV_VM_STATE_SUSPENDED: 32769}
+                            constants.HYPERV_VM_STATE_REBOOT: 11,
+                            constants.HYPERV_VM_STATE_PAUSED: 9,
+                            constants.HYPERV_VM_STATE_SUSPENDED: 6}
 
     def __init__(self, host='.'):
         self._jobutils = jobutils.JobUtils()
@@ -83,27 +94,24 @@ class VMUtils(object):
                                     six.iteritems(self._vm_power_states_map)}
         if sys.platform == 'win32':
             self._init_hyperv_wmi_conn(host)
-            self._conn_cimv2 = wmi.WMI(moniker='//%s/root/cimv2' % host)
-
-        # On version of Hyper-V prior to 2012 trying to directly set properties
-        # in default setting data WMI objects results in an exception
-        self._clone_wmi_objs = False
-        if sys.platform == 'win32':
-            hostutls = hostutils.HostUtils()
-            self._clone_wmi_objs = not hostutls.check_min_windows_version(6, 2)
+            # A separate WMI class for VM serial ports has been introduced
+            # in Windows 10 / Windows Server 2016
+            if hostutils.HostUtils().check_min_windows_version(10, 0):
+                self._SERIAL_PORT_SETTING_DATA_CLASS = (
+                    "Msvm_SerialPortSettingData")
 
     def _init_hyperv_wmi_conn(self, host):
-        self._conn = wmi.WMI(moniker='//%s/root/virtualization' % host)
+        self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
 
     def list_instance_notes(self):
         instance_notes = []
 
         for vs in self._conn.Msvm_VirtualSystemSettingData(
                 ['ElementName', 'Notes'],
-                SettingType=self._VIRTUAL_SYSTEM_CURRENT_SETTINGS):
+                VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED):
             if vs.Notes is not None:
                 instance_notes.append(
-                    (vs.ElementName, [v for v in vs.Notes.split('\n') if v]))
+                    (vs.ElementName, [v for v in vs.Notes if v]))
 
         return instance_notes
 
@@ -112,7 +120,7 @@ class VMUtils(object):
         return [v.ElementName for v in
                 self._conn.Msvm_VirtualSystemSettingData(
                     ['ElementName'],
-                    SettingType=self._VIRTUAL_SYSTEM_CURRENT_SETTINGS)]
+                    VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED)]
 
     def get_vm_summary_info(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -155,6 +163,10 @@ class VMUtils(object):
                              'UpTime': up_time}
         return summary_info_dict
 
+    def get_vm_state(self, vm_name):
+        settings = self.get_vm_summary_info(vm_name)
+        return settings['EnabledState']
+
     def _lookup_vm_check(self, vm_name):
 
         vm = self._lookup_vm(vm_name)
@@ -184,7 +196,8 @@ class VMUtils(object):
         vmsettings = vm.associators(
             wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)
         # Avoid snapshots
-        return [s for s in vmsettings if s.SettingType == 3][0]
+        return [s for s in vmsettings if
+                s.VirtualSystemType == self._VIRTUAL_SYSTEM_TYPE_REALIZED][0]
 
     def _set_vm_memory(self, vm, vmsetting, memory_mb, dynamic_memory_ratio):
         mem_settings = vmsetting.associators(
@@ -250,26 +263,36 @@ class VMUtils(object):
 
     def _create_vm_obj(self, vs_man_svc, vm_name, vm_gen, notes,
                        dynamic_memory_ratio, instance_path):
-        vs_gs_data = self._conn.Msvm_VirtualSystemGlobalSettingData.new()
-        vs_gs_data.ElementName = vm_name
+        vs_data = self._conn.Msvm_VirtualSystemSettingData.new()
+        vs_data.ElementName = vm_name
+        vs_data.Notes = notes
         # Don't start automatically on host boot
-        vs_gs_data.AutomaticStartupAction = self._AUTOMATIC_STARTUP_ACTION_NONE
-        vs_gs_data.ExternalDataRoot = instance_path
-        vs_gs_data.SnapshotDataRoot = instance_path
+        vs_data.AutomaticStartupAction = self._AUTOMATIC_STARTUP_ACTION_NONE
 
-        (vm_path,
-         job_path,
-         ret_val) = vs_man_svc.DefineVirtualSystem([], None,
-                                                   vs_gs_data.GetText_(1))
-        self._jobutils.check_ret_val(ret_val, job_path)
+        # vNUMA and dynamic memory are mutually exclusive
+        if dynamic_memory_ratio > 1:
+            vs_data.VirtualNumaEnabled = False
 
-        vm = self._get_wmi_obj(vm_path)
+        if vm_gen == constants.VM_GEN_2:
+            vs_data.VirtualSystemSubType = self._VIRTUAL_SYSTEM_SUBTYPE_GEN2
+            vs_data.SecureBootEnabled = False
 
-        if notes:
-            vmsetting = self._get_vm_setting_data(vm)
-            vmsetting.Notes = '\n'.join(notes)
-            self._modify_virtual_system(vs_man_svc, vm_path, vmsetting)
+        # Created VMs must have their *DataRoot paths in the same location as
+        # the instances' path.
+        vs_data.ConfigurationDataRoot = instance_path
+        vs_data.LogDataRoot = instance_path
+        vs_data.SnapshotDataRoot = instance_path
+        vs_data.SuspendDataRoot = instance_path
+        vs_data.SwapFileDataRoot = instance_path
 
+        (job_path,
+         vm_path,
+         ret_val) = vs_man_svc.DefineSystem(ResourceSettings=[],
+                                            ReferenceConfiguration=None,
+                                            SystemSettings=vs_data.GetText_(1))
+        job = self._jobutils.check_ret_val(ret_val, job_path)
+        if not vm_path and job:
+            vm_path = job.associators(self._AFFECTED_JOB_ELEMENT_CLASS)[0]
         return self._get_wmi_obj(vm_path)
 
     def _modify_virtual_system(self, vs_man_svc, vm_path, vmsetting):
@@ -312,19 +335,21 @@ class VMUtils(object):
         return volumes
 
     def _get_attached_disks_query_string(self, scsi_controller_path):
-        return ("SELECT * FROM %(class_name)s WHERE ("
+        # DVD Drives can be attached to SCSI as well, if the VM Generation is 2
+        return ("SELECT * FROM Msvm_ResourceAllocationSettingData WHERE ("
                 "ResourceSubType='%(res_sub_type)s' OR "
-                "ResourceSubType='%(res_sub_type_virt)s') AND "
-                "Parent='%(parent)s'" % {
-                    'class_name': self._RESOURCE_ALLOC_SETTING_DATA_CLASS,
+                "ResourceSubType='%(res_sub_type_virt)s' OR "
+                "ResourceSubType='%(res_sub_type_dvd)s') AND "
+                "Parent = '%(parent)s'" % {
                     'res_sub_type': self._PHYS_DISK_RES_SUB_TYPE,
                     'res_sub_type_virt': self._DISK_DRIVE_RES_SUB_TYPE,
+                    'res_sub_type_dvd': self._DVD_DRIVE_RES_SUB_TYPE,
                     'parent': scsi_controller_path.replace("'", "''")})
 
     def _get_new_setting_data(self, class_name):
         obj = self._conn.query("SELECT * FROM %s WHERE InstanceID "
                                 "LIKE '%%\\Default'" % class_name)[0]
-        return self._check_clone_wmi_obj(class_name, obj)
+        return obj
 
     def _get_new_resource_setting_data(self, resource_sub_type,
                                        class_name=None):
@@ -336,22 +361,7 @@ class VMUtils(object):
                                 "InstanceID LIKE '%%\\Default'" %
                                 {"class_name": class_name,
                                  "res_sub_type": resource_sub_type})[0]
-        return self._check_clone_wmi_obj(class_name, obj)
-
-    def _check_clone_wmi_obj(self, class_name, obj):
-        if self._clone_wmi_objs:
-            return self._clone_wmi_obj(class_name, obj)
-        else:
-            return obj
-
-    def _clone_wmi_obj(self, class_name, obj):
-        wmi_class = getattr(self._conn, class_name)
-        new_obj = wmi_class.new()
-        # Copy the properties from the original.
-        for prop in obj._properties:
-                value = obj.Properties_.Item(prop).Value
-                new_obj.Properties_.Item(prop).Value = value
-        return new_obj
+        return obj
 
     def attach_scsi_drive(self, vm_name, path, drive_type=constants.DISK):
         vm = self._lookup_vm_check(vm_name)
@@ -381,6 +391,7 @@ class VMUtils(object):
         # Set the ctrller as parent.
         drive.Parent = ctrller_path
         drive.Address = drive_addr
+        drive.AddressOnParent = drive_addr
         # Add the cloned disk drive object to the vm.
         new_resources = self._jobutils.add_virt_resource(drive, vm)
         drive_path = new_resources[0]
@@ -390,10 +401,11 @@ class VMUtils(object):
         elif drive_type == constants.DVD:
             res_sub_type = self._DVD_DISK_RES_SUB_TYPE
 
-        res = self._get_new_resource_setting_data(res_sub_type)
-        # Set the new drive as the parent.
+        res = self._get_new_resource_setting_data(
+            res_sub_type, self._STORAGE_ALLOC_SETTING_DATA_CLASS)
+
         res.Parent = drive_path
-        res.Connection = [path]
+        res.HostResource = [path]
 
         # Add the new vhd object as a virtual hard disk to the vm.
         self._jobutils.add_virt_resource(res, vm)
@@ -417,13 +429,14 @@ class VMUtils(object):
         diskdrive = self._get_new_resource_setting_data(
             self._PHYS_DISK_RES_SUB_TYPE)
 
-        diskdrive.Address = address
+        diskdrive.AddressOnParent = address
         diskdrive.Parent = controller_path
         diskdrive.HostResource = [mounted_disk_path]
+
         self._jobutils.add_virt_resource(diskdrive, vm)
 
     def _get_disk_resource_address(self, disk_resource):
-        return disk_resource.Address
+        return disk_resource.AddressOnParent
 
     def set_disk_host_resource(self, vm_name, controller_path, address,
                                mounted_disk_path):
@@ -511,7 +524,7 @@ class VMUtils(object):
                   {'vm_name': vm_name, 'req_state': req_state})
 
     def _get_disk_resource_disk_path(self, disk_resource):
-        return disk_resource.Connection
+        return disk_resource.HostResource
 
     def get_vm_storage_paths(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -553,8 +566,8 @@ class VMUtils(object):
         vm = self._lookup_vm_check(vm_name)
 
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        # Remove the VM. Does not destroy disks.
-        (job_path, ret_val) = vs_man_svc.DestroyVirtualSystem(vm.path_())
+        # Remove the VM. It does not destroy any associated virtual disk.
+        (job_path, ret_val) = vs_man_svc.DestroySystem(vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_wmi_obj(self, path):
@@ -562,25 +575,63 @@ class VMUtils(object):
 
     def take_vm_snapshot(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
+        vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-
-        (job_path, ret_val,
-         snp_setting_data) = vs_man_svc.CreateVirtualSystemSnapshot(vm.path_())
+        (job_path, snp_setting_data, ret_val) = vs_snap_svc.CreateSnapshot(
+            AffectedSystem=vm.path_(),
+            SnapshotType=self._SNAPSHOT_FULL)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-        job_wmi_path = job_path.replace('\\', '/')
-        job = wmi.WMI(moniker=job_wmi_path)
+        job = self._get_wmi_obj(job_path)
         snp_setting_data = job.associators(
             wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)[0]
+
         return snp_setting_data.path_()
 
     def remove_vm_snapshot(self, snapshot_path):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-
-        (job_path, ret_val) = vs_man_svc.RemoveVirtualSystemSnapshot(
-            snapshot_path)
+        vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
+        (job_path, ret_val) = vs_snap_svc.DestroySnapshot(snapshot_path)
         self._jobutils.check_ret_val(ret_val, job_path)
+
+    def enable_vm_metrics_collection(self, vm_name):
+        metric_names = [self._METRIC_AGGR_CPU_AVG,
+                        self._METRIC_AGGR_MEMORY_AVG]
+
+        vm = self._lookup_vm_check(vm_name)
+        metric_svc = self._conn.Msvm_MetricService()[0]
+        (disks, volumes) = self._get_vm_disks(vm)
+        filtered_disks = [d for d in disks if
+                          d.ResourceSubType is not self._DVD_DISK_RES_SUB_TYPE]
+
+        # enable metrics for disk.
+        for disk in filtered_disks:
+            self._enable_metrics(metric_svc, disk)
+
+        for metric_name in metric_names:
+            metric_def = self._conn.CIM_BaseMetricDefinition(Name=metric_name)
+            if not metric_def:
+                LOG.debug("Metric not found: %s", metric_name)
+            else:
+                self._enable_metrics(metric_svc, vm, metric_def[0].path_())
+
+    def _enable_metrics(self, metric_svc, element, definition_path=None):
+        metric_svc.ControlMetrics(
+            Subject=element.path_(),
+            Definition=definition_path,
+            MetricCollectionEnabled=self._METRIC_ENABLED)
+
+    def get_vm_dvd_disk_paths(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+
+        settings = vm.associators(
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)[0]
+        sasds = settings.associators(
+            wmi_result_class=self._STORAGE_ALLOC_SETTING_DATA_CLASS)
+
+        dvd_paths = [sasd.HostResource[0] for sasd in sasds
+                     if sasd.ResourceSubType == self._DVD_DISK_RES_SUB_TYPE]
+
+        return dvd_paths
 
     def detach_vm_disk(self, vm_name, disk_path, is_physical=True):
         vm = self._lookup_vm_check(vm_name)
@@ -649,10 +700,6 @@ class VMUtils(object):
         raise exceptions.HyperVException(
             _("Exceeded the maximum number of slots"))
 
-    def enable_vm_metrics_collection(self, vm_name):
-        raise NotImplementedError(_("Metrics collection is not supported on "
-                                    "this version of Hyper-V"))
-
     def get_vm_serial_port_connection(self, vm_name, update_connection=None):
         vm = self._lookup_vm_check(vm_name)
 
@@ -719,7 +766,7 @@ class VMUtils(object):
     def _get_instance_notes(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
         vmsettings = self._get_vm_setting_data(vm)
-        return [note for note in vmsettings.Notes.split('\n') if note]
+        return [note for note in vmsettings.Notes if note]
 
     def get_instance_uuid(self, vm_name):
         instance_notes = self._get_instance_notes(vm_name)
@@ -731,6 +778,11 @@ class VMUtils(object):
                                             constants.HYPERV_VM_STATE_OTHER)
 
     def get_vm_generation(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+        vssd = self._get_vm_setting_data(vm)
+        if hasattr(vssd, self._VIRTUAL_SYSTEM_SUBTYPE):
+            # expected format: 'Microsoft:Hyper-V:SubType:2'
+            return int(vssd.VirtualSystemSubType.split(':')[-1])
         return constants.VM_GEN_1
 
     def stop_vm_jobs(self, vm_name):

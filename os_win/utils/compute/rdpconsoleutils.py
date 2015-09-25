@@ -13,9 +13,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import sys
+
+if sys.platform == 'win32':
+    import wmi
+
 
 class RDPConsoleUtils(object):
-    _DEFAULT_HYPERV_RDP_PORT = 2179
+    def __init__(self):
+        if sys.platform == 'win32':
+            self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
 
     def get_rdp_console_port(self):
-        return self._DEFAULT_HYPERV_RDP_PORT
+        rdp_setting_data = self._conn.Msvm_TerminalServiceSettingData()[0]
+        return rdp_setting_data.ListenerPort

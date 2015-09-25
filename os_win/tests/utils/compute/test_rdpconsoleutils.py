@@ -12,18 +12,26 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import mock
 from oslotest import base
 
 from os_win.utils.compute import rdpconsoleutils
 
 
 class RDPConsoleUtilsTestCase(base.BaseTestCase):
+    _FAKE_RDP_PORT = 1000
+
     def setUp(self):
         self._rdpconsoleutils = rdpconsoleutils.RDPConsoleUtils()
+        self._rdpconsoleutils._conn = mock.MagicMock()
+
         super(RDPConsoleUtilsTestCase, self).setUp()
 
     def test_get_rdp_console_port(self):
+        conn = self._rdpconsoleutils._conn
+        mock_rdp_setting_data = conn.Msvm_TerminalServiceSettingData()[0]
+        mock_rdp_setting_data.ListenerPort = self._FAKE_RDP_PORT
+
         listener_port = self._rdpconsoleutils.get_rdp_console_port()
 
-        self.assertEqual(self._rdpconsoleutils._DEFAULT_HYPERV_RDP_PORT,
-                         listener_port)
+        self.assertEqual(self._FAKE_RDP_PORT, listener_port)

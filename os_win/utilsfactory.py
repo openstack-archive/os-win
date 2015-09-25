@@ -17,26 +17,17 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LW  # noqa
-from os_win import exceptions
 from os_win.utils.compute import livemigrationutils
 from os_win.utils.compute import rdpconsoleutils
-from os_win.utils.compute import rdpconsoleutilsv2
 from os_win.utils.compute import vmutils
-from os_win.utils.compute import vmutilsv2
 from os_win.utils import hostutils
-from os_win.utils import hostutilsv2
 from os_win.utils.network import networkutils
-from os_win.utils.network import networkutilsv2
 from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
 from os_win.utils.storage.virtdisk import vhdutils
 
 hyper_opts = [
-    cfg.BoolOpt('force_hyperv_utils_v1',
-                default=False,
-                deprecated_for_removal=True,
-                help='Force V1 WMI utility classes'),
     cfg.BoolOpt('force_volumeutils_v1',
                 default=False,
                 help='Force V1 volume utility class'),
@@ -50,33 +41,22 @@ LOG = logging.getLogger(__name__)
 utils = hostutils.HostUtils()
 
 
-def _get_class(v1_class, v2_class, force_v1_flag):
+def _get_class(v1_class, v2_class, force_v1_flag, *version):
     # V2 classes are supported starting from Hyper-V Server 2012 and
     # Windows Server 2012 (kernel version 6.2)
-    if not force_v1_flag and utils.check_min_windows_version(6, 2):
-        cls = v2_class
-    else:
+    if force_v1_flag:
         cls = v1_class
+    elif version and not utils.check_min_windows_version(*version):
+        cls = v1_class
+    else:
+        cls = v2_class
     LOG.debug("Loading class: %(module_name)s.%(class_name)s",
               {'module_name': cls.__module__, 'class_name': cls.__name__})
     return cls
 
 
-def _get_virt_utils_class(v1_class, v2_class):
-    # The "root/virtualization" WMI namespace is no longer supported on
-    # Windows Server / Hyper-V Server 2012 R2 / Windows 8.1
-    # (kernel version 6.3) or above.
-    if (CONF.hyperv.force_hyperv_utils_v1 and
-            utils.check_min_windows_version(6, 3)):
-        raise exceptions.HyperVException(
-            _('The "force_hyperv_utils_v1" option cannot be set to "True" '
-              'on Windows Server / Hyper-V Server 2012 R2 or above as the WMI '
-              '"root/virtualization" namespace is no longer supported.'))
-    return _get_class(v1_class, v2_class, CONF.hyperv.force_hyperv_utils_v1)
-
-
 def get_vmutils(host='.'):
-    return _get_virt_utils_class(vmutils.VMUtils, vmutilsv2.VMUtilsV2)(host)
+    return vmutils.VMUtils(host)
 
 
 def get_vhdutils():
@@ -84,22 +64,12 @@ def get_vhdutils():
 
 
 def get_networkutils():
-    force_v1_flag = CONF.hyperv.force_hyperv_utils_v1
-    if utils.check_min_windows_version(6, 3):
-        if force_v1_flag:
-            LOG.warning(_LW('V1 virtualization namespace no longer supported '
-                            'on Windows Server / Hyper-V Server 2012 R2 or '
-                            'above.'))
-        cls = networkutilsv2.NetworkUtilsV2R2
-    else:
-        cls = _get_virt_utils_class(networkutils.NetworkUtils,
-                                    networkutilsv2.NetworkUtilsV2)
-    return cls()
+    return _get_class(networkutils.NetworkUtils, networkutils.NetworkUtilsR2,
+                      False, 6, 3)()
 
 
 def get_hostutils():
-    return _get_virt_utils_class(hostutils.HostUtils,
-                                 hostutilsv2.HostUtilsV2)()
+    return hostutils.HostUtils()
 
 
 def get_pathutils():
@@ -118,5 +88,4 @@ def get_livemigrationutils():
 
 
 def get_rdpconsoleutils():
-    return _get_virt_utils_class(rdpconsoleutils.RDPConsoleUtils,
-                      rdpconsoleutilsv2.RDPConsoleUtilsV2)()
+    return rdpconsoleutils.RDPConsoleUtils()
