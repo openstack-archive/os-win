@@ -28,7 +28,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import uuidutils
 import six
-from six.moves import range
+from six.moves import range  # noqa
 
 from os_win._i18n import _, _LW
 from os_win import exceptions

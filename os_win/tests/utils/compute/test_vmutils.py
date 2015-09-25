@@ -16,7 +16,7 @@
 import mock
 from oslotest import base
 
-from six.moves import range
+from six.moves import range  # noqa
 
 from os_win import exceptions
 from os_win.utils.compute import vmutils
