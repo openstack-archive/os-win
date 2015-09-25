@@ -13,15 +13,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
 import os
 import sys
 
 from oslo_log import log as logging
 
-from os_win._i18n import _
+from os_win._i18n import _, _LE
 from os_win import exceptions
+from os_win.utils import win32utils
 
 if sys.platform == 'win32':
+    kernel32 = ctypes.windll.kernel32
     import wmi
 
 LOG = logging.getLogger(__name__)
@@ -30,6 +33,7 @@ LOG = logging.getLogger(__name__)
 class SMBUtils(object):
     def __init__(self):
         self._smb_conn = wmi.WMI(moniker=r"root\Microsoft\Windows\SMB")
+        self._win32_utils = win32utils.Win32Utils()
 
     def check_smb_mapping(self, share_path, remove_unavailable_mapping=False):
         mappings = self._smb_conn.Msft_SmbMapping(RemotePath=share_path)
@@ -80,3 +84,27 @@ class SMBUtils(object):
                 if force:
                     raise exceptions.SMBException(
                         _("Could not unmount share: %s") % share_path)
+
+    def get_share_capacity_info(self, share_path, ignore_errors=False):
+        norm_path = os.path.abspath(share_path)
+
+        total_bytes = ctypes.c_ulonglong(0)
+        free_bytes = ctypes.c_ulonglong(0)
+
+        try:
+            self._win32_utils.run_and_check_output(
+                kernel32.GetDiskFreeSpaceExW,
+                ctypes.c_wchar_p(norm_path),
+                None,
+                ctypes.pointer(total_bytes),
+                ctypes.pointer(free_bytes))
+            return total_bytes.value, free_bytes.value
+        except exceptions.Win32Exception as exc:
+            LOG.error(_LE("Could not get share %(share_path)s capacity info. "
+                          "Exception: %(exc)s"),
+                      dict(share_path=share_path,
+                           exc=exc))
+            if ignore_errors:
+                return 0, 0
+            else:
+                raise exc
