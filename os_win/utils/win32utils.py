@@ -87,3 +87,18 @@ class Win32Utils(object):
         error_code = kernel32.GetLastError()
         kernel32.SetLastError(0)
         return error_code
+
+    @staticmethod
+    def hresult_to_err_code(hresult):
+        # The last 2 bytes of the hresult store the error code.
+        return hresult & 0xFF
+
+    def get_com_err_code(self, com_error):
+        hres = None
+        try:
+            hres = com_error.excepinfo[5]
+        except Exception:
+            LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
+
+        if hres is not None:
+            return self.hresult_to_err_code(hres)
