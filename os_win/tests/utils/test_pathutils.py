@@ -17,8 +17,6 @@ import os
 import mock
 from oslotest import base
 
-from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils import pathutils
 
 
@@ -27,9 +25,6 @@ class PathUtilsTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(PathUtilsTestCase, self).setUp()
-        self.fake_instance_dir = os.path.join('C:', 'fake_instance_dir')
-        self.fake_instance_name = 'fake_instance_name'
-
         self._pathutils = pathutils.PathUtils()
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
@@ -50,33 +45,6 @@ class PathUtilsTestCase(base.BaseTestCase):
         self._pathutils.move_folder_files(src_dir, dest_dir)
         mock_rename.assert_called_once_with(src_fname, dest_fname)
 
-    def _mock_lookup_configdrive_path(self, ext):
-        self._pathutils.get_instance_dir = mock.MagicMock(
-            return_value=self.fake_instance_dir)
-
-        def mock_exists(*args, **kwargs):
-            path = args[0]
-            return True if path[(path.rfind('.') + 1):] == ext else False
-        self._pathutils.exists = mock_exists
-        configdrive_path = self._pathutils.lookup_configdrive_path(
-            self.fake_instance_name)
-        return configdrive_path
-
-    def test_lookup_configdrive_path(self):
-        for format_ext in constants.DISK_FORMAT_MAP:
-            configdrive_path = self._mock_lookup_configdrive_path(format_ext)
-            fake_path = os.path.join(self.fake_instance_dir,
-                                     'configdrive.' + format_ext)
-            self.assertEqual(configdrive_path, fake_path)
-
-    def test_lookup_configdrive_path_non_exist(self):
-        self._pathutils.get_instance_dir = mock.MagicMock(
-            return_value=self.fake_instance_dir)
-        self._pathutils.exists = mock.MagicMock(return_value=False)
-        configdrive_path = self._pathutils.lookup_configdrive_path(
-            self.fake_instance_name)
-        self.assertIsNone(configdrive_path)
-
     @mock.patch('shutil.rmtree')
     @mock.patch('time.sleep')
     def test_rmtree(self, mock_sleep, mock_rmtree):
@@ -95,21 +63,21 @@ class PathUtilsTestCase(base.BaseTestCase):
         mock_rmtree.assert_has_calls([mock.call(mock.sentinel.FAKE_PATH),
                                       mock.call(mock.sentinel.FAKE_PATH)])
 
-    @mock.patch.object(pathutils, 'CONF')
-    @mock.patch('os.path.join')
-    def test_get_instances_sub_dir(self, fake_path_join, mock_conf):
-        mock_conf.hyperv.instances_dir = '\\'
+    @mock.patch.object(pathutils.PathUtils, 'makedirs')
+    @mock.patch.object(pathutils.PathUtils, 'exists')
+    def test_check_create_dir(self, mock_exists, mock_makedirs):
+        fake_dir = 'dir'
+        mock_exists.return_value = False
+        self._pathutils.check_create_dir(fake_dir)
 
-        class WindowsError(Exception):
-            def __init__(self, winerror=None):
-                self.winerror = winerror
+        mock_exists.assert_called_once_with(fake_dir)
+        mock_makedirs.assert_called_once_with(fake_dir)
 
-        fake_dir_name = "fake_dir_name"
-        fake_windows_error = WindowsError
-        self._pathutils._check_create_dir = mock.MagicMock(
-            side_effect=WindowsError(pathutils.ERROR_INVALID_NAME))
-        with mock.patch('__builtin__.WindowsError',
-                        fake_windows_error, create=True):
-            self.assertRaises(exceptions.HyperVException,
-                              self._pathutils._get_instances_sub_dir,
-                              fake_dir_name)
+    @mock.patch.object(pathutils.PathUtils, 'rmtree')
+    @mock.patch.object(pathutils.PathUtils, 'exists')
+    def test_check_remove_dir(self, mock_exists, mock_rmtree):
+        fake_dir = 'dir'
+        self._pathutils.check_remove_dir(fake_dir)
+
+        mock_exists.assert_called_once_with(fake_dir)
+        mock_rmtree.assert_called_once_with(fake_dir)

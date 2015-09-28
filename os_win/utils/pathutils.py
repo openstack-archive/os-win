@@ -17,30 +17,13 @@ import os
 import shutil
 import time
 
-from oslo_config import cfg
 from oslo_log import log as logging
 
 from os_win._i18n import _
 from os_win import _utils
-from os_win import exceptions
-from os_win.utils import constants
 
 LOG = logging.getLogger(__name__)
 
-hyperv_opts = [
-    cfg.StrOpt('instances_path_share',
-               default="",
-               help='The name of a Windows share name mapped to the '
-                    '"instances_path" dir and used by the resize feature '
-                    'to copy files to the target host. If left blank, an '
-                    'administrative share will be used, looking for the same '
-                    '"instances_path" used locally'),
-]
-
-CONF = cfg.CONF
-CONF.register_opts(hyperv_opts, 'hyperv')
-
-ERROR_INVALID_NAME = 123
 ERROR_DIR_IS_NOT_EMPTY = 145
 
 
@@ -105,110 +88,12 @@ class PathUtils(object):
                 else:
                     raise e
 
-    def get_instances_dir(self, remote_server=None):
-        local_instance_path = os.path.normpath(CONF.instances_path)
-
-        if remote_server:
-            if CONF.hyperv.instances_path_share:
-                path = CONF.hyperv.instances_path_share
-            else:
-                # Use an administrative share
-                path = local_instance_path.replace(':', '$')
-            return ('\\\\%(remote_server)s\\%(path)s' %
-                {'remote_server': remote_server, 'path': path})
-        else:
-            return local_instance_path
-
-    def _check_create_dir(self, path):
+    def check_create_dir(self, path):
         if not self.exists(path):
             LOG.debug('Creating directory: %s', path)
             self.makedirs(path)
 
-    def _check_remove_dir(self, path):
+    def check_remove_dir(self, path):
         if self.exists(path):
             LOG.debug('Removing directory: %s', path)
             self.rmtree(path)
-
-    def _get_instances_sub_dir(self, dir_name, remote_server=None,
-                               create_dir=True, remove_dir=False):
-        instances_path = self.get_instances_dir(remote_server)
-        path = os.path.join(instances_path, dir_name)
-        try:
-            if remove_dir:
-                self._check_remove_dir(path)
-            if create_dir:
-                self._check_create_dir(path)
-            return path
-        except WindowsError as ex:
-            if ex.winerror == ERROR_INVALID_NAME:
-                raise exceptions.HyperVException(_(
-                    "Cannot access \"%(instances_path)s\", make sure the "
-                    "path exists and that you have the proper permissions. "
-                    "In particular Nova-Compute must not be executed with the "
-                    "builtin SYSTEM account or other accounts unable to "
-                    "authenticate on a remote host.") %
-                    {'instances_path': instances_path})
-            raise
-
-    def get_instance_migr_revert_dir(self, instance_name, create_dir=False,
-                                     remove_dir=False):
-        dir_name = '%s_revert' % instance_name
-        return self._get_instances_sub_dir(dir_name, None, create_dir,
-                                           remove_dir)
-
-    def get_instance_dir(self, instance_name, remote_server=None,
-                         create_dir=True, remove_dir=False):
-        return self._get_instances_sub_dir(instance_name, remote_server,
-                                           create_dir, remove_dir)
-
-    def _lookup_vhd_path(self, instance_name, vhd_path_func):
-        vhd_path = None
-        for format_ext in ['vhd', 'vhdx']:
-            test_path = vhd_path_func(instance_name, format_ext)
-            if self.exists(test_path):
-                vhd_path = test_path
-                break
-        return vhd_path
-
-    def lookup_root_vhd_path(self, instance_name):
-        return self._lookup_vhd_path(instance_name, self.get_root_vhd_path)
-
-    def lookup_configdrive_path(self, instance_name):
-        configdrive_path = None
-        for format_ext in constants.DISK_FORMAT_MAP:
-            test_path = self.get_configdrive_path(instance_name, format_ext)
-            if self.exists(test_path):
-                configdrive_path = test_path
-                break
-        return configdrive_path
-
-    def lookup_ephemeral_vhd_path(self, instance_name):
-        return self._lookup_vhd_path(instance_name,
-                                     self.get_ephemeral_vhd_path)
-
-    def get_root_vhd_path(self, instance_name, format_ext):
-        instance_path = self.get_instance_dir(instance_name)
-        return os.path.join(instance_path, 'root.' + format_ext.lower())
-
-    def get_configdrive_path(self, instance_name, format_ext,
-                             remote_server=None):
-        instance_path = self.get_instance_dir(instance_name, remote_server)
-        return os.path.join(instance_path, 'configdrive.' + format_ext.lower())
-
-    def get_ephemeral_vhd_path(self, instance_name, format_ext):
-        instance_path = self.get_instance_dir(instance_name)
-        return os.path.join(instance_path, 'ephemeral.' + format_ext.lower())
-
-    def get_base_vhd_dir(self):
-        return self._get_instances_sub_dir('_base')
-
-    def get_export_dir(self, instance_name):
-        dir_name = os.path.join('export', instance_name)
-        return self._get_instances_sub_dir(dir_name, create_dir=True,
-                                           remove_dir=True)
-
-    def get_vm_console_log_paths(self, vm_name, remote_server=None):
-        instance_dir = self.get_instance_dir(vm_name,
-                                             remote_server)
-        console_log_path = os.path.join(instance_dir, 'console.log')
-        return console_log_path, console_log_path + '.1'
