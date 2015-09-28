@@ -20,13 +20,14 @@ import sys
 import time
 
 if sys.platform == 'win32':
+    from ctypes import wintypes
     kernel32 = ctypes.windll.kernel32
 
 from oslo_log import log as logging
 import six
 
 from os_win._i18n import _
-from os_win import _utils
+from os_win import exceptions
 from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
@@ -60,18 +61,29 @@ class PathUtils(object):
     def copyfile(self, src, dest):
         self.copy(src, dest)
 
-    def copy(self, src, dest):
+    def copy(self, src, dest, fail_if_exists=True):
+        """Copies a file to a specified location.
+
+        :param fail_if_exists: if set to True, the method fails if the
+                               destination path exists.
+        """
         # With large files this is 2x-3x faster than shutil.copy(src, dest),
         # especially when copying to a UNC target.
-        # shutil.copyfileobj(...) with a proper buffer is better than
-        # shutil.copy(...) but still 20% slower than a shell copy.
-        # It can be replaced with Win32 API calls to avoid the process
-        # spawning overhead.
-        LOG.debug('Copying file from %s to %s', src, dest)
-        output, ret = _utils.execute('cmd.exe', '/C', 'copy', '/Y', src, dest)
-        if ret:
-            raise IOError(_('The file copy from %(src)s to %(dest)s failed')
-                           % {'src': src, 'dest': dest})
+        if os.path.isdir(dest):
+            src_fname = os.path.basename(src)
+            dest = os.path.join(dest, src_fname)
+
+        try:
+            self._win32_utils.run_and_check_output(
+                kernel32.CopyFileW,
+                ctypes.c_wchar_p(src),
+                ctypes.c_wchar_p(dest),
+                wintypes.BOOL(fail_if_exists),
+                kernel32_lib_func=True)
+        except exceptions.Win32Exception as exc:
+            err_msg = _('The file copy from %(src)s to %(dest)s failed.'
+                        'Exception: %(exc)s')
+            raise IOError(err_msg % dict(src=src, dest=dest, exc=exc))
 
     def move_folder_files(self, src_dir, dest_dir):
         """Moves the files of the given src_dir to dest_dir.

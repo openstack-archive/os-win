@@ -17,6 +17,7 @@ import os
 import mock
 from oslotest import base
 
+from os_win import exceptions
 from os_win.utils import pathutils
 
 
@@ -34,8 +35,15 @@ class PathUtilsTestCase(base.BaseTestCase):
         self.addCleanup(mock.patch.stopall)
 
     def _setup_lib_mocks(self):
+        self._ctypes = mock.Mock()
+        self._wintypes = mock.Mock()
+
+        self._wintypes.BOOL = lambda x: (x, 'BOOL')
+        self._ctypes.c_wchar_p = lambda x: (x, "c_wchar_p")
+
         mock.patch.multiple(pathutils,
-                            ctypes=mock.DEFAULT, kernel32=mock.DEFAULT,
+                            wintypes=self._wintypes,
+                            ctypes=self._ctypes, kernel32=mock.DEFAULT,
                             create=True).start()
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
@@ -142,3 +150,42 @@ class PathUtilsTestCase(base.BaseTestCase):
             mock.sentinel.target,
             tg_is_dir,
             kernel32_lib_func=True)
+
+    @mock.patch('os.path.isdir')
+    def _test_copy(self, mock_isdir, dest_isdir=False):
+        mock_isdir.return_value = dest_isdir
+        fail_if_exists = False
+
+        fake_src = r'fake_src_fname'
+        fake_dest = r'fake_dest'
+
+        expected_dest = (os.path.join(fake_dest, fake_src)
+                         if dest_isdir else fake_dest)
+
+        self._pathutils.copy(fake_src, fake_dest,
+                             fail_if_exists=fail_if_exists)
+
+        self._mock_run.assert_called_once_with(
+            pathutils.kernel32.CopyFileW,
+            self._ctypes.c_wchar_p(fake_src),
+            self._ctypes.c_wchar_p(expected_dest),
+            self._wintypes.BOOL(fail_if_exists),
+            kernel32_lib_func=True)
+
+    def test_copy_dest_is_fpath(self):
+        self._test_copy()
+
+    def test_copy_dest_is_dir(self):
+        self._test_copy(dest_isdir=True)
+
+    @mock.patch('os.path.isdir')
+    def test_copy_exc(self, mock_isdir):
+        mock_isdir.return_value = False
+        self._mock_run.side_effect = exceptions.Win32Exception(
+            func_name='mock_copy',
+            error_code='fake_error_code',
+            error_message='fake_error_msg')
+        self.assertRaises(IOError,
+                          self._pathutils.copy,
+                          mock.sentinel.src,
+                          mock.sentinel.dest)
