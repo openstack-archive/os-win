@@ -17,28 +17,37 @@
 Utility class for VM related operations on Hyper-V.
 """
 
+from os_win._i18n import _
 
-class HyperVException(Exception):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
+
+class OSWinException(Exception):
+    msg_fmt = '%(message)s'
+
+    def __init__(self, message=None, **kwargs):
+        self.kwargs = kwargs
+
+        if not message:
+            message = self.msg_fmt % kwargs
+
+        self.message = message
+        super(OSWinException, self).__init__(message)
+
+
+class HyperVException(OSWinException):
+    pass
 
 
 # TODO(alexpilotti): Add a storage exception base class
 class VHDResizeException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
+    msg_fmt = _("Exception encountered while resizing the VHD %(vhd_path)s."
+                "Reason: %(reason)s")
 
 
 class HyperVAuthorizationException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
-
-
-class UnsupportedConfigDriveFormatException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVException, self).__init__(message)
+    msg_fmt = _("The Windows account running nova-compute on this Hyper-V "
+                "host doesn't have the required permissions to perform "
+                "Hyper-V related operations.")
 
 
 class HyperVVMNotFoundException(HyperVException):
-    def __init__(self, message=None):
-        super(HyperVVMNotFoundException, self).__init__(message)
+    msg_fmt = _("VM not found: %(vm_name)s")

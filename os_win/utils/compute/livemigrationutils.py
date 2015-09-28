@@ -67,8 +67,7 @@ class LiveMigrationUtils(object):
         vms = conn_v2.Msvm_ComputerSystem(ElementName=vm_name)
         n = len(vms)
         if not n:
-            raise exceptions.HyperVVMNotFoundException(
-                _('VM not found: %s') % vm_name)
+            raise exceptions.HyperVVMNotFoundException(vm_name=vm_name)
         elif n > 1:
             raise exceptions.HyperVException(_('Duplicate VM name found: %s')
                                              % vm_name)

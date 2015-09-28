@@ -159,8 +159,7 @@ class VMUtils(object):
 
         vm = self._lookup_vm(vm_name)
         if not vm:
-            raise exceptions.HyperVVMNotFoundException(
-                _('VM not found: %s') % vm_name)
+            raise exceptions.HyperVVMNotFoundException(vm_name=vm_name)
         return vm
 
     def _lookup_vm(self, vm_name):
@@ -230,10 +229,7 @@ class VMUtils(object):
 
     def check_admin_permissions(self):
         if not self._conn.Msvm_VirtualSystemManagementService():
-            msg = _("The Windows account running nova-compute on this Hyper-V"
-                    " host doesn't have the required permissions to create or"
-                    " operate the virtual machine.")
-            raise exceptions.HyperVAuthorizationException(msg)
+            raise exceptions.HyperVAuthorizationException()
 
     def create_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
                   dynamic_memory_ratio, vm_gen, instance_path, notes=None):
