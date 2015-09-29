@@ -42,9 +42,6 @@ CONF = cfg.CONF
 
 class ISCSIInitiatorCLIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
 
-    def __init__(self):
-        super(ISCSIInitiatorCLIUtils, self).__init__()
-
     def execute(self, *args, **kwargs):
         stdout_value, stderr_value = _utils.execute(*args, **kwargs)
         if stdout_value.find('The operation completed successfully') == -1:
