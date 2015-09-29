@@ -241,7 +241,7 @@ class VHDUtilsTestCase(base.BaseTestCase):
         f.read.side_effect = read_data
         f.tell.return_value = curr_f_pos
 
-        return f
+        return mock_open
 
     def test_get_vhd_format_by_sig_vhdx(self):
         read_data = (vdisk_const.VHDX_SIGNATURE, )
@@ -254,14 +254,14 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
     def test_get_vhd_format_by_sig_vhd(self):
         read_data = ('notthesig', vdisk_const.VHD_SIGNATURE)
-        f = self._mock_open(read_data=read_data, curr_f_pos=1024)
+        mock_open = self._mock_open(read_data=read_data, curr_f_pos=1024)
 
         fmt = self._vhdutils._get_vhd_format_by_signature(
             mock.sentinel.vhd_path)
 
         self.assertEqual(constants.DISK_FORMAT_VHD, fmt)
-        f.seek.assert_has_calls((mock.call(0, 2),
-                                 mock.call(-512, 2)))
+        mock_open.return_value.seek.assert_has_calls([mock.call(0, 2),
+                                                      mock.call(-512, 2)])
 
     def test_get_vhd_format_by_sig_invalid_format(self):
         self._mock_open(read_data='notthesig', curr_f_pos=1024)
@@ -272,13 +272,13 @@ class VHDUtilsTestCase(base.BaseTestCase):
         self.assertIsNone(fmt)
 
     def test_get_vhd_format_by_sig_zero_length_file(self):
-        f = self._mock_open(read_data=('', ''))
+        mock_open = self._mock_open(read_data=('', ''))
 
         fmt = self._vhdutils._get_vhd_format_by_signature(
             mock.sentinel.vhd_path)
 
         self.assertIsNone(fmt)
-        f.seek.assert_called_once_with(0, 2)
+        mock_open.return_value.seek.assert_called_once_with(0, 2)
 
     @mock.patch.object(vhdutils.VHDUtils, '_open')
     @mock.patch.object(vhdutils.VHDUtils, '_close')
@@ -580,10 +580,9 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
     @mock.patch.object(vhdutils.VHDUtils, '_get_vhdx_log_size')
     @mock.patch.object(vhdutils.VHDUtils, '_get_vhdx_metadata_size_and_offset')
-    @mock.patch.object(vhdutils, 'open')
-    def test_get_vhdx_internal_size(self, mock_open,
-                                    mock_get_vhdx_md_sz_and_off,
+    def test_get_vhdx_internal_size(self, mock_get_vhdx_md_sz_and_off,
                                     mock_get_vhdx_log_sz):
+        self._mock_open()
         fake_log_sz = 1 << 20
         fake_block_sz = 32 << 20
         fake_md_sz = 1 << 20
@@ -603,8 +602,8 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
         self.assertEqual(expected_max_int_sz, internal_size)
 
-    @mock.patch.object(vhdutils, 'open')
-    def test_get_vhdx_internal_size_exception(self, mock_open):
+    def test_get_vhdx_internal_size_exception(self):
+        mock_open = self._mock_open()
         mock_open.side_effect = IOError
         func = self._vhdutils._get_internal_vhdx_size_by_file_size
         self.assertRaises(exceptions.VHDException,
