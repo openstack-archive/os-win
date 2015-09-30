@@ -25,6 +25,7 @@ if sys.platform == 'win32':
     import wmi
 
 from oslo_log import log as logging
+from oslo_service import loopingcall
 
 from os_win._i18n import _
 from os_win import exceptions
@@ -126,6 +127,10 @@ class JobUtils(object):
         self.check_ret_val(ret_val, job_path)
         return new_resources
 
+    # modify_virt_resource can fail, especially while setting up the VM's
+    # serial port connection. Retrying the operation will yield success.
+    @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
+                                exceptions=(exceptions.HyperVException, ))
     def modify_virt_resource(self, virt_resource, parent=None):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         (job_path, out_set_data, ret_val) = vs_man_svc.ModifyResourceSettings(
