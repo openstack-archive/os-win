@@ -57,13 +57,13 @@ class VMUtilsTestCase(base.BaseTestCase):
                           'MemoryUsage': 2,
                           'UpTime': 1}
 
-    _DEFINE_SYSTEM = 'DefineVirtualSystem'
-    _DESTROY_SYSTEM = 'DestroyVirtualSystem'
-    _DESTROY_SNAPSHOT = 'RemoveVirtualSystemSnapshot'
-    _SETTING_TYPE = 'SettingType'
-    _VM_GEN = constants.VM_GEN_1
+    _DEFINE_SYSTEM = 'DefineSystem'
+    _DESTROY_SYSTEM = 'DestroySystem'
+    _DESTROY_SNAPSHOT = 'DestroySnapshot'
+    _SETTING_TYPE = 'VirtualSystemType'
+    _VM_GEN = constants.VM_GEN_2
 
-    _VIRTUAL_SYSTEM_TYPE_REALIZED = 3
+    _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
 
     def setUp(self):
         self._vmutils = vmutils.VMUtils()
@@ -72,10 +72,18 @@ class VMUtilsTestCase(base.BaseTestCase):
 
         super(VMUtilsTestCase, self).setUp()
 
-    def test_enable_vm_metrics_collection(self):
-        self.assertRaises(NotImplementedError,
-                          self._vmutils.enable_vm_metrics_collection,
-                          self._FAKE_VM_NAME)
+    @mock.patch('os_win.utils.hostutils.HostUtils'
+                '.check_min_windows_version')
+    @mock.patch.object(vmutils, 'sys')
+    @mock.patch.object(vmutils, 'wmi', create=True)
+    def test_serial_port_setting_data_win_version_10(self, mock_wmi, mock_sys,
+                                                     mock_check_version):
+        mock_sys.platform = 'win32'
+        mock_check_version.return_value = True
+        _vmutils = vmutils.VMUtils()
+
+        self.assertEqual("Msvm_SerialPortSettingData",
+                         _vmutils._SERIAL_PORT_SETTING_DATA_CLASS)
 
     def test_get_vm_summary_info(self):
         self._lookup_vm()
@@ -434,13 +442,15 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._lookup_vm()
 
         mock_svc = self._get_snapshot_service()
-        mock_svc.CreateVirtualSystemSnapshot.return_value = (
-            self._FAKE_JOB_PATH, self._FAKE_RET_VAL, mock.MagicMock())
+        mock_svc.CreateSnapshot.return_value = (self._FAKE_JOB_PATH,
+                                                mock.MagicMock(),
+                                                self._FAKE_RET_VAL)
 
         self._vmutils.take_vm_snapshot(self._FAKE_VM_NAME)
 
-        mock_svc.CreateVirtualSystemSnapshot.assert_called_with(
-            self._FAKE_VM_PATH)
+        mock_svc.CreateSnapshot.assert_called_with(
+            AffectedSystem=self._FAKE_VM_PATH,
+            SnapshotType=self._vmutils._SNAPSHOT_FULL)
 
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, self._FAKE_JOB_PATH)
@@ -453,6 +463,53 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils.remove_vm_snapshot(self._FAKE_SNAPSHOT_PATH)
         getattr(mock_svc, self._DESTROY_SNAPSHOT).assert_called_with(
             self._FAKE_SNAPSHOT_PATH)
+
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
+    def test_enable_vm_metrics_collection(self, mock_get_vm_disks):
+        self._lookup_vm()
+        mock_svc = self._vmutils._conn.Msvm_MetricService()[0]
+
+        metric_def = mock.MagicMock()
+        mock_disk = mock.MagicMock()
+        mock_disk.path_.return_value = self._FAKE_RES_PATH
+        mock_get_vm_disks.return_value = ([mock_disk], [mock_disk])
+
+        fake_metric_def_paths = ['fake_0', 'fake_0', None]
+        fake_metric_resource_paths = [self._FAKE_VM_PATH,
+                                      self._FAKE_VM_PATH,
+                                      self._FAKE_RES_PATH]
+
+        metric_def.path_.side_effect = fake_metric_def_paths
+        self._vmutils._conn.CIM_BaseMetricDefinition.return_value = [
+            metric_def]
+
+        self._vmutils.enable_vm_metrics_collection(self._FAKE_VM_NAME)
+
+        calls = [mock.call(Name=def_name)
+                 for def_name in [self._vmutils._METRIC_AGGR_CPU_AVG,
+                                  self._vmutils._METRIC_AGGR_MEMORY_AVG]]
+        self._vmutils._conn.CIM_BaseMetricDefinition.assert_has_calls(calls)
+
+        calls = []
+        for i in range(len(fake_metric_def_paths)):
+            calls.append(mock.call(
+                Subject=fake_metric_resource_paths[i],
+                Definition=fake_metric_def_paths[i],
+                MetricCollectionEnabled=self._vmutils._METRIC_ENABLED))
+
+        mock_svc.ControlMetrics.assert_has_calls(calls, any_order=True)
+
+    def test_get_vm_dvd_disk_paths(self):
+        mock_vm = self._lookup_vm()
+        mock_sasd1 = mock.MagicMock(
+            ResourceSubType=self._vmutils._DVD_DISK_RES_SUB_TYPE,
+            HostResource=[mock.sentinel.FAKE_DVD_PATH1])
+        mock_settings = mock.MagicMock()
+        mock_settings.associators.return_value = [mock_sasd1]
+        mock_vm.associators.return_value = [mock_settings]
+
+        ret_val = self._vmutils.get_vm_dvd_disk_paths(self._FAKE_VM_NAME)
+        self.assertEqual(mock.sentinel.FAKE_DVD_PATH1, ret_val[0])
 
     def test_detach_vm_disk(self):
         mock_vm = self._lookup_vm()
@@ -490,7 +547,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         return mock_disk
 
     def _get_snapshot_service(self):
-        return self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
+        return self._vmutils._conn.Msvm_VirtualSystemSnapshotService()[0]
 
     def test_get_active_instances(self):
         fake_vm = mock.MagicMock()
@@ -545,17 +602,17 @@ class VMUtilsTestCase(base.BaseTestCase):
     def test_list_instance_notes(self):
         vs = mock.MagicMock()
         attrs = {'ElementName': 'fake_name',
-                 'Notes': '4f54fb69-d3a2-45b7-bb9b-b6e6b3d893b3'}
+                 'Notes': ['4f54fb69-d3a2-45b7-bb9b-b6e6b3d893b3']}
         vs.configure_mock(**attrs)
         vs2 = mock.MagicMock(ElementName='fake_name2', Notes=None)
         self._vmutils._conn.Msvm_VirtualSystemSettingData.return_value = [vs,
                                                                           vs2]
         response = self._vmutils.list_instance_notes()
 
-        self.assertEqual([(attrs['ElementName'], [attrs['Notes']])], response)
+        self.assertEqual([(attrs['ElementName'], attrs['Notes'])], response)
         self._vmutils._conn.Msvm_VirtualSystemSettingData.assert_called_with(
             ['ElementName', 'Notes'],
-            SettingType=self._vmutils._VIRTUAL_SYSTEM_CURRENT_SETTINGS)
+            VirtualSystemType=self._vmutils._VIRTUAL_SYSTEM_TYPE_REALIZED)
 
     def test_modify_virtual_system(self):
         mock_vs_man_svc = mock.MagicMock()
@@ -578,48 +635,72 @@ class VMUtilsTestCase(base.BaseTestCase):
             fake_ret_val, fake_job_path)
 
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
-    @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
-    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
-    def test_create_vm_obj(self, mock_get_vm_setting_data,
-                           mock_modify_virtual_system,
-                           mock_get_wmi_obj):
+    def _test_create_vm_obj(self, mock_get_wmi_obj, vm_path,
+                            dynamic_memory_ratio=1.0):
         mock_vs_man_svc = mock.MagicMock()
-        mock_vs_gs_data = mock.MagicMock()
-        fake_vm_path = 'fake vm path'
+        mock_vs_data = mock.MagicMock()
+        mock_job = mock.MagicMock()
         fake_job_path = 'fake job path'
         fake_ret_val = 'fake return value'
-        _conn = self._vmutils._conn.Msvm_VirtualSystemGlobalSettingData
+        fake_vm_name = 'fake_vm_name'
+        _conn = self._vmutils._conn.Msvm_VirtualSystemSettingData
 
-        _conn.new.return_value = mock_vs_gs_data
-        mock_vs_man_svc.DefineVirtualSystem.return_value = (fake_vm_path,
-                                                            fake_job_path,
-                                                            fake_ret_val)
+        self._vmutils._jobutils.check_ret_val.return_value = mock_job
+        _conn.new.return_value = mock_vs_data
+        mock_vs_man_svc.DefineSystem.return_value = (fake_job_path,
+                                                     vm_path,
+                                                     fake_ret_val)
+        mock_job.associators.return_value = ['fake vm path']
 
         response = self._vmutils._create_vm_obj(
             vs_man_svc=mock_vs_man_svc,
-            vm_name='fake vm', vm_gen='fake vm gen',
-            notes='fake notes', dynamic_memory_ratio=1.0,
+            vm_name=fake_vm_name,
+            vm_gen=constants.VM_GEN_2,
+            notes='fake notes',
+            dynamic_memory_ratio=dynamic_memory_ratio,
             instance_path=mock.sentinel.instance_path)
 
+        if not vm_path:
+            mock_job.associators.assert_called_once_with(
+                self._vmutils._AFFECTED_JOB_ELEMENT_CLASS)
+
         _conn.new.assert_called_once_with()
-        self.assertEqual(mock_vs_gs_data.ElementName, 'fake vm')
-        mock_vs_man_svc.DefineVirtualSystem.assert_called_once_with(
-            [], None, mock_vs_gs_data.GetText_(1))
+        self.assertEqual(mock_vs_data.ElementName, fake_vm_name)
+        mock_vs_man_svc.DefineSystem.assert_called_once_with(
+            ResourceSettings=[], ReferenceConfiguration=None,
+            SystemSettings=mock_vs_data.GetText_(1))
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             fake_ret_val, fake_job_path)
-        self.assertEqual(mock.sentinel.instance_path,
-                         mock_vs_gs_data.ExternalDataRoot)
-        self.assertEqual(mock.sentinel.instance_path,
-                         mock_vs_gs_data.SnapshotDataRoot)
 
-        mock_get_wmi_obj.assert_called_with(fake_vm_path)
-        mock_get_vm_setting_data.assert_called_once_with(mock_get_wmi_obj())
-        mock_modify_virtual_system.assert_called_once_with(
-            mock_vs_man_svc, fake_vm_path, mock_get_vm_setting_data())
+        self.assertEqual(self._vmutils._VIRTUAL_SYSTEM_SUBTYPE_GEN2,
+                         mock_vs_data.VirtualSystemSubType)
+        self.assertFalse(mock_vs_data.SecureBootEnabled)
 
-        self.assertEqual(mock_get_vm_setting_data().Notes,
-                         '\n'.join('fake notes'))
+        if dynamic_memory_ratio > 1:
+            self.assertFalse(mock_vs_data.VirtualNumaEnabled)
+
+        mock_get_wmi_obj.assert_called_with('fake vm path')
+
+        self.assertEqual(mock_vs_data.Notes, 'fake notes')
+        self.assertEqual(mock.sentinel.instance_path,
+                         mock_vs_data.ConfigurationDataRoot)
+        self.assertEqual(mock.sentinel.instance_path, mock_vs_data.LogDataRoot)
+        self.assertEqual(mock.sentinel.instance_path,
+                         mock_vs_data.SnapshotDataRoot)
+        self.assertEqual(mock.sentinel.instance_path,
+                         mock_vs_data.SuspendDataRoot)
+        self.assertEqual(mock.sentinel.instance_path,
+                         mock_vs_data.SwapFileDataRoot)
         self.assertEqual(response, mock_get_wmi_obj())
+
+    def test_create_vm_obj(self):
+        self._test_create_vm_obj(vm_path='fake vm path')
+
+    def test_create_vm_obj_no_vm_path(self):
+        self._test_create_vm_obj(vm_path=None)
+
+    def test_create_vm_obj_dynamic_memory(self):
+        self._test_create_vm_obj(vm_path=None, dynamic_memory_ratio=1.1)
 
     def test_list_instances(self):
         vs = mock.MagicMock()
@@ -631,56 +712,24 @@ class VMUtilsTestCase(base.BaseTestCase):
         self.assertEqual([(attrs['ElementName'])], response)
         self._vmutils._conn.Msvm_VirtualSystemSettingData.assert_called_with(
             ['ElementName'],
-            SettingType=self._vmutils._VIRTUAL_SYSTEM_CURRENT_SETTINGS)
-
-    @mock.patch.object(vmutils.VMUtils, "_clone_wmi_obj")
-    def _test_check_clone_wmi_obj(self, mock_clone_wmi_obj, clone_objects):
-        mock_obj = mock.MagicMock()
-        self._vmutils._clone_wmi_objs = clone_objects
-
-        response = self._vmutils._check_clone_wmi_obj(class_name="fakeClass",
-                                                      obj=mock_obj)
-        if not clone_objects:
-            self.assertEqual(mock_obj, response)
-        else:
-            mock_clone_wmi_obj.assert_called_once_with("fakeClass", mock_obj)
-            self.assertEqual(mock_clone_wmi_obj.return_value, response)
-
-    def test_check_clone_wmi_obj_true(self):
-        self._test_check_clone_wmi_obj(clone_objects=True)
-
-    def test_check_clone_wmi_obj_false(self):
-        self._test_check_clone_wmi_obj(clone_objects=False)
-
-    def test_clone_wmi_obj(self):
-        mock_obj = mock.MagicMock()
-        mock_value = mock.MagicMock()
-        mock_value.Value = mock.sentinel.fake_value
-        mock_obj._properties = [mock.sentinel.property]
-        mock_obj.Properties_.Item.return_value = mock_value
-
-        response = self._vmutils._clone_wmi_obj(
-            class_name="FakeClass", obj=mock_obj)
-
-        compare = self._vmutils._conn.FakeClass.new()
-        self.assertEqual(mock.sentinel.fake_value,
-                         compare.Properties_.Item().Value)
-        self.assertEqual(compare, response)
+            VirtualSystemType=self._vmutils._VIRTUAL_SYSTEM_TYPE_REALIZED)
 
     def test_get_attached_disks(self):
         mock_scsi_ctrl_path = mock.MagicMock()
         expected_query = ("SELECT * FROM %(class_name)s "
                           "WHERE (ResourceSubType='%(res_sub_type)s' OR "
-                          "ResourceSubType='%(res_sub_type_virt)s')"
-                          " AND Parent='%(parent)s'" %
+                          "ResourceSubType='%(res_sub_type_virt)s' OR "
+                          "ResourceSubType='%(res_sub_type_dvd)s') AND "
+                          "Parent = '%(parent)s'" %
                           {"class_name":
                            self._vmutils._RESOURCE_ALLOC_SETTING_DATA_CLASS,
                            "res_sub_type":
                            self._vmutils._PHYS_DISK_RES_SUB_TYPE,
                            "res_sub_type_virt":
                            self._vmutils._DISK_DRIVE_RES_SUB_TYPE,
-                           "parent":
-                           mock_scsi_ctrl_path.replace("'", "''")})
+                           "res_sub_type_dvd":
+                           self._vmutils._DVD_DRIVE_RES_SUB_TYPE,
+                           "parent": mock_scsi_ctrl_path.replace("'", "''")})
         expected_disks = self._vmutils._conn.query.return_value
 
         ret_disks = self._vmutils.get_attached_disks(mock_scsi_ctrl_path)
@@ -689,7 +738,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         self.assertEqual(expected_disks, ret_disks)
 
     def _get_fake_instance_notes(self):
-        return self._FAKE_VM_UUID
+        return [self._FAKE_VM_UUID]
 
     def test_instance_notes(self):
         self._lookup_vm()
@@ -749,9 +798,22 @@ class VMUtilsTestCase(base.BaseTestCase):
 
             self.assertEqual(watcher.return_value, listener)
 
-    def test_get_vm_generation_gen1(self):
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
+    def _test_get_vm_generation(self, vm_gen, mock_get_vm_setting_data):
+        self._lookup_vm()
+        vm_gen_string = "Microsoft:Hyper-V:SubType:" + str(vm_gen)
+        mock_vssd = mock.MagicMock(VirtualSystemSubType=vm_gen_string)
+        mock_get_vm_setting_data.return_value = mock_vssd
+
         ret = self._vmutils.get_vm_generation(mock.sentinel.FAKE_VM_NAME)
-        self.assertEqual(constants.VM_GEN_1, ret)
+
+        self.assertEqual(vm_gen, ret)
+
+    def test_get_vm_generation_gen1(self):
+        self._test_get_vm_generation(constants.VM_GEN_1)
+
+    def test_get_vm_generation_gen2(self):
+        self._test_get_vm_generation(constants.VM_GEN_2)
 
     def test_stop_vm_jobs(self):
         mock_vm = self._lookup_vm()

@@ -20,8 +20,13 @@ import sys
 if sys.platform == 'win32':
     import wmi
 
+from oslo_log import log as logging
+
 from os_win._i18n import _
+from os_win import exceptions
 from os_win.utils import constants
+
+LOG = logging.getLogger(__name__)
 
 
 class HostUtils(object):
@@ -30,13 +35,26 @@ class HostUtils(object):
     _HOST_FORCED_SHUTDOWN = 12
     _DEFAULT_VM_GENERATION = constants.IMAGE_PROP_VM_GEN_1
 
+    FEATURE_RDS_VIRTUALIZATION = 322
+
     def __init__(self):
+        self._virt_v2 = None
         if sys.platform == 'win32':
             self._conn_cimv2 = wmi.WMI(privileges=["Shutdown"])
             self._init_wmi_virt_conn()
 
     def _init_wmi_virt_conn(self):
-        self._conn_virt = None
+        try:
+            self._virt_v2 = wmi.WMI(moniker='//./root/virtualization/v2')
+        except Exception:
+            pass
+
+    @property
+    def _conn_virt(self):
+        if self._virt_v2:
+            return self._virt_v2
+        raise exceptions.HyperVException(
+            _("No connection to the 'root/virtualization/v2' WMI namespace."))
 
     def get_cpus_info(self):
         cpus = self._conn_cimv2.query("SELECT * FROM Win32_Processor "

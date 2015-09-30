@@ -15,6 +15,7 @@
 import mock
 from oslotest import base
 
+from os_win import exceptions
 from os_win.utils import constants
 from os_win.utils import hostutils
 
@@ -42,8 +43,34 @@ class HostUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self._hostutils = hostutils.HostUtils()
         self._hostutils._conn_cimv2 = mock.MagicMock()
+        self._hostutils._virt_v2 = mock.MagicMock()
 
         super(HostUtilsTestCase, self).setUp()
+
+    @mock.patch.object(hostutils, 'wmi', create=True)
+    def test_init_wmi_virt_conn(self, mock_wmi):
+        self._hostutils._init_wmi_virt_conn()
+
+        self.assertEqual(mock_wmi.WMI.return_value, self._hostutils._virt_v2)
+        mock_wmi.WMI.assert_called_once_with(
+            moniker='//./root/virtualization/v2')
+
+    @mock.patch.object(hostutils, 'wmi', create=True)
+    def test_init_wmi_virt_conn_exception(self, mock_wmi):
+        self._hostutils._virt_v2 = None
+        mock_wmi.WMI.side_effect = Exception
+
+        self._hostutils._init_wmi_virt_conn()
+        self.assertIsNone(self._hostutils._virt_v2)
+
+    def test_conn_virt(self):
+        self._hostutils._virt_v2 = mock.sentinel.conn
+        self.assertEqual(mock.sentinel.conn, self._hostutils._conn_virt)
+
+    def test_conn_virt_uninitialized(self):
+        self._hostutils._virt_v2 = None
+        self.assertRaises(exceptions.HyperVException,
+                          getattr, self._hostutils, '_conn_virt')
 
     @mock.patch('os_win.utils.hostutils.ctypes')
     def test_get_host_tick_count64(self, mock_ctypes):

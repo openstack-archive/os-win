@@ -226,9 +226,9 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
             MigrationSettingData=mock_vsmsd.GetText_.return_value,
             NewResourceSettingData=mock.sentinel.FAKE_RASD_PATH)
 
-    @mock.patch.object(livemigrationutils, 'vmutilsv2')
+    @mock.patch.object(livemigrationutils, 'vmutils')
     def test_live_migrate_vm(self, mock_vm_utils):
-        mock_vm_utils_remote = mock_vm_utils.VMUtilsV2.return_value
+        mock_vm_utils_remote = mock_vm_utils.VMUtils.return_value
         mock_vm = self._get_vm()
 
         mock_migr_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]
