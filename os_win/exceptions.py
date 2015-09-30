@@ -98,3 +98,7 @@ class ISCSITargetException(OSWinException):
 
 class ISCSITargetWMIException(ISCSITargetException, WMIException):
     pass
+
+
+class Win32IOException(Win32Exception):
+    pass
