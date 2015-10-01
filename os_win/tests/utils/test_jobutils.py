@@ -130,15 +130,47 @@ class JobUtilsTestCase(base.BaseTestCase):
         mock_wmi.WMI.return_value = mock_job
         return mock_job
 
+    def test_modify_virt_resource(self):
+        side_effect = [
+            (self._FAKE_JOB_PATH, mock.MagicMock(), self._FAKE_RET_VAL)]
+        self._check_modify_virt_resource_max_retries(side_effect=side_effect)
+
+    def test_modify_virt_resource_max_retries_exception(self):
+        side_effect = exceptions.HyperVException('expected failure.')
+        self._check_modify_virt_resource_max_retries(
+            side_effect=side_effect, num_calls=6, expected_fail=True)
+
+    def test_modify_virt_resource_max_retries(self):
+        side_effect = [exceptions.HyperVException('expected failure.')] * 5 + [
+            (self._FAKE_JOB_PATH, mock.MagicMock(), self._FAKE_RET_VAL)]
+        self._check_modify_virt_resource_max_retries(side_effect=side_effect,
+                                                     num_calls=5)
+
+    @mock.patch('eventlet.greenthread.sleep')
+    def _check_modify_virt_resource_max_retries(
+            self, mock_sleep, side_effect, num_calls=1, expected_fail=False):
+        mock_svc = self.jobutils._conn.Msvm_VirtualSystemManagementService()[0]
+        mock_svc.ModifyResourceSettings.side_effect = side_effect
+        mock_res_setting_data = mock.MagicMock()
+        mock_res_setting_data.GetText_.return_value = mock.sentinel.res_data
+
+        if expected_fail:
+            self.assertRaises(exceptions.HyperVException,
+                              self.jobutils.modify_virt_resource,
+                              mock_res_setting_data, mock.sentinel.fake_path)
+        else:
+            self.jobutils.modify_virt_resource(mock_res_setting_data,
+                                               mock.sentinel.fake_path)
+
+        mock_calls = [
+            mock.call(ResourceSettings=[mock.sentinel.res_data])] * num_calls
+        mock_svc.ModifyResourceSettings.has_calls(mock_calls)
+        mock_sleep.has_calls(mock.call(1) * num_calls)
+
     def test_add_virt_resource(self):
         self._test_virt_method('AddResourceSettings', 3, 'add_virt_resource',
                                True, mock.sentinel.vm_path,
                                [mock.sentinel.res_data])
-
-    def test_modify_virt_resource(self):
-        self._test_virt_method('ModifyResourceSettings', 3,
-                               'modify_virt_resource', True,
-                               ResourceSettings=[mock.sentinel.res_data])
 
     def test_remove_virt_resource(self):
         self._test_virt_method('RemoveResourceSettings', 2,
