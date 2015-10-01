@@ -129,3 +129,26 @@ class Win32UtilsTestCase(base.BaseTestCase):
         self.assertEqual(win32utils.kernel32.GetLastError.return_value,
                          last_err)
         win32utils.kernel32.SetLastError.assert_called_once_with(0)
+
+    def test_hresult_to_err_code(self):
+        # This could differ based on the error source.
+        # Only the last 2 bytes of the hresult the error code.
+        fake_file_exists_hres = -0x7ff8ffb0
+        file_exists_err_code = 0x50
+
+        ret_val = self._win32_utils.hresult_to_err_code(fake_file_exists_hres)
+        self.assertEqual(file_exists_err_code, ret_val)
+
+    @mock.patch.object(win32utils.Win32Utils, 'hresult_to_err_code')
+    def test_get_com_err_code(self, mock_hres_to_err_code):
+        mock_excepinfo = [None] * 5 + [mock.sentinel.hres]
+        mock_com_err = mock.Mock(excepinfo=mock_excepinfo)
+
+        ret_val = self._win32_utils.get_com_err_code(mock_com_err)
+
+        self.assertEqual(mock_hres_to_err_code.return_value, ret_val)
+        mock_hres_to_err_code.assert_called_once_with(mock.sentinel.hres)
+
+    def test_get_com_err_code_missing_excepinfo(self):
+        ret_val = self._win32_utils.get_com_err_code(None)
+        self.assertIsNone(ret_val)

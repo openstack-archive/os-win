@@ -25,6 +25,7 @@ from os_win.utils.network import networkutils
 from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
+from os_win.utils.storage.target import iscsi_target_utils
 from os_win.utils.storage.virtdisk import vhdutils
 
 hyper_opts = [
@@ -89,3 +90,7 @@ def get_livemigrationutils():
 
 def get_rdpconsoleutils():
     return rdpconsoleutils.RDPConsoleUtils()
+
+
+def get_iscsi_target_utils():
+    return iscsi_target_utils.ISCSITargetUtils()
