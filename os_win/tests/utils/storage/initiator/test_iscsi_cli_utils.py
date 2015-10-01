@@ -33,26 +33,26 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(ISCSIInitiatorCLIUtilsTestCase, self).setUp()
-        self._volutils = iscsi_cli_utils.ISCSIInitiatorCLIUtils()
-        self._volutils._conn_wmi = mock.MagicMock()
-        self._volutils._conn_cimv2 = mock.MagicMock()
+        self._initiator = iscsi_cli_utils.ISCSIInitiatorCLIUtils()
+        self._initiator._conn_wmi = mock.MagicMock()
+        self._initiator._conn_cimv2 = mock.MagicMock()
 
     def _test_login_target_portal(self, portal_connected):
         fake_portal = '%s:%s' % (self._FAKE_PORTAL_ADDR,
                                  self._FAKE_PORTAL_PORT)
 
-        self._volutils.execute = mock.MagicMock()
+        self._initiator.execute = mock.MagicMock()
         if portal_connected:
             exec_output = 'Address and Socket: %s %s' % (
                 self._FAKE_PORTAL_ADDR, self._FAKE_PORTAL_PORT)
         else:
             exec_output = ''
 
-        self._volutils.execute.return_value = exec_output
+        self._initiator.execute.return_value = exec_output
 
-        self._volutils._login_target_portal(fake_portal)
+        self._initiator._login_target_portal(fake_portal)
 
-        call_list = self._volutils.execute.call_args_list
+        call_list = self._initiator.execute.call_args_list
         all_call_args = [arg for call in call_list for arg in call[0]]
 
         if portal_connected:
@@ -73,8 +73,8 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
         mock_CONF.hyperv.volume_attach_retry_interval = 0
         fake_portal = '%s:%s' % (self._FAKE_PORTAL_ADDR,
                                  self._FAKE_PORTAL_PORT)
-        self._volutils.execute = mock.MagicMock()
-        self._volutils._login_target_portal = mock.MagicMock()
+        self._initiator.execute = mock.MagicMock()
+        self._initiator._login_target_portal = mock.MagicMock()
 
         if use_chap:
             username, password = (mock.sentinel.username,
@@ -83,30 +83,30 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
             username, password = None, None
 
         if target_connected:
-            self._volutils.execute.return_value = self._FAKE_TARGET
+            self._initiator.execute.return_value = self._FAKE_TARGET
         elif raise_exception:
-            self._volutils.execute.return_value = ''
+            self._initiator.execute.return_value = ''
         else:
-            self._volutils.execute.side_effect = (
+            self._initiator.execute.side_effect = (
                 ['', '', '', self._FAKE_TARGET, ''])
 
         if raise_exception:
             self.assertRaises(exceptions.HyperVException,
-                              self._volutils.login_storage_target,
+                              self._initiator.login_storage_target,
                               self._FAKE_LUN, self._FAKE_TARGET,
                               fake_portal, username, password)
         else:
-            self._volutils.login_storage_target(self._FAKE_LUN,
+            self._initiator.login_storage_target(self._FAKE_LUN,
                                                 self._FAKE_TARGET,
                                                 fake_portal,
                                                 username, password)
 
             if target_connected:
-                call_list = self._volutils.execute.call_args_list
+                call_list = self._initiator.execute.call_args_list
                 all_call_args = [arg for call in call_list for arg in call[0]]
                 self.assertNotIn('qlogintarget', all_call_args)
             else:
-                self._volutils.execute.assert_any_call(
+                self._initiator.execute.assert_any_call(
                     'iscsicli.exe', 'qlogintarget',
                     self._FAKE_TARGET, username, password)
 
@@ -135,10 +135,10 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
 
             if raise_exception:
                 self.assertRaises(exceptions.HyperVException,
-                                  self._volutils.execute,
+                                  self._initiator.execute,
                                   *fake_cmd)
             else:
-                ret_val = self._volutils.execute(*fake_cmd)
+                ret_val = self._initiator.execute(*fake_cmd)
                 self.assertEqual(output, ret_val)
 
     def test_execute_raise_exception(self):
@@ -153,8 +153,8 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
                                            mock.sentinel.FAKE_STDERR_VALUE)
         session = mock.MagicMock()
         session.SessionId = mock.sentinel.FAKE_SESSION_ID
-        self._volutils._conn_wmi.query.return_value = [session]
+        self._initiator._conn_wmi.query.return_value = [session]
 
-        self._volutils.logout_storage_target(mock.sentinel.FAKE_IQN)
+        self._initiator.logout_storage_target(mock.sentinel.FAKE_IQN)
         mock_utils.execute.assert_called_once_with(
             'iscsicli.exe', 'logouttarget', mock.sentinel.FAKE_SESSION_ID)

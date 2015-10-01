@@ -29,16 +29,16 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(ISCSIInitiatorWMIUtilsTestCase, self).setUp()
-        self._volutilsv2 = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
-        self._volutilsv2._conn_storage = mock.MagicMock()
-        self._volutilsv2._conn_wmi = mock.MagicMock()
+        self._initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
+        self._initiator._conn_storage = mock.MagicMock()
+        self._initiator._conn_wmi = mock.MagicMock()
 
     def _test_login_target_portal(self, portal_connected):
         fake_portal = '%s:%s' % (self._FAKE_PORTAL_ADDR,
                                  self._FAKE_PORTAL_PORT)
         fake_portal_object = mock.MagicMock()
-        _query = self._volutilsv2._conn_storage.query
-        self._volutilsv2._conn_storage.MSFT_iSCSITargetPortal = (
+        _query = self._initiator._conn_storage.query
+        self._initiator._conn_storage.MSFT_iSCSITargetPortal = (
             fake_portal_object)
 
         if portal_connected:
@@ -46,7 +46,7 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
         else:
             _query.return_value = None
 
-        self._volutilsv2._login_target_portal(fake_portal)
+        self._initiator._login_target_portal(fake_portal)
 
         if portal_connected:
             fake_portal_object.Update.assert_called_once_with()
@@ -79,17 +79,17 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
         else:
             fake_target_object.IsConnected = False
 
-        _query = self._volutilsv2._conn_storage.query
+        _query = self._initiator._conn_storage.query
         _query.return_value = [fake_target_object]
 
-        self._volutilsv2._conn_storage.MSFT_iSCSITarget = (
+        self._initiator._conn_storage.MSFT_iSCSITarget = (
             fake_target_object)
 
         if use_chap:
             username, password = (mock.sentinel.username,
                                   mock.sentinel.password)
             auth = {
-                'AuthenticationType': self._volutilsv2._CHAP_AUTH_TYPE,
+                'AuthenticationType': self._initiator._CHAP_AUTH_TYPE,
                 'ChapUsername': username,
                 'ChapSecret': password,
             }
@@ -99,10 +99,10 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
 
         if raise_exception:
             self.assertRaises(exceptions.HyperVException,
-                              self._volutilsv2.login_storage_target,
+                              self._initiator.login_storage_target,
                               self._FAKE_LUN, self._FAKE_TARGET, fake_portal)
         else:
-            self._volutilsv2.login_storage_target(self._FAKE_LUN,
+            self._initiator.login_storage_target(self._FAKE_LUN,
                                                   self._FAKE_TARGET,
                                                   fake_portal,
                                                   username, password)
@@ -126,8 +126,8 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
         self._test_login_target(use_chap=True)
 
     def test_logout_storage_target(self):
-        mock_msft_target = self._volutilsv2._conn_storage.MSFT_iSCSITarget
-        mock_msft_session = self._volutilsv2._conn_storage.MSFT_iSCSISession
+        mock_msft_target = self._initiator._conn_storage.MSFT_iSCSITarget
+        mock_msft_session = self._initiator._conn_storage.MSFT_iSCSISession
 
         mock_target = mock.MagicMock()
         mock_target.IsConnected = True
@@ -137,7 +137,7 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
         mock_session.IsPersistent = True
         mock_msft_session.return_value = [mock_session]
 
-        self._volutilsv2.logout_storage_target(self._FAKE_TARGET)
+        self._initiator.logout_storage_target(self._FAKE_TARGET)
 
         mock_msft_target.assert_called_once_with(NodeAddress=self._FAKE_TARGET)
         mock_msft_session.assert_called_once_with(
@@ -149,12 +149,12 @@ class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(iscsi_wmi_utils.ISCSIInitiatorWMIUtils,
                        'logout_storage_target')
     def test_execute_log_out(self, mock_logout_target):
-        sess_class = self._volutilsv2._conn_wmi.MSiSCSIInitiator_SessionClass
+        sess_class = self._initiator._conn_wmi.MSiSCSIInitiator_SessionClass
 
         mock_session = mock.MagicMock()
         sess_class.return_value = [mock_session]
 
-        self._volutilsv2.execute_log_out(mock.sentinel.FAKE_SESSION_ID)
+        self._initiator.execute_log_out(mock.sentinel.FAKE_SESSION_ID)
 
         sess_class.assert_called_once_with(
             SessionId=mock.sentinel.FAKE_SESSION_ID)
