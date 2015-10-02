@@ -21,7 +21,7 @@ from os_win._i18n import _
 
 
 class OSWinException(Exception):
-    msg_fmt = '%(message)s'
+    msg_fmt = 'An exception has been encountered.'
 
     def __init__(self, message=None, **kwargs):
         self.kwargs = kwargs
