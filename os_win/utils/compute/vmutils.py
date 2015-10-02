@@ -62,7 +62,7 @@ class VMUtils(object):
     _SERIAL_PORT_SETTING_DATA_CLASS = _RESOURCE_ALLOC_SETTING_DATA_CLASS
     _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
     _SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS = (
-        'Msvm_EthernetPortAllocationSettingData')
+        'Msvm_SyntheticEthernetPortSettingData')
     _AFFECTED_JOB_ELEMENT_CLASS = "Msvm_AffectedJobElement"
     _COMPUTER_SYSTEM_CLASS = "Msvm_ComputerSystem"
 
