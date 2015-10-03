@@ -591,7 +591,7 @@ class VHDUtilsTestCase(base.BaseTestCase):
         # We expect less than a block to be reserved for internal metadata.
         expected_max_int_sz = new_vhd_sz - fake_block_sz
 
-        fake_vhd_info = dict(LogicalSectorSize=fake_logical_sector_sz,
+        fake_vhd_info = dict(SectorSize=fake_logical_sector_sz,
                              BlockSize=fake_block_sz)
 
         mock_get_vhdx_log_sz.return_value = fake_log_sz

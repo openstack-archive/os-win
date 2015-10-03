@@ -393,7 +393,7 @@ class VHDUtils(object):
         The chunk size is the maximum number of bytes described by a SB
         block.
 
-        Chunk size = 2^{23} * LogicalSectorSize
+        Chunk size = 2^{23} * SectorSize
 
         :param str vhd_path: VHD file path
         :param new_vhd_file_size: Size of the new VHD file.
@@ -404,7 +404,7 @@ class VHDUtils(object):
                 hs = vdisk_const.VHDX_HEADER_SECTION_SIZE
                 bes = vdisk_const.VHDX_BAT_ENTRY_SIZE
 
-                lss = vhd_info['LogicalSectorSize']
+                lss = vhd_info['SectorSize']
                 bs = vhd_info['BlockSize']
                 ls = self._get_vhdx_log_size(f)
                 ms = self._get_vhdx_metadata_size_and_offset(f)[0]
