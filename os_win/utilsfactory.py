@@ -21,6 +21,7 @@ from os_win.utils.compute import livemigrationutils
 from os_win.utils.compute import rdpconsoleutils
 from os_win.utils.compute import vmutils
 from os_win.utils import hostutils
+from os_win.utils.io import namedpipe
 from os_win.utils.network import networkutils
 from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
@@ -94,3 +95,7 @@ def get_rdpconsoleutils():
 
 def get_iscsi_target_utils():
     return iscsi_target_utils.ISCSITargetUtils()
+
+
+def get_named_pipe_handler(*args, **kwargs):
+    return namedpipe.NamedPipeHandler(*args, **kwargs)
