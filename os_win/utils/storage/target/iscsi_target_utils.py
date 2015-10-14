@@ -257,6 +257,18 @@ class ISCSITargetUtils(object):
             raise exceptions.ISCSITargetWMIException(err_msg % wtd_name,
                                                      wmi_exc=wmi_exc)
 
+    def extend_wt_disk(self, wtd_name, additional_mb):
+        try:
+            wt_disk = self._get_wt_disk(wtd_name)
+            wt_disk.Extend(additional_mb)
+        except wmi.x_wmi as wmi_exc:
+            err_msg = _('Could not extend WT Disk %(wtd_name)s '
+                        'with additional %(additional_mb)s MB.')
+            raise exceptions.ISCSITargetWMIException(
+                err_msg % dict(wtd_name=wtd_name,
+                               additional_mb=additional_mb),
+                wmi_exc=wmi_exc)
+
     def add_disk_to_target(self, wtd_name, target_name):
         """Adds the disk to the target."""
         try:

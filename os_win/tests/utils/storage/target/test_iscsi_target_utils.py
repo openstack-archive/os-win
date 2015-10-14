@@ -409,6 +409,20 @@ class ISCSITargetUtilsTestCase(base.BaseTestCase):
         mock_get_wt_disk.assert_called_once_with(mock.sentinel.wtd_name,
                                                  fail_if_not_found=False)
 
+    @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_disk')
+    def test_extend_wt_disk_exception(self, mock_get_wt_disk):
+        mock_wt_disk = mock_get_wt_disk.return_value
+        mock_wt_disk.Extend.side_effect = FakeWMIExc
+
+        self.assertRaises(exceptions.ISCSITargetException,
+                          self._tgutils.extend_wt_disk,
+                          mock.sentinel.wtd_name,
+                          mock.sentinel.additional_mb)
+
+        mock_get_wt_disk.assert_called_once_with(mock.sentinel.wtd_name)
+        mock_wt_disk.Extend.assert_called_once_with(
+            mock.sentinel.additional_mb)
+
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_host')
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_disk')
     def test_add_disk_to_target_exception(self, mock_get_wt_disk,
