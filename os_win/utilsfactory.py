@@ -25,6 +25,7 @@ from os_win.utils.network import networkutils
 from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
+from os_win.utils.storage import smbutils
 from os_win.utils.storage.target import iscsi_target_utils
 from os_win.utils.storage.virtdisk import vhdutils
 
@@ -86,6 +87,10 @@ def get_iscsi_initiator_utils(use_iscsi_cli=False):
 
 def get_livemigrationutils():
     return livemigrationutils.LiveMigrationUtils()
+
+
+def get_smbutils():
+    return smbutils.SMBUtils()
 
 
 def get_rdpconsoleutils():

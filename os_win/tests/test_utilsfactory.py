@@ -25,6 +25,7 @@ from os_win.utils.compute import vmutils
 from os_win.utils.network import networkutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
+from os_win.utils.storage import smbutils
 from os_win import utilsfactory
 
 CONF = cfg.CONF
@@ -64,4 +65,12 @@ class TestHyperVUtilsFactory(base.BaseTestCase):
         CONF.set_override('force_volumeutils_v1', force_v1, 'hyperv')
 
         actual_class = type(utilsfactory.get_iscsi_initiator_utils())
+        self.assertEqual(expected_class, actual_class)
+
+    @mock.patch.object(smbutils.SMBUtils, '__init__',
+                       lambda *args, **kwargs: None)
+    def test_get_smbutils(self):
+        actual_class = type(utilsfactory.get_smbutils())
+
+        expected_class = smbutils.SMBUtils
         self.assertEqual(expected_class, actual_class)
