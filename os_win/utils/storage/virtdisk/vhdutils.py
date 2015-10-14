@@ -308,14 +308,38 @@ class VHDUtils(object):
                                    ctypes.byref(params),
                                    cleanup_handle=handle)
 
-    def resize_vhd(self, vhd_path, new_max_size, is_file_max_size=True):
+    def resize_vhd(self, vhd_path, new_max_size, is_file_max_size=True,
+                   validate_new_size=True):
         if is_file_max_size:
             new_internal_max_size = self.get_internal_vhd_size_by_file_size(
                 vhd_path, new_max_size)
         else:
             new_internal_max_size = new_max_size
 
+        if validate_new_size:
+            if not self._check_resize_needed(vhd_path, new_internal_max_size):
+                return
+
         self._resize_vhd(vhd_path, new_internal_max_size)
+
+    def _check_resize_needed(self, vhd_path, new_size):
+        curr_size = self.get_vhd_size(vhd_path)['VirtualSize']
+        if curr_size > new_size:
+            err_msg = _("Cannot resize image %(vhd_path)s "
+                        "to a smaller size. "
+                        "Image virtual size: %(curr_size)s, "
+                        "Requested virtual size: %(new_size)s")
+            raise exceptions.VHDException(
+                err_msg % dict(vhd_path=vhd_path,
+                               curr_size=curr_size,
+                               new_size=new_size))
+        elif curr_size == new_size:
+            LOG.debug("Skipping resizing %(vhd_path)s to %(new_size)s"
+                      "as it already has the requested size.",
+                      dict(vhd_path=vhd_path,
+                           new_size=new_size))
+            return False
+        return True
 
     def _resize_vhd(self, vhd_path, new_max_size):
         handle = self._open(vhd_path)
