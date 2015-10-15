@@ -454,11 +454,16 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
     @mock.patch.object(vhdutils.VHDUtils, 'get_internal_vhd_size_by_file_size')
     @mock.patch.object(vhdutils.VHDUtils, '_resize_vhd')
-    def _test_resize_vhd(self, mock_resize_helper, mock_get_internal_size,
-                        is_file_max_size=True):
+    @mock.patch.object(vhdutils.VHDUtils, '_check_resize_needed')
+    def _test_resize_vhd(self, mock_check_resize_needed,
+                         mock_resize_helper, mock_get_internal_size,
+                         is_file_max_size=True, resize_needed=True):
+        mock_check_resize_needed.return_value = resize_needed
+
         self._vhdutils.resize_vhd(mock.sentinel.vhd_path,
                                   mock.sentinel.new_size,
-                                  is_file_max_size)
+                                  is_file_max_size,
+                                  validate_new_size=True)
 
         if is_file_max_size:
             mock_get_internal_size.assert_called_once_with(
@@ -467,14 +472,46 @@ class VHDUtilsTestCase(base.BaseTestCase):
         else:
             expected_new_size = mock.sentinel.new_size
 
-        mock_resize_helper.assert_called_once_with(mock.sentinel.vhd_path,
-                                                   expected_new_size)
+        mock_check_resize_needed.assert_called_once_with(
+            mock.sentinel.vhd_path, expected_new_size)
+        if resize_needed:
+            mock_resize_helper.assert_called_once_with(mock.sentinel.vhd_path,
+                                                       expected_new_size)
+        else:
+            self.assertFalse(mock_resize_helper.called)
 
     def test_resize_vhd_specifying_internal_size(self):
         self._test_resize_vhd(is_file_max_size=False)
 
     def test_resize_vhd_specifying_file_max_size(self):
         self._test_resize_vhd()
+
+    def test_resize_vhd_already_having_requested_size(self):
+        self._test_resize_vhd(resize_needed=False)
+
+    @mock.patch.object(vhdutils.VHDUtils, 'get_vhd_size')
+    def _test_check_resize_needed(self, mock_get_vhd_size,
+                                  current_size=1, new_size=2):
+        mock_get_vhd_size.return_value = dict(VirtualSize=current_size)
+
+        if current_size > new_size:
+            self.assertRaises(exceptions.VHDException,
+                              self._vhdutils._check_resize_needed,
+                              mock.sentinel.vhd_path,
+                              new_size)
+        else:
+            resize_needed = self._vhdutils._check_resize_needed(
+                mock.sentinel.vhd_path, new_size)
+            self.assertEqual(current_size < new_size, resize_needed)
+
+    def test_check_resize_needed_smaller_new_size(self):
+        self._test_check_resize_needed(current_size=2, new_size=1)
+
+    def test_check_resize_needed_bigger_new_size(self):
+        self._test_check_resize_needed()
+
+    def test_check_resize_needed_smaller_equal_size(self):
+        self._test_check_resize_needed(current_size=1, new_size=1)
 
     @mock.patch.object(vhdutils.VHDUtils, '_open')
     @mock.patch.object(vhdutils.VHDUtils, '_close')
