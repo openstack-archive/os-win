@@ -151,6 +151,10 @@ class ISCSITargetUtils(object):
             raise exceptions.ISCSITargetWMIException(err_msg % target_name,
                                                      wmi_exc=wmi_exc)
 
+    def iscsi_target_exists(self, target_name):
+        wt_host = self._get_wt_host(target_name, fail_if_not_found=False)
+        return wt_host is not None
+
     def get_target_information(self, target_name):
         wt_host = self._get_wt_host(target_name)
 

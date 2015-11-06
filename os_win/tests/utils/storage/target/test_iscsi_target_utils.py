@@ -278,6 +278,23 @@ class ISCSITargetUtilsTestCase(base.BaseTestCase):
                                                  fail_if_not_found=False)
 
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_host')
+    def _test_iscsi_target_exists(self, mock_get_wt_host, target_exists=True):
+        mock_get_wt_host.return_value = (mock.sentinel.wt_host
+                                         if target_exists else None)
+
+        result = self._tgutils.iscsi_target_exists(mock.sentinel.target_name)
+
+        self.assertEqual(target_exists, result)
+        mock_get_wt_host.assert_called_once_with(mock.sentinel.target_name,
+                                                 fail_if_not_found=False)
+
+    def test_iscsi_target_exists(self):
+        self._test_iscsi_target_exists()
+
+    def test_iscsi_target_unexisting(self):
+        self._test_iscsi_target_exists(target_exists=False)
+
+    @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_host')
     def test_get_target_information(self, mock_get_wt_host):
         mock_wt_host = mock_get_wt_host.return_value
         mock_wt_host.EnableCHAP = True
