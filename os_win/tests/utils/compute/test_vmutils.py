@@ -821,3 +821,35 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils.stop_vm_jobs(mock.sentinel.vm_name)
 
         self._vmutils._jobutils.stop_jobs.assert_called_once_with(mock_vm)
+
+    def test_set_secure_boot(self):
+        vs_data = mock.MagicMock()
+        self._vmutils._set_secure_boot(vs_data, msft_ca_required=False)
+        self.assertTrue(vs_data.SecureBootEnabled)
+
+    def test_set_secure_boot_CA_required(self):
+        self.assertRaises(exceptions.HyperVException,
+                          self._vmutils._set_secure_boot,
+                          mock.MagicMock(), True)
+
+    @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
+    @mock.patch.object(vmutils.VMUtils, '_lookup_vm_check')
+    def test_enable_secure_boot(self, mock_lookup_vm_check,
+                                mock_get_vm_setting_data,
+                                mock_modify_virtual_system):
+        vm = mock_lookup_vm_check.return_value
+        vs_data = mock_get_vm_setting_data.return_value
+        vs_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
+
+        with mock.patch.object(self._vmutils,
+                               '_set_secure_boot') as mock_set_secure_boot:
+            self._vmutils.enable_secure_boot(
+                mock.sentinel.VM_NAME, mock.sentinel.msft_ca_required)
+
+            mock_lookup_vm_check.assert_called_with(mock.sentinel.VM_NAME)
+            mock_get_vm_setting_data.assert_called_once_with(vm)
+            mock_set_secure_boot.assert_called_once_with(
+                vs_data, mock.sentinel.msft_ca_required)
+            mock_modify_virtual_system.assert_called_once_with(
+                vs_svc, vm.path_(), vs_data)

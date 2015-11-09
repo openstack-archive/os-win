@@ -791,3 +791,26 @@ class VMUtils(object):
     def stop_vm_jobs(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
         self._jobutils.stop_jobs(vm)
+
+    def enable_secure_boot(self, vm_name, msft_ca_required):
+        """Enables Secure Boot for the instance with the given name.
+
+        :param vm_name: The name of the VM for which Secure Boot will be
+                        enabled.
+        :param msft_ca_required: boolean specifying whether the VM will
+                                 require Microsoft UEFI Certificate
+                                 Authority for Secure Boot. Only Linux
+                                 guests require this CA.
+        """
+        vm = self._lookup_vm_check(vm_name)
+        vs_data = self._get_vm_setting_data(vm)
+        self._set_secure_boot(vs_data, msft_ca_required)
+        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
+        self._modify_virtual_system(vs_man_svc, vm.path_(), vs_data)
+
+    def _set_secure_boot(self, vs_data, msft_ca_required):
+        vs_data.SecureBootEnabled = True
+        if msft_ca_required:
+            raise exceptions.HyperVException(
+                _('UEFI SecureBoot is supported only on Windows instances for '
+                  'this Hyper-V version.'))
