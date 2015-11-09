@@ -15,20 +15,13 @@
 
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_utils import importutils
 
 from os_win._i18n import _, _LW  # noqa
-from os_win.utils.compute import livemigrationutils
-from os_win.utils.compute import rdpconsoleutils
-from os_win.utils.compute import vmutils
+from os_win import exceptions
 from os_win.utils import hostutils
 from os_win.utils.io import namedpipe
-from os_win.utils.network import networkutils
-from os_win.utils import pathutils
 from os_win.utils.storage.initiator import iscsi_cli_utils
-from os_win.utils.storage.initiator import iscsi_wmi_utils
-from os_win.utils.storage import smbutils
-from os_win.utils.storage.target import iscsi_target_utils
-from os_win.utils.storage.virtdisk import vhdutils
 
 hyper_opts = [
     cfg.BoolOpt('force_volumeutils_v1',
@@ -43,63 +36,135 @@ LOG = logging.getLogger(__name__)
 
 utils = hostutils.HostUtils()
 
+utils_map = {
+    'hostutils': {
+        'HostUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.hostutils.HostUtils'}},
+    'iscsi_initiator_utils': {
+        'ISCSIInitiatorCLIUtils': {
+            'min_version': 6.0,
+            'max_version': 6.2,
+            'path': 'os_win.utils.storage.initiator.iscsi_cli_utils.'
+                    'ISCSIInitiatorCLIUtils'},
+        'ISCSIInitiatorWMIUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.initiator.iscsi_wmi_utils.'
+                    'ISCSIInitiatorWMIUtils'}},
+    'iscsi_target_utils': {
+        'ISCSITargetUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.target.iscsi_target_utils.'
+                    'ISCSITargetUtils'}},
+    'livemigrationutils': {
+        'LiveMigrationUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.compute.livemigrationutils.'
+                    'LiveMigrationUtils'}},
+    'networkutils': {
+        'NetworkUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.network.networkutils.NetworkUtils'}},
+    'pathutils': {
+        'PathUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.pathutils.PathUtils'}},
+    'rdpconsoleutils': {
+        'RDPConsoleUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.compute.rdpconsoleutils.RDPConsoleUtils'}},
+    'smbutils': {
+        'SMBUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.smbutils.SMBUtils'}},
+    'vhdutils': {
+        'VHDUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.virtdisk.vhdutils.VHDUtils'}},
+    'vmutils': {
+        'VMUtils': {
+            'min_version': 6.2,
+            'max_version': 10,
+            'path': 'os_win.utils.compute.vmutils.VMUtils'},
+        'VMUtils10': {
+            'min_version': 10,
+            'max_version': None,
+            'path': 'os_win.utils.compute.vmutils10.VMUtils10'}},
+}
 
-def _get_class(v1_class, v2_class, force_v1_flag, *version):
-    # V2 classes are supported starting from Hyper-V Server 2012 and
-    # Windows Server 2012 (kernel version 6.2)
-    if force_v1_flag:
-        cls = v1_class
-    elif version and not utils.check_min_windows_version(*version):
-        cls = v1_class
-    else:
-        cls = v2_class
-    LOG.debug("Loading class: %(module_name)s.%(class_name)s",
-              {'module_name': cls.__module__, 'class_name': cls.__name__})
-    return cls
+
+def _get_class(class_type):
+    if class_type not in utils_map:
+        raise exceptions.HyperVException(_('Class type %(class)s does '
+                                           'not exist') % class_type)
+
+    windows_version = utils.get_windows_version()
+    build = map(int, windows_version.split('.'))
+    windows_version = float("%i.%i" % (build[0], build[1]))
+
+    existing_classes = utils_map.get(class_type)
+    for class_variant in existing_classes.keys():
+        utils_class = existing_classes.get(class_variant)
+        if (utils_class['min_version'] <= windows_version and
+                (utils_class['max_version'] is None or
+                 windows_version < utils_class['max_version'])):
+            return importutils.import_object(utils_class['path'])
+
+    raise exceptions.HyperVException(_('Could not find any %(class)s class for'
+        'this Windows version: %(win_version)s')
+        % {'class': class_type, 'win_version': windows_version})
 
 
 def get_vmutils(host='.'):
-    return vmutils.VMUtils(host)
+    return _get_class(class_type='vmutils')
 
 
 def get_vhdutils():
-    return vhdutils.VHDUtils()
+    return _get_class(class_type='vhdutils')
 
 
 def get_networkutils():
-    return _get_class(networkutils.NetworkUtils, networkutils.NetworkUtilsR2,
-                      False, 6, 3)()
+    return _get_class(class_type='networkutils')
 
 
 def get_hostutils():
-    return hostutils.HostUtils()
+    return _get_class(class_type='hostutils')
 
 
 def get_pathutils():
-    return pathutils.PathUtils()
+    return _get_class(class_type='pathutils')
 
 
 def get_iscsi_initiator_utils(use_iscsi_cli=False):
     use_iscsi_cli = use_iscsi_cli or CONF.hyperv.force_volumeutils_v1
-    return _get_class(iscsi_cli_utils.ISCSIInitiatorCLIUtils,
-                      iscsi_wmi_utils.ISCSIInitiatorWMIUtils,
-                      use_iscsi_cli)()
+    if use_iscsi_cli:
+        return iscsi_cli_utils.ISCSIInitiatorCLIUtils()
+    return _get_class(class_type='iscsi_initiator_utils')
 
 
 def get_livemigrationutils():
-    return livemigrationutils.LiveMigrationUtils()
+    return _get_class(class_type='livemigrationutils')
 
 
 def get_smbutils():
-    return smbutils.SMBUtils()
+    return _get_class(class_type='smbutils')
 
 
 def get_rdpconsoleutils():
-    return rdpconsoleutils.RDPConsoleUtils()
+    return _get_class(class_type='rdpconsoleutils')
 
 
 def get_iscsi_target_utils():
-    return iscsi_target_utils.ISCSITargetUtils()
+    return _get_class(class_type='iscsi_target_utils')
 
 
 def get_named_pipe_handler(*args, **kwargs):
