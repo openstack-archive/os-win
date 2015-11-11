@@ -651,16 +651,19 @@ class VMUtils(object):
     def _get_mounted_disk_resource_from_path(self, disk_path, is_physical):
         if is_physical:
             class_name = self._RESOURCE_ALLOC_SETTING_DATA_CLASS
-            res_sub_type = self._PHYS_DISK_RES_SUB_TYPE
         else:
             class_name = self._STORAGE_ALLOC_SETTING_DATA_CLASS
-            res_sub_type = self._HARD_DISK_RES_SUB_TYPE
 
-        disk_resources = self._conn.query("SELECT * FROM %(class_name)s "
-                                          "WHERE ResourceSubType = "
-                                          "'%(res_sub_type)s'" %
-                                          {"class_name": class_name,
-                                           "res_sub_type": res_sub_type})
+        query = ("SELECT * FROM %(class_name)s WHERE ("
+                 "ResourceSubType='%(res_sub_type)s' OR "
+                 "ResourceSubType='%(res_sub_type_virt)s' OR "
+                 "ResourceSubType='%(res_sub_type_dvd)s')" % {
+                     'class_name': class_name,
+                     'res_sub_type': self._PHYS_DISK_RES_SUB_TYPE,
+                     'res_sub_type_virt': self._HARD_DISK_RES_SUB_TYPE,
+                     'res_sub_type_dvd': self._DVD_DISK_RES_SUB_TYPE})
+
+        disk_resources = self._conn.query(query)
 
         for disk_resource in disk_resources:
             if disk_resource.HostResource:
