@@ -148,7 +148,8 @@ class SMBUtilsTestCase(base.BaseTestCase):
             mock_ctypes.c_wchar_p(mock_abspath.return_value),
             None,
             mock_ctypes.pointer.return_value,
-            mock_ctypes.pointer.return_value)
+            mock_ctypes.pointer.return_value,
+            kernel32_lib_func=True)
 
     def test_get_share_capacity_info_successfully(self):
         self._test_get_share_capacity_info()

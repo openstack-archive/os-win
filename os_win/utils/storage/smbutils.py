@@ -97,7 +97,8 @@ class SMBUtils(object):
                 ctypes.c_wchar_p(norm_path),
                 None,
                 ctypes.pointer(total_bytes),
-                ctypes.pointer(free_bytes))
+                ctypes.pointer(free_bytes),
+                kernel32_lib_func=True)
             return total_bytes.value, free_bytes.value
         except exceptions.Win32Exception as exc:
             LOG.error(_LE("Could not get share %(share_path)s capacity info. "
