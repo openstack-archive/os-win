@@ -511,6 +511,19 @@ class VMUtilsTestCase(base.BaseTestCase):
         ret_val = self._vmutils.get_vm_dvd_disk_paths(self._FAKE_VM_NAME)
         self.assertEqual(mock.sentinel.FAKE_DVD_PATH1, ret_val[0])
 
+    @mock.patch.object(vmutils.VMUtils,
+                       '_get_mounted_disk_resource_from_path')
+    def test_is_disk_attached(self, mock_get_mounted_disk_from_path):
+        is_physical = True
+
+        is_attached = self._vmutils.is_disk_attached(mock.sentinel.vm_name,
+                                                     mock.sentinel.disk_path,
+                                                     is_physical=is_physical)
+
+        self.assertTrue(is_attached)
+        mock_get_mounted_disk_from_path.assert_called_once_with(
+            mock.sentinel.disk_path, is_physical)
+
     def test_detach_vm_disk(self):
         mock_vm = self._lookup_vm()
         mock_disk = self._prepare_mock_disk()
