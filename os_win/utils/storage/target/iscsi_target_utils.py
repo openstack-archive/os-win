@@ -100,7 +100,7 @@ class ISCSITargetUtils(object):
             err_msg = _('Could not find WT Disk: %s')
             raise exceptions.ISCSITargetException(err_msg % description)
 
-    def _get_wt_snapshot(self, description, fail_if_not_found):
+    def _get_wt_snapshot(self, description, fail_if_not_found=True):
         wt_snapshots = self._conn_wmi.WT_Snapshot(Description=description)
         if wt_snapshots:
             return wt_snapshots[0]
