@@ -276,7 +276,7 @@ class VMUtilsTestCase(base.BaseTestCase):
     def test_get_free_controller_slot_exception(self):
         fake_drive = mock.MagicMock()
         type(fake_drive).AddressOnParent = mock.PropertyMock(
-            side_effect=range(constants.SCSI_CONTROLLER_SLOTS_NUMBER))
+            side_effect=list(range(constants.SCSI_CONTROLLER_SLOTS_NUMBER)))
 
         with mock.patch.object(self._vmutils,
                 'get_attached_disks') as fake_get_attached_disks:

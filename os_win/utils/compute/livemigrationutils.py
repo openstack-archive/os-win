@@ -118,7 +118,7 @@ class LiveMigrationUtils(object):
         scsi_ctrl_path = self._vmutils.get_vm_scsi_controller(vm_name)
         scsi_paths = self._vmutils.get_controller_volume_paths(scsi_ctrl_path)
 
-        return dict(ide_paths.items() + scsi_paths.items())
+        return dict(list(ide_paths.items()) + list(scsi_paths.items()))
 
     def _get_remote_disk_data(self, vmutils_remote, disk_paths, dest_host):
         remote_iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils(

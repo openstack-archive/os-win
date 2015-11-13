@@ -405,7 +405,7 @@ class VHDUtils(object):
             fs = vdisk_const.VHD_FOOTER_SIZE_DYNAMIC
 
             max_internal_size = (new_vhd_file_size -
-                                 (hs + ddhs + fs)) * bs / (bes + bs)
+                                 (hs + ddhs + fs)) * bs // (bes + bs)
             return max_internal_size
 
     def _get_internal_vhdx_size_by_file_size(self, vhd_path,
@@ -437,7 +437,7 @@ class VHDUtils(object):
                 size = new_vhd_file_size
 
                 max_internal_size = (bs * chunk_ratio * (size - hs -
-                    ls - ms - bes - bes / chunk_ratio) / (bs *
+                    ls - ms - bes - bes // chunk_ratio) // (bs *
                     chunk_ratio + bes * chunk_ratio + bes))
 
                 return max_internal_size - (max_internal_size % bs)

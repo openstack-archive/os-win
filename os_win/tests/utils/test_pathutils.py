@@ -13,6 +13,7 @@
 #    under the License.
 
 import os
+import six
 
 import mock
 from oslotest import base
@@ -74,8 +75,8 @@ class PathUtilsTestCase(base.BaseTestCase):
         mock_rmtree.side_effect = [WindowsError(
             pathutils.ERROR_DIR_IS_NOT_EMPTY), True]
         fake_windows_error = WindowsError
-        with mock.patch('__builtin__.WindowsError',
-                        fake_windows_error, create=True):
+        with mock.patch.object(six.moves.builtins, 'WindowsError',
+                               fake_windows_error, create=True):
             self._pathutils.rmtree(mock.sentinel.FAKE_PATH)
 
         mock_sleep.assert_called_once_with(1)

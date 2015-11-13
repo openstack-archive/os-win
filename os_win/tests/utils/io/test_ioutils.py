@@ -34,7 +34,7 @@ class IOThreadTestCase(base.BaseTestCase):
             self._FAKE_SRC, self._FAKE_DEST, self._FAKE_MAX_BYTES)
         super(IOThreadTestCase, self).setUp()
 
-    @mock.patch('__builtin__.open')
+    @mock.patch.object(six.moves.builtins, 'open')
     @mock.patch('os.rename')
     @mock.patch('os.path.exists')
     @mock.patch('os.remove')

@@ -656,8 +656,9 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
     def test_get_vhdx_current_header(self):
         # The current header has the maximum sequence number.
-        fake_seq_numbers = ['\x01\x00\x00\x00\x00\x00\x00\x00',
-                            '\x02\x00\x00\x00\x00\x00\x00\x00']
+        fake_seq_numbers = [
+            bytearray(b'\x01\x00\x00\x00\x00\x00\x00\x00'),
+            bytearray(b'\x02\x00\x00\x00\x00\x00\x00\x00')]
         mock_handle = self._get_mock_file_handle(*fake_seq_numbers)
 
         offset = self._vhdutils._get_vhdx_current_header_offset(mock_handle)
@@ -667,7 +668,7 @@ class VHDUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(vhdutils.VHDUtils, '_get_vhdx_current_header_offset')
     def test_get_log_size(self, mock_get_vhdx_curr_hd_offset):
         fake_curr_header_offset = vdisk_const.VHDX_HEADER_OFFSETS[0]
-        fake_log_sz = '\x01\x00\x00\x00'
+        fake_log_sz = bytearray(b'\x01\x00\x00\x00')
 
         mock_get_vhdx_curr_hd_offset.return_value = fake_curr_header_offset
         mock_handle = self._get_mock_file_handle(fake_log_sz)
@@ -677,8 +678,8 @@ class VHDUtilsTestCase(base.BaseTestCase):
         self.assertEqual(log_size, 1)
 
     def test_get_vhdx_metadata_size(self):
-        fake_md_offset = '\x01\x00\x00\x00\x00\x00\x00\x00'
-        fake_md_sz = '\x01\x00\x00\x00'
+        fake_md_offset = bytearray(b'\x01\x00\x00\x00\x00\x00\x00\x00')
+        fake_md_sz = bytearray(b'\x01\x00\x00\x00')
 
         mock_handle = self._get_mock_file_handle(fake_md_offset,
                                                       fake_md_sz)

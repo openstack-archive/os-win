@@ -64,7 +64,7 @@ class BaseISCSIInitiatorUtilsTestCase(base.BaseTestCase):
             mock_computer]
 
         with mock.patch.object(base_iscsi_utils,
-                               '_winreg', create=True) as mock_winreg:
+                               'winreg', create=True) as mock_winreg:
             mock_winreg.OpenKey = winreg_method
             mock_winreg.QueryValueEx = mock.MagicMock(return_value=[expected])
 

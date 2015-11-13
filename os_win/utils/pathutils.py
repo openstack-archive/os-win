@@ -43,8 +43,8 @@ class PathUtils(object):
 
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
-        import __builtin__
-        return __builtin__.open(path, mode)
+        from six.moves import builtins
+        return builtins.open(path, mode)
 
     def exists(self, path):
         return os.path.exists(path)

@@ -108,7 +108,7 @@ def _get_class(class_type):
                                            'not exist') % class_type)
 
     windows_version = utils.get_windows_version()
-    build = map(int, windows_version.split('.'))
+    build = list(map(int, windows_version.split('.')))
     windows_version = float("%i.%i" % (build[0], build[1]))
 
     existing_classes = utils_map.get(class_type)

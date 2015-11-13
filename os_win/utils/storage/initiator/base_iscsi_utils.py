@@ -25,7 +25,7 @@ import re
 import sys
 
 if sys.platform == 'win32':
-    import _winreg
+    from six.moves import winreg
     import wmi
 
 from oslo_log import log as logging
@@ -64,11 +64,11 @@ class BaseISCSIInitiatorUtils(object):
         keypath = ("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\"
                    "iSCSI\\Discovery")
         try:
-            key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, keypath, 0,
-                                  _winreg.KEY_ALL_ACCESS)
-            temp = _winreg.QueryValueEx(key, 'DefaultInitiatorName')
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, keypath, 0,
+                                 winreg.KEY_ALL_ACCESS)
+            temp = winreg.QueryValueEx(key, 'DefaultInitiatorName')
             initiator_name = str(temp[0])
-            _winreg.CloseKey(key)
+            winreg.CloseKey(key)
         except Exception:
             LOG.info(_LI("The ISCSI initiator name can't be found. "
                          "Choosing the default one"))

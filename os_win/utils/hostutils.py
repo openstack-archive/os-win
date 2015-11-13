@@ -80,8 +80,8 @@ class HostUtils(object):
         mem_info = self._conn_cimv2.query("SELECT TotalVisibleMemorySize, "
                                           "FreePhysicalMemory "
                                           "FROM win32_operatingsystem")[0]
-        return (long(mem_info.TotalVisibleMemorySize),
-                long(mem_info.FreePhysicalMemory))
+        return (int(mem_info.TotalVisibleMemorySize),
+                int(mem_info.FreePhysicalMemory))
 
     def get_volume_info(self, drive):
         """Returns a tuple with total size and free space
@@ -91,11 +91,11 @@ class HostUtils(object):
                                               "FROM win32_logicaldisk "
                                               "WHERE DeviceID='%s'"
                                               % drive)[0]
-        return (long(logical_disk.Size), long(logical_disk.FreeSpace))
+        return (int(logical_disk.Size), int(logical_disk.FreeSpace))
 
     def check_min_windows_version(self, major, minor, build=0):
         version_str = self.get_windows_version()
-        return map(int, version_str.split('.')) >= [major, minor, build]
+        return list(map(int, version_str.split('.'))) >= [major, minor, build]
 
     def get_windows_version(self):
         return self._conn_cimv2.Win32_OperatingSystem()[0].Version

@@ -69,7 +69,7 @@ class ISCSITargetUtils(object):
         wt_portals = self._conn_wmi.WT_Portal()
 
         if available_only:
-            wt_portals = filter(lambda portal: portal.Listen, wt_portals)
+            wt_portals = list(filter(lambda portal: portal.Listen, wt_portals))
 
         if not wt_portals and fail_if_none_found:
             err_msg = _("No valid iSCSI portal was found.")

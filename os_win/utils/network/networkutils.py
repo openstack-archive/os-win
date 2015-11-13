@@ -428,27 +428,27 @@ class NetworkUtilsR2(NetworkUtils):
                          if a.Action == sg_rule.Action]
         if not existent_acls:
             if sg_rule.Action == self._ACL_ACTION_DENY:
-                return range(1, 1 + num_rules)
+                return list(range(1, 1 + num_rules))
             else:
-                return range(self._MAX_WEIGHT - 1,
-                             self._MAX_WEIGHT - 1 - num_rules, - 1)
+                return list(range(self._MAX_WEIGHT - 1,
+                                  self._MAX_WEIGHT - 1 - num_rules, - 1))
 
         # there are existent ACLs.
         weights = [a.Weight for a in existent_acls]
         if sg_rule.Action == self._ACL_ACTION_DENY:
-            return [i for i in range(1, self._REJECT_ACLS_COUNT + 1)
+            return [i for i in list(range(1, self._REJECT_ACLS_COUNT + 1))
                     if i not in weights][:num_rules]
 
         min_weight = min(weights)
         last_weight = min_weight - num_rules - 1
         if last_weight > self._REJECT_ACLS_COUNT:
-            return range(min_weight - 1, last_weight, - 1)
+            return list(range(min_weight - 1, last_weight, - 1))
 
         # not enough weights. Must search for available weights.
         # if it is this case, num_rules is a small number.
         current_weight = self._MAX_WEIGHT - 1
         new_weights = []
-        for i in range(num_rules):
+        for i in list(range(num_rules)):
             while current_weight in weights:
                 current_weight -= 1
             new_weights.append(current_weight)
