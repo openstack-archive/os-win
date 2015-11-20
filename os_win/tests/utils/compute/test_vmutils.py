@@ -69,6 +69,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn = mock.MagicMock()
         self._vmutils._jobutils = mock.MagicMock()
+        self._vmutils._pathutils = mock.MagicMock()
 
         super(VMUtilsTestCase, self).setUp()
 
@@ -888,3 +889,114 @@ class VMUtilsTestCase(base.BaseTestCase):
                                          mock.sentinel.disk_path)
 
         self.assertFalse(mock_get_disk_resource.called)
+
+    def _test_is_drive_physical(self, is_physical):
+        self._vmutils._pathutils.exists.return_value = not is_physical
+        ret = self._vmutils._is_drive_physical(mock.sentinel.fake_drive_path)
+
+        self.assertEqual(is_physical, ret)
+
+    def test_is_drive_phyisical_true(self):
+        self._test_is_drive_physical(is_physical=True)
+
+    def test_is_drive_physical_false(self):
+        self._test_is_drive_physical(is_physical=False)
+
+    @mock.patch.object(vmutils.VMUtils, '_is_drive_physical')
+    @mock.patch.object(vmutils.VMUtils,
+                       '_get_mounted_disk_resource_from_path')
+    @mock.patch.object(vmutils, 'wmi', create=True)
+    def _test_drive_to_boot_source(self, mock_wmi, mock_get_disk_res_from_path,
+                                  mock_is_drive_physical, is_physical):
+        mock_is_drive_physical.return_value = is_physical
+        mock_drive = mock.MagicMock(Parent=mock.sentinel.fake_drive_parent)
+        mock_drive.associators.return_value = [mock.sentinel.physical_bssd]
+        mock_get_disk_res_from_path.return_value = mock_drive
+        mock_rads = mock.MagicMock()
+        mock_rads.associators.return_value = [mock.sentinel.bssd]
+        mock_wmi.WMI.return_value = mock_rads
+
+        ret = self._vmutils._drive_to_boot_source(mock.sentinel.drive_path)
+
+        mock_is_drive_physical.assert_called_once_with(
+            mock.sentinel.drive_path)
+        mock_get_disk_res_from_path.assert_called_once_with(
+            mock.sentinel.drive_path, is_physical=is_physical)
+        if is_physical:
+            self.assertEqual(mock.sentinel.physical_bssd, ret)
+        else:
+            self.assertEqual(mock.sentinel.bssd, ret)
+
+    def test_physical_drive_to_boot_source(self):
+        self._test_drive_to_boot_source(is_physical=True)
+
+    def test_drive_to_boot_source(self):
+        self._test_drive_to_boot_source(is_physical=False)
+
+    @mock.patch.object(vmutils.VMUtils, '_set_boot_order_gen1')
+    @mock.patch.object(vmutils.VMUtils, '_set_boot_order_gen2')
+    @mock.patch.object(vmutils.VMUtils, 'get_vm_generation')
+    def _test_set_boot_order(self, mock_get_vm_gen, mock_set_boot_order_gen2,
+                             mock_set_boot_order_gen1, vm_gen):
+        mock_get_vm_gen.return_value = vm_gen
+        self._vmutils.set_boot_order(mock.sentinel.fake_vm_name,
+                                     mock.sentinel.boot_order)
+        if vm_gen == constants.VM_GEN_1:
+            mock_set_boot_order_gen1.assert_called_once_with(
+                mock.sentinel.fake_vm_name, mock.sentinel.boot_order)
+        else:
+            mock_set_boot_order_gen2.assert_called_once_with(
+                mock.sentinel.fake_vm_name, mock.sentinel.boot_order)
+
+    def test_set_boot_order_gen1_vm(self):
+        self._test_set_boot_order(vm_gen=constants.VM_GEN_1)
+
+    def test_set_boot_order_gen2_vm(self):
+        self._test_set_boot_order(vm_gen=constants.VM_GEN_2)
+
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
+    @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
+    def test_set_boot_order_gen1(self, mock_modify_virt_syst,
+                            mock_get_vm_setting_data):
+        mock_vm = self._lookup_vm()
+
+        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
+        mock_vssd = mock_get_vm_setting_data.return_value
+        fake_dev_boot_order = [mock.sentinel.BOOT_DEV1,
+                               mock.sentinel.BOOT_DEV2]
+        self._vmutils._set_boot_order_gen1(
+            mock_vm.name, fake_dev_boot_order)
+
+        mock_modify_virt_syst.assert_called_once_with(
+            mock_svc, mock_vssd)
+        self.assertEqual(mock_vssd.BootOrder, tuple(fake_dev_boot_order))
+
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
+    @mock.patch.object(vmutils.VMUtils, '_drive_to_boot_source')
+    @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
+    def test_set_boot_order_gen2(self, mock_modify_virtual_system,
+                                 mock_drive_to_boot_source,
+                                 mock_get_vm_setting_data):
+        fake_boot_dev1 = mock.MagicMock()
+        fake_boot_dev2 = mock.MagicMock()
+        fake_boot_dev1.path_.return_value = mock.sentinel.BOOT_SOURCE1
+        fake_boot_dev2.path_.return_value = mock.sentinel.BOOT_SOURCE2
+
+        fake_dev_order = [fake_boot_dev1, fake_boot_dev2]
+        mock_drive_to_boot_source.side_effect = fake_dev_order
+        mock_vm = self._lookup_vm()
+        mock_svc = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
+        mock_vssd = mock_get_vm_setting_data.return_value
+        old_boot_order = tuple([mock.sentinel.BOOT_SOURCE2,
+                                mock.sentinel.BOOT_SOURCE1,
+                                mock.sentinel.BOOT_SOURCE_NET])
+        expected_boot_order = tuple([mock.sentinel.BOOT_SOURCE1,
+                                     mock.sentinel.BOOT_SOURCE2,
+                                     mock.sentinel.BOOT_SOURCE_NET])
+        mock_vssd.BootSourceOrder = old_boot_order
+
+        self._vmutils._set_boot_order_gen2(mock_vm.name, fake_dev_order)
+
+        mock_modify_virtual_system.assert_called_once_with(
+            mock_svc, mock_vssd)
+        self.assertEqual(expected_boot_order, mock_vssd.BootSourceOrder)
