@@ -146,6 +146,8 @@ class JobUtils(object):
     def add_virt_feature(self, virt_feature, parent):
         self.add_multiple_virt_features([virt_feature], parent)
 
+    @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
+                                exceptions=(exceptions.HyperVException, ))
     def add_multiple_virt_features(self, virt_features, parent):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         (job_path, out_set_data, ret_val) = vs_man_svc.AddFeatureSettings(
