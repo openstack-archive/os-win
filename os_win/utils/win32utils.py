@@ -48,11 +48,19 @@ class Win32Utils(object):
         # A list of return values signaling that the operation failed.
         error_ret_vals = kwargs.pop('error_ret_vals', [])
         error_on_nonzero_ret_val = kwargs.pop('error_on_nonzero_ret_val', True)
+        # Note(lpetrut): In the future, we may use functions that can
+        # return information/warning HRESULTs that should not be
+        # treated as exceptions.
         ret_val_is_err_code = kwargs.pop('ret_val_is_err_code', True)
 
         # The exception raised when the Win32 API function fails. The
         # exception must inherit Win32Exception.
         failure_exc = kwargs.pop('failure_exc', exceptions.Win32Exception)
+        # Expects a dict containing error codes as keys and the
+        # according error message codes as values. If the error code is
+        # not present in this dict, this method will search the System
+        # message table.
+        error_msg_src = kwargs.pop('error_msg_src', {})
 
         ret_val = func(*args, **kwargs)
 
@@ -62,8 +70,11 @@ class Win32Utils(object):
         if func_failed:
             error_code = (ret_val
                           if ret_val_is_err_code else self.get_last_error())
+            error_code = ctypes.c_ulong(error_code).value
             if error_code not in ignored_error_codes:
-                error_message = self.get_error_message(error_code)
+                error_message = error_msg_src.get(error_code,
+                                                  self.get_error_message(
+                                                      error_code))
                 func_name = getattr(func, '__name__', '')
                 raise failure_exc(error_code=error_code,
                                   error_message=error_message,

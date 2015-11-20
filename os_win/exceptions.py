@@ -64,7 +64,7 @@ class SMBException(OSWinException):
 class Win32Exception(OSWinException):
     msg_fmt = _("Executing Win32 API function %(func_name)s failed. "
                 "Error code: %(error_code)s. "
-                "Error message %(error_message)s.")
+                "Error message: %(error_message)s")
 
     def __init__(self, message=None, **kwargs):
         self.error_code = kwargs.get('error_code')
@@ -107,6 +107,15 @@ class ISCSITargetException(OSWinException):
 
 class ISCSITargetWMIException(ISCSITargetException, WMIException):
     pass
+
+
+class ISCSIInitiatorAPIException(Win32Exception):
+    pass
+
+
+class ISCSILunNotAvailable(ISCSITargetException):
+    msg_fmt = _("Could not find lun %(target_lun)s "
+                "for iSCSI target %(target_iqn)s.")
 
 
 class Win32IOException(Win32Exception):
