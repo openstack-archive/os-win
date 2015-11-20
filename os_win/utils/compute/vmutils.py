@@ -819,3 +819,20 @@ class VMUtils(object):
             raise exceptions.HyperVException(
                 _('UEFI SecureBoot is supported only on Windows instances for '
                   'this Hyper-V version.'))
+
+    def set_disk_qos_specs(self, vm_name, disk_path,
+                            max_iops=None, min_iops=None):
+        if min_iops is None and max_iops is None:
+            LOG.debug("Skipping setting disk QoS specs as no "
+                      "value was provided.")
+            return
+
+        disk_resource = self._get_mounted_disk_resource_from_path(
+            disk_path, is_physical=False)
+
+        if max_iops is not None:
+            disk_resource.IOPSLimit = max_iops
+        if min_iops is not None:
+            disk_resource.IOPSReservation = min_iops
+
+        self._jobutils.modify_virt_resource(disk_resource)
