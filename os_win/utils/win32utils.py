@@ -91,7 +91,7 @@ class Win32Utils(object):
     @staticmethod
     def hresult_to_err_code(hresult):
         # The last 2 bytes of the hresult store the error code.
-        return hresult & 0xFF
+        return hresult & 0xFFFF
 
     def get_com_err_code(self, com_error):
         hres = None
