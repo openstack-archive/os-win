@@ -295,10 +295,9 @@ class VMUtils(object):
             vm_path = job.associators(self._AFFECTED_JOB_ELEMENT_CLASS)[0]
         return self._get_wmi_obj(vm_path)
 
-    def _modify_virtual_system(self, vs_man_svc, vm_path, vmsetting):
-        (job_path, ret_val) = vs_man_svc.ModifyVirtualSystem(
-            ComputerSystem=vm_path,
-            SystemSettingData=vmsetting.GetText_(1))[1:]
+    def _modify_virtual_system(self, vs_man_svc, vmsetting):
+        (job_path, ret_val) = vs_man_svc.ModifySystemSettings(
+            SystemSettings=vmsetting.GetText_(1))
         self._jobutils.check_ret_val(ret_val, job_path)
 
     def get_vm_scsi_controller(self, vm_name):
@@ -811,7 +810,7 @@ class VMUtils(object):
         vs_data = self._get_vm_setting_data(vm)
         self._set_secure_boot(vs_data, msft_ca_required)
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        self._modify_virtual_system(vs_man_svc, vm.path_(), vs_data)
+        self._modify_virtual_system(vs_man_svc, vs_data)
 
     def _set_secure_boot(self, vs_data, msft_ca_required):
         vs_data.SecureBootEnabled = True

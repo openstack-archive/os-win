@@ -630,20 +630,17 @@ class VMUtilsTestCase(base.BaseTestCase):
     def test_modify_virtual_system(self):
         mock_vs_man_svc = mock.MagicMock()
         mock_vmsetting = mock.MagicMock()
-        fake_path = 'fake path'
         fake_job_path = 'fake job path'
         fake_ret_val = 'fake return value'
 
-        mock_vs_man_svc.ModifyVirtualSystem.return_value = (0, fake_job_path,
+        mock_vs_man_svc.ModifySystemSettings.return_value = (fake_job_path,
                                                             fake_ret_val)
 
         self._vmutils._modify_virtual_system(vs_man_svc=mock_vs_man_svc,
-                                             vm_path=fake_path,
                                              vmsetting=mock_vmsetting)
 
-        mock_vs_man_svc.ModifyVirtualSystem.assert_called_once_with(
-            ComputerSystem=fake_path,
-            SystemSettingData=mock_vmsetting.GetText_(1))
+        mock_vs_man_svc.ModifySystemSettings.assert_called_once_with(
+            SystemSettings=mock_vmsetting.GetText_(1))
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             fake_ret_val, fake_job_path)
 
@@ -865,7 +862,7 @@ class VMUtilsTestCase(base.BaseTestCase):
             mock_set_secure_boot.assert_called_once_with(
                 vs_data, mock.sentinel.msft_ca_required)
             mock_modify_virtual_system.assert_called_once_with(
-                vs_svc, vm.path_(), vs_data)
+                vs_svc, vs_data)
 
     @mock.patch.object(vmutils.VMUtils,
                        '_get_mounted_disk_resource_from_path')
