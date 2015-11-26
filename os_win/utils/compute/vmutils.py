@@ -202,7 +202,7 @@ class VMUtils(object):
         return [s for s in vmsettings if
                 s.VirtualSystemType == self._VIRTUAL_SYSTEM_TYPE_REALIZED][0]
 
-    def _set_vm_memory(self, vm, vmsetting, memory_mb, dynamic_memory_ratio):
+    def _set_vm_memory(self, vmsetting, memory_mb, dynamic_memory_ratio):
         mem_settings = vmsetting.associators(
             wmi_result_class=self._MEMORY_SETTING_DATA_CLASS)[0]
 
@@ -223,9 +223,9 @@ class VMUtils(object):
         # Start with the minimum memory
         mem_settings.VirtualQuantity = reserved_mem
 
-        self._jobutils.modify_virt_resource(mem_settings, vm)
+        self._jobutils.modify_virt_resource(mem_settings)
 
-    def _set_vm_vcpus(self, vm, vmsetting, vcpus_num, limit_cpu_features):
+    def _set_vm_vcpus(self, vmsetting, vcpus_num, limit_cpu_features):
         procsetting = vmsetting.associators(
             wmi_result_class=self._PROCESSOR_SETTING_DATA_CLASS)[0]
         vcpus = int(vcpus_num)
@@ -234,14 +234,14 @@ class VMUtils(object):
         procsetting.Limit = 100000  # static assignment to 100%
         procsetting.LimitProcessorFeatures = limit_cpu_features
 
-        self._jobutils.modify_virt_resource(procsetting, vm)
+        self._jobutils.modify_virt_resource(procsetting)
 
     def update_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
                   dynamic_memory_ratio):
         vm = self._lookup_vm_check(vm_name)
         vmsetting = self._get_vm_setting_data(vm)
-        self._set_vm_memory(vm, vmsetting, memory_mb, dynamic_memory_ratio)
-        self._set_vm_vcpus(vm, vmsetting, vcpus_num, limit_cpu_features)
+        self._set_vm_memory(vmsetting, memory_mb, dynamic_memory_ratio)
+        self._set_vm_vcpus(vmsetting, vcpus_num, limit_cpu_features)
 
     def check_admin_permissions(self):
         if not self._conn.Msvm_VirtualSystemManagementService():
@@ -456,7 +456,7 @@ class VMUtils(object):
                               {'old': disk_resource.HostResource[0],
                                'new': mounted_disk_path})
                     disk_resource.HostResource = [mounted_disk_path]
-                    self._jobutils.modify_virt_resource(disk_resource, vm)
+                    self._jobutils.modify_virt_resource(disk_resource)
                 disk_found = True
                 break
         if not disk_found:
@@ -493,10 +493,9 @@ class VMUtils(object):
         :param vm_name: The name of the VM which has the NIC to be destroyed.
         :param nic_name: The NIC's ElementName.
         """
+        # TODO(claudiub): remove vm_name argument, no longer used.
         nic_data = self._get_nic_data_by_name(nic_name)
-
-        vm = self._lookup_vm_check(vm_name)
-        self._jobutils.remove_virt_resource(nic_data, vm)
+        self._jobutils.remove_virt_resource(nic_data)
 
     def soft_shutdown_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
@@ -641,7 +640,7 @@ class VMUtils(object):
         return disk_resource is not None
 
     def detach_vm_disk(self, vm_name, disk_path, is_physical=True):
-        vm = self._lookup_vm_check(vm_name)
+        # TODO(claudiub): remove vm_name argument, no longer used.
         disk_resource = self._get_mounted_disk_resource_from_path(disk_path,
                                                                   is_physical)
 
@@ -651,9 +650,9 @@ class VMUtils(object):
                                       "WHERE __PATH = '%s'" %
                                       disk_resource.Parent)[0]
 
-            self._jobutils.remove_virt_resource(disk_resource, vm)
+            self._jobutils.remove_virt_resource(disk_resource)
             if not is_physical:
-                self._jobutils.remove_virt_resource(parent, vm)
+                self._jobutils.remove_virt_resource(parent)
 
     def _get_mounted_disk_resource_from_path(self, disk_path, is_physical):
         if is_physical:
@@ -723,7 +722,7 @@ class VMUtils(object):
 
         if update_connection:
             serial_port.Connection = [update_connection]
-            self._jobutils.modify_virt_resource(serial_port, vm)
+            self._jobutils.modify_virt_resource(serial_port)
 
         if len(serial_port.Connection) > 0:
             return serial_port.Connection[0]

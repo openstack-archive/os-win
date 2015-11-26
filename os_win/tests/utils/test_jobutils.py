@@ -157,10 +157,9 @@ class JobUtilsTestCase(base.BaseTestCase):
         if expected_fail:
             self.assertRaises(exceptions.HyperVException,
                               self.jobutils.modify_virt_resource,
-                              mock_res_setting_data, mock.sentinel.fake_path)
+                              mock_res_setting_data)
         else:
-            self.jobutils.modify_virt_resource(mock_res_setting_data,
-                                               mock.sentinel.fake_path)
+            self.jobutils.modify_virt_resource(mock_res_setting_data)
 
         mock_calls = [
             mock.call(ResourceSettings=[mock.sentinel.res_data])] * num_calls
@@ -174,7 +173,7 @@ class JobUtilsTestCase(base.BaseTestCase):
 
     def test_remove_virt_resource(self):
         self._test_virt_method('RemoveResourceSettings', 2,
-                               'remove_virt_resource', True,
+                               'remove_virt_resource', False,
                                ResourceSettings=[mock.sentinel.res_path])
 
     def test_add_virt_feature(self):
