@@ -104,7 +104,7 @@ utils_map = {
 
 def _get_class(class_type):
     if class_type not in utils_map:
-        raise exceptions.HyperVException(_('Class type %(class)s does '
+        raise exceptions.HyperVException(_('Class type %s does '
                                            'not exist') % class_type)
 
     windows_version = utils.get_windows_version()
