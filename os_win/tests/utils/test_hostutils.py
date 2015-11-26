@@ -33,6 +33,9 @@ class FakeCPUSpec(object):
 class HostUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V hostutils class."""
 
+    _DEVICE_ID = "Microsoft:UUID\\0\\0"
+    _NODE_ID = "Microsoft:PhysicalNode\\0"
+
     _FAKE_MEMORY_TOTAL = 1024
     _FAKE_MEMORY_FREE = 512
     _FAKE_DISK_SIZE = 1024
@@ -186,3 +189,78 @@ class HostUtilsTestCase(base.BaseTestCase):
 
         mock_sv_feature_cls.assert_called_once_with(
             ID=mock.sentinel.feature_id)
+
+    def _check_get_numa_nodes_missing_info(self):
+        numa_node = mock.MagicMock()
+        self._hostutils._conn_virt.Msvm_NumaNode.return_value = [
+            numa_node, numa_node]
+
+        nodes_info = self._hostutils.get_numa_nodes()
+        self.assertEqual([], nodes_info)
+
+    @mock.patch.object(hostutils.HostUtils, '_get_numa_memory_info')
+    def test_get_numa_nodes_missing_memory_info(self, mock_get_memory_info):
+        mock_get_memory_info.return_value = None
+        self._check_get_numa_nodes_missing_info()
+
+    @mock.patch.object(hostutils.HostUtils, '_get_numa_cpu_info')
+    @mock.patch.object(hostutils.HostUtils, '_get_numa_memory_info')
+    def test_get_numa_nodes_missing_cpu_info(self, mock_get_memory_info,
+                                             mock_get_cpu_info):
+        mock_get_cpu_info.return_value = None
+        self._check_get_numa_nodes_missing_info()
+
+    @mock.patch.object(hostutils.HostUtils, '_get_numa_cpu_info')
+    @mock.patch.object(hostutils.HostUtils, '_get_numa_memory_info')
+    def test_get_numa_nodes(self, mock_get_memory_info, mock_get_cpu_info):
+        numa_memory = mock_get_memory_info.return_value
+        host_cpu = mock.MagicMock(DeviceID=self._DEVICE_ID)
+        mock_get_cpu_info.return_value = [host_cpu]
+        numa_node = mock.MagicMock(NodeID=self._NODE_ID)
+        numa_node.associators.return_value = [numa_memory, host_cpu]
+        self._hostutils._conn_virt.Msvm_NumaNode.return_value = [
+            numa_node, numa_node]
+
+        nodes_info = self._hostutils.get_numa_nodes()
+
+        expected_info = {
+            'id': self._DEVICE_ID.split('\\')[-1],
+            'memory': numa_memory.NumberOfBlocks,
+            'memory_usage': numa_node.CurrentlyConsumableMemoryBlocks,
+            'cpuset': set([self._DEVICE_ID.split('\\')[-1]]),
+            'cpu_usage': 0,
+        }
+
+        self.assertEqual([expected_info, expected_info], nodes_info)
+
+    def test_get_numa_memory_info(self):
+        numa_memory = mock.MagicMock()
+        numa_node = mock.MagicMock()
+        numa_node.associators.return_value = [numa_memory]
+        memory_info = self._hostutils._get_numa_memory_info(numa_node)
+
+        self.assertEqual(numa_memory, memory_info)
+
+    def test_get_numa_memory_info_not_found(self):
+        numa_node = mock.MagicMock()
+        numa_node.associators.return_value = []
+        memory_info = self._hostutils._get_numa_memory_info(numa_node)
+
+        self.assertIsNone(memory_info)
+
+    def test_get_numa_cpu_info(self):
+        host_cpu = mock.MagicMock()
+        host_cpu.path_.return_value = 'fake_wmi_obj_path'
+        vm_cpu = mock.MagicMock()
+        vm_cpu.path_return_value = 'fake_wmi_obj_path1'
+        numa_node_proc_path = ['fake_wmi_obj_path']
+        cpu_info = self._hostutils._get_numa_cpu_info(numa_node_proc_path,
+                                                      [host_cpu, vm_cpu])
+
+        self.assertEqual([host_cpu], cpu_info)
+
+    def test_get_numa_cpu_info_not_found(self):
+        other = mock.MagicMock()
+        cpu_info = self._hostutils._get_numa_cpu_info([], [other])
+
+        self.assertEqual([], cpu_info)

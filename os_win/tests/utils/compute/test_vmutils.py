@@ -125,7 +125,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_set_vm_memory_dynamic(self):
         self._test_set_vm_memory_dynamic(2.0)
 
-    def _test_set_vm_memory_dynamic(self, dynamic_memory_ratio):
+    def _test_set_vm_memory_dynamic(self, dynamic_memory_ratio,
+                                    mem_per_numa_node=None):
         mock_s = self._vmutils._conn.Msvm_VirtualSystemSettingData()[0]
         mock_s.SystemType = 3
 
@@ -134,15 +135,41 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._vmutils._set_vm_memory(mock_vmsetting,
                                      self._FAKE_MEMORY_MB,
+                                     mem_per_numa_node,
                                      dynamic_memory_ratio)
 
         self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
             mock_s)
 
+        if mem_per_numa_node:
+            self.assertEqual(mem_per_numa_node,
+                             mock_s.MaxMemoryBlocksPerNumaNode)
         if dynamic_memory_ratio > 1:
             self.assertTrue(mock_s.DynamicMemoryEnabled)
         else:
             self.assertFalse(mock_s.DynamicMemoryEnabled)
+
+    def test_set_vm_vcpus(self):
+        self._check_set_vm_vcpus()
+
+    def test_set_vm_vcpus_per_vnuma_node(self):
+        self._check_set_vm_vcpus(vcpus_per_numa_node=1)
+
+    def _check_set_vm_vcpus(self, vcpus_per_numa_node=None):
+        procsetting = mock.MagicMock()
+        mock_vmsetting = mock.MagicMock()
+        mock_vmsetting.associators.return_value = [procsetting]
+
+        self._vmutils._set_vm_vcpus(mock_vmsetting,
+                                    self._FAKE_VCPUS_NUM,
+                                    vcpus_per_numa_node,
+                                    limit_cpu_features=False)
+
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            procsetting)
+        if vcpus_per_numa_node:
+            self.assertEqual(vcpus_per_numa_node,
+                             procsetting.MaxProcessorsPerNumaNode)
 
     def test_soft_shutdown_vm(self):
         mock_vm = self._lookup_vm()
@@ -228,8 +255,45 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_setting_data')
+    def test_update_vm(self, mock_get_vm_setting_data, mock_set_mem,
+                       mock_set_vcpus):
+        self._lookup_vm()
+        mock_vm_settings = mock_get_vm_setting_data.return_value
+
+        self._vmutils.update_vm(
+            mock.sentinel.vm_name, mock.sentinel.memory_mb,
+            mock.sentinel.memory_per_numa, mock.sentinel.vcpus_num,
+            mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
+            mock.sentinel.dynamic_mem_ratio)
+
+        mock_set_mem.assert_called_once_with(
+            mock_vm_settings, mock.sentinel.memory_mb,
+            mock.sentinel.memory_per_numa, mock.sentinel.dynamic_mem_ratio)
+        mock_set_vcpus.assert_called_once_with(
+            mock_vm_settings, mock.sentinel.vcpus_num,
+            mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features)
+
+    @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
+    @mock.patch.object(vmutils.VMUtils, '_create_vm_obj')
+    def test_vnuma_create_vm(self, mock_create_vm_obj, mock_set_mem):
+        self._vmutils._vs_man_svc.DefineSystem.return_value = (
+            None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
+        self._vmutils.create_vm(self._FAKE_VM_NAME,
+                                mock.sentinel.vnuma_enabled,
+                                self._VM_GEN,
+                                mock.sentinel.instance_path)
+
+        mock_create_vm_obj.assert_called_once_with(
+            self._FAKE_VM_NAME, mock.sentinel.vnuma_enabled,
+            self._VM_GEN, None, mock.sentinel.instance_path)
+        self.assertFalse(mock_set_mem.called)
+
+    @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
+    @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
-    def test_create_vm(self, mock_get_wmi_obj, mock_set_mem, mock_set_vcpus):
+    def test_old_create_vm(self, mock_get_wmi_obj, mock_set_mem,
+                           mock_set_vcpus):
         mock_svc = self._vmutils._vs_man_svc
         getattr(mock_svc, self._DEFINE_SYSTEM).return_value = (
             None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
@@ -250,10 +314,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                                 mock.sentinel.instance_path)
 
         self.assertTrue(getattr(mock_svc, self._DEFINE_SYSTEM).called)
-        mock_set_mem.assert_called_with(mock_s, self._FAKE_MEMORY_MB,
+        mock_set_mem.assert_called_with(mock_s, self._FAKE_MEMORY_MB, None,
                                         self._FAKE_DYNAMIC_MEMORY_RATIO)
 
-        mock_set_vcpus.assert_called_with(mock_s, self._FAKE_VCPUS_NUM, False)
+        mock_set_vcpus.assert_called_with(mock_s, self._FAKE_VCPUS_NUM, None,
+                                          False)
 
     def test_get_vm_scsi_controller(self):
         self._prepare_get_vm_controller(self._vmutils._SCSI_CTRL_RES_SUB_TYPE)
@@ -761,7 +826,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
     def _test_create_vm_obj(self, mock_get_wmi_obj, vm_path,
-                            dynamic_memory_ratio=1.0):
+                            vnuma_enabled=True):
         mock_vs_man_svc = self._vmutils._vs_man_svc
         mock_vs_data = mock.MagicMock()
         mock_job = mock.MagicMock()
@@ -781,7 +846,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             vm_name=fake_vm_name,
             vm_gen=constants.VM_GEN_2,
             notes='fake notes',
-            dynamic_memory_ratio=dynamic_memory_ratio,
+            vnuma_enabled=vnuma_enabled,
             instance_path=mock.sentinel.instance_path)
 
         if not vm_path:
@@ -800,11 +865,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                          mock_vs_data.VirtualSystemSubType)
         self.assertFalse(mock_vs_data.SecureBootEnabled)
 
-        if dynamic_memory_ratio > 1:
-            self.assertFalse(mock_vs_data.VirtualNumaEnabled)
-
         mock_get_wmi_obj.assert_called_with('fake vm path')
 
+        self.assertEqual(vnuma_enabled, mock_vs_data.VirtualNumaEnabled)
+        self.assertEqual(self._vmutils._VIRTUAL_SYSTEM_SUBTYPE_GEN2,
+                         mock_vs_data.VirtualSystemSubType)
         self.assertEqual(mock_vs_data.Notes, 'fake notes')
         self.assertEqual(mock.sentinel.instance_path,
                          mock_vs_data.ConfigurationDataRoot)
@@ -823,8 +888,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_create_vm_obj_no_vm_path(self):
         self._test_create_vm_obj(vm_path=None)
 
-    def test_create_vm_obj_dynamic_memory(self):
-        self._test_create_vm_obj(vm_path=None, dynamic_memory_ratio=1.1)
+    def test_create_vm_obj_vnuma_disabled(self):
+        self._test_create_vm_obj(vm_path=None, vnuma_enabled=False)
 
     def test_list_instances(self):
         vs = mock.MagicMock()
