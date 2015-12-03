@@ -517,8 +517,7 @@ class VMUtilsTestCase(base.BaseTestCase):
     def test_is_disk_attached(self, mock_get_mounted_disk_from_path):
         is_physical = True
 
-        is_attached = self._vmutils.is_disk_attached(mock.sentinel.vm_name,
-                                                     mock.sentinel.disk_path,
+        is_attached = self._vmutils.is_disk_attached(mock.sentinel.disk_path,
                                                      is_physical=is_physical)
 
         self.assertTrue(is_attached)
