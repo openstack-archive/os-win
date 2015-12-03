@@ -635,7 +635,7 @@ class VMUtils(object):
 
         return dvd_paths
 
-    def is_disk_attached(self, vm_name, disk_path, is_physical=True):
+    def is_disk_attached(self, disk_path, is_physical=True):
         disk_resource = self._get_mounted_disk_resource_from_path(disk_path,
                                                                   is_physical)
         return disk_resource is not None
