@@ -133,20 +133,18 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._test_set_vm_memory_dynamic(2.0)
 
     def _test_set_vm_memory_dynamic(self, dynamic_memory_ratio):
-        mock_vm = self._lookup_vm()
-
         mock_s = self._vmutils._conn.Msvm_VirtualSystemSettingData()[0]
         mock_s.SystemType = 3
 
         mock_vmsetting = mock.MagicMock()
         mock_vmsetting.associators.return_value = [mock_s]
 
-        self._vmutils._set_vm_memory(mock_vm, mock_vmsetting,
+        self._vmutils._set_vm_memory(mock_vmsetting,
                                      self._FAKE_MEMORY_MB,
                                      dynamic_memory_ratio)
 
         self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
-            mock_s, mock_vm)
+            mock_s)
 
         if dynamic_memory_ratio > 1:
             self.assertTrue(mock_s.DynamicMemoryEnabled)
@@ -385,14 +383,13 @@ class VMUtilsTestCase(base.BaseTestCase):
 
     @mock.patch.object(vmutils.VMUtils, '_get_nic_data_by_name')
     def test_destroy_nic(self, mock_get_nic_data_by_name):
-        mock_vm = self._lookup_vm()
         mock_nic_data = mock_get_nic_data_by_name.return_value
 
         self._vmutils.destroy_nic(self._FAKE_VM_NAME,
                                   mock.sentinel.FAKE_NIC_NAME)
 
         self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
-            mock_nic_data, mock_vm)
+            mock_nic_data)
 
     def test_set_vm_state(self):
         mock_vm = self._lookup_vm()
@@ -417,7 +414,7 @@ class VMUtilsTestCase(base.BaseTestCase):
             self._FAKE_VM_PATH)
 
     def test_set_disk_host_resource(self):
-        mock_vm = self._lookup_vm()
+        self._lookup_vm()
         mock_rasds = self._create_mock_disks()
 
         self._vmutils._get_vm_disks = mock.MagicMock(
@@ -433,7 +430,7 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils._get_disk_resource_address.assert_called_with(
             mock_rasds[0])
         self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
-            mock_rasds[0], mock_vm)
+            mock_rasds[0])
         self.assertEqual(
             mock.sentinel.fake_new_mounted_disk_path,
             mock_rasds[0].HostResource[0])
@@ -525,13 +522,12 @@ class VMUtilsTestCase(base.BaseTestCase):
             mock.sentinel.disk_path, is_physical)
 
     def test_detach_vm_disk(self):
-        mock_vm = self._lookup_vm()
         mock_disk = self._prepare_mock_disk()
 
         self._vmutils.detach_vm_disk(self._FAKE_VM_NAME,
                                      self._FAKE_HOST_RESOURCE)
         self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
-            mock_disk, mock_vm)
+            mock_disk)
 
     def test_get_mounted_disk_resource_from_path(self):
         mock_disk_1 = mock.MagicMock()
@@ -601,8 +597,7 @@ class VMUtilsTestCase(base.BaseTestCase):
 
         if new_connection:
             self.assertEqual(new_connection, ret_val)
-            fake_modify.assert_called_once_with(fake_serial_port,
-                                                mock_vm)
+            fake_modify.assert_called_once_with(fake_serial_port)
         else:
             self.assertEqual(old_serial_connection, ret_val)
 

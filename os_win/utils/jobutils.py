@@ -131,13 +131,13 @@ class JobUtils(object):
     # serial port connection. Retrying the operation will yield success.
     @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
                                 exceptions=(exceptions.HyperVException, ))
-    def modify_virt_resource(self, virt_resource, parent=None):
+    def modify_virt_resource(self, virt_resource):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         (job_path, out_set_data, ret_val) = vs_man_svc.ModifyResourceSettings(
             ResourceSettings=[virt_resource.GetText_(1)])
         self.check_ret_val(ret_val, job_path)
 
-    def remove_virt_resource(self, virt_resource, parent=None):
+    def remove_virt_resource(self, virt_resource):
         vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         (job, ret_val) = vs_man_svc.RemoveResourceSettings(
             ResourceSettings=[virt_resource.path_()])
