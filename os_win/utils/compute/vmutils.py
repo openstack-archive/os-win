@@ -259,10 +259,10 @@ class VMUtils(object):
         vmsetting = self._get_vm_setting_data(vm)
 
         LOG.debug('Setting memory for vm %s', vm_name)
-        self._set_vm_memory(vm, vmsetting, memory_mb, dynamic_memory_ratio)
+        self._set_vm_memory(vmsetting, memory_mb, dynamic_memory_ratio)
 
         LOG.debug('Set vCPUs for vm %s', vm_name)
-        self._set_vm_vcpus(vm, vmsetting, vcpus_num, limit_cpu_features)
+        self._set_vm_vcpus(vmsetting, vcpus_num, limit_cpu_features)
 
     def _create_vm_obj(self, vs_man_svc, vm_name, vm_gen, notes,
                        dynamic_memory_ratio, instance_path):

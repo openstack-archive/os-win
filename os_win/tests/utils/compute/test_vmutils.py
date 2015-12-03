@@ -246,12 +246,10 @@ class VMUtilsTestCase(base.BaseTestCase):
                                 mock.sentinel.instance_path)
 
         self.assertTrue(getattr(mock_svc, self._DEFINE_SYSTEM).called)
-        mock_set_mem.assert_called_with(mock_vm, mock_s, self._FAKE_MEMORY_MB,
+        mock_set_mem.assert_called_with(mock_s, self._FAKE_MEMORY_MB,
                                         self._FAKE_DYNAMIC_MEMORY_RATIO)
 
-        mock_set_vcpus.assert_called_with(mock_vm, mock_s,
-                                          self._FAKE_VCPUS_NUM,
-                                          False)
+        mock_set_vcpus.assert_called_with(mock_s, self._FAKE_VCPUS_NUM, False)
 
     def test_get_vm_scsi_controller(self):
         self._prepare_get_vm_controller(self._vmutils._SCSI_CTRL_RES_SUB_TYPE)
