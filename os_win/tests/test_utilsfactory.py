@@ -40,10 +40,15 @@ CONF = cfg.CONF
 class TestHyperVUtilsFactory(base.BaseTestCase):
 
     @mock.patch.object(utilsfactory.utils, 'get_windows_version')
-    def test_get_class_not_found(self, mock_get_windows_version):
+    def test_get_class_unsupported_win_version(self, mock_get_windows_version):
         mock_get_windows_version.return_value = '5.2'
         self.assertRaises(exceptions.HyperVException, utilsfactory._get_class,
                           'hostutils')
+
+    def test_get_class_unsupported_class_type(self):
+        self.assertRaises(exceptions.HyperVException,
+                          utilsfactory._get_class,
+                          'invalid_class_type')
 
     @mock.patch.object(utilsfactory.utils, 'get_windows_version')
     def _check_get_class(self, mock_get_windows_version, expected_class,
