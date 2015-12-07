@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import platform
 import sys
 
 if sys.platform == 'win32':
@@ -24,7 +25,6 @@ from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
-from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ class LiveMigrationUtils(object):
     def __init__(self):
         self._vmutils = vmutils.VMUtils()
         self._jobutils = jobutils.JobUtils()
-        self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
         try:
@@ -75,77 +74,54 @@ class LiveMigrationUtils(object):
                                              % vm_name)
         return vms[0]
 
-    def _destroy_planned_vm(self, conn_v2_remote, planned_vm):
-        LOG.debug("Destroying existing remote planned VM: %s",
+    def _destroy_planned_vm(self, conn_v2, planned_vm):
+        LOG.debug("Destroying existing planned VM: %s",
                   planned_vm.ElementName)
-        vs_man_svc = conn_v2_remote.Msvm_VirtualSystemManagementService()[0]
+        vs_man_svc = conn_v2.Msvm_VirtualSystemManagementService()[0]
         (job_path, ret_val) = vs_man_svc.DestroySystem(planned_vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def _check_existing_planned_vm(self, conn_v2_remote, vm):
-        # Make sure that there's not yet a remote planned VM on the target
-        # host for this VM
-        planned_vms = conn_v2_remote.Msvm_PlannedComputerSystem(Name=vm.Name)
-        if planned_vms:
-            self._destroy_planned_vm(conn_v2_remote, planned_vms[0])
+    def _get_planned_vms(self, conn_v2, vm):
+        return conn_v2.Msvm_PlannedComputerSystem(Name=vm.Name)
 
-    def _create_remote_planned_vm(self, conn_v2_local, conn_v2_remote,
-                                  vm, rmt_ip_addr_list, dest_host):
+    def _destroy_existing_planned_vms(self, conn_v2, vm):
+        planned_vms = self._get_planned_vms(conn_v2, vm)
+        for planned_vm in planned_vms:
+            self._destroy_planned_vm(conn_v2, planned_vm)
+
+    def _create_planned_vm(self, conn_v2_local, conn_v2_remote,
+                           vm, ip_addr_list, dest_host):
         # Staged
-        vsmsd = conn_v2_local.query("select * from "
-                                    "Msvm_VirtualSystemMigrationSettingData "
-                                    "where MigrationType = 32770")[0]
-        vsmsd.DestinationIPAddressList = rmt_ip_addr_list
+        vsmsd = conn_v2_remote.query("select * from "
+                                     "Msvm_VirtualSystemMigrationSettingData "
+                                     "where MigrationType = 32770")[0]
+        vsmsd.DestinationIPAddressList = ip_addr_list
         migration_setting_data = vsmsd.GetText_(1)
 
-        LOG.debug("Creating remote planned VM for VM: %s",
-                  vm.ElementName)
-        migr_svc = conn_v2_local.Msvm_VirtualSystemMigrationService()[0]
+        LOG.debug("Creating planned VM for VM: %s", vm.ElementName)
+        migr_svc = conn_v2_remote.Msvm_VirtualSystemMigrationService()[0]
         (job_path, ret_val) = migr_svc.MigrateVirtualSystemToHost(
             ComputerSystem=vm.path_(),
             DestinationHost=dest_host,
             MigrationSettingData=migration_setting_data)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-        return conn_v2_remote.Msvm_PlannedComputerSystem(Name=vm.Name)[0]
+        return conn_v2_local.Msvm_PlannedComputerSystem(Name=vm.Name)[0]
 
-    def _get_physical_disk_paths(self, vm_name):
-        ide_ctrl_path = self._vmutils.get_vm_ide_controller(vm_name, 0)
-        if ide_ctrl_path:
-            ide_paths = self._vmutils.get_controller_volume_paths(
-                ide_ctrl_path)
-        else:
-            ide_paths = {}
+    def _get_disk_data(self, vm_name, vmutils_remote, disk_path_mapping):
+        disk_paths = {}
+        phys_disk_resources = vmutils_remote.get_vm_disks(vm_name)[1]
 
-        scsi_ctrl_path = self._vmutils.get_vm_scsi_controller(vm_name)
-        scsi_paths = self._vmutils.get_controller_volume_paths(scsi_ctrl_path)
+        for disk in phys_disk_resources:
+            rasd_rel_path = disk.path().RelPath
+            # We set this when volumes are attached.
+            serial = disk.ElementName
+            disk_paths[rasd_rel_path] = disk_path_mapping[serial]
+        return disk_paths
 
-        return dict(list(ide_paths.items()) + list(scsi_paths.items()))
-
-    def _get_remote_disk_data(self, vmutils_remote, disk_paths, dest_host):
-        remote_iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils(
-            dest_host)
-
-        disk_paths_remote = {}
-        for (rasd_rel_path, disk_path) in disk_paths.items():
-            target = self._iscsi_initiator.get_target_from_disk_path(disk_path)
-            if target:
-                (target_iqn, target_lun) = target
-
-                dev_num = remote_iscsi_initiator.get_device_number_for_target(
-                    target_iqn, target_lun)
-                disk_path_remote = (
-                    vmutils_remote.get_mounted_disk_by_drive_number(dev_num))
-
-                disk_paths_remote[rasd_rel_path] = disk_path_remote
-            else:
-                LOG.debug("Could not retrieve iSCSI target "
-                          "from disk path: %s", disk_path)
-
-        return disk_paths_remote
-
-    def _update_planned_vm_disk_resources(self, conn_v2_remote, planned_vm,
-                                          vm_name, disk_paths_remote):
+    def _update_planned_vm_disk_resources(self, conn_v2_local,
+                                          planned_vm, vm_name,
+                                          disk_paths_remote):
         vm_settings = planned_vm.associators(
             wmi_association_class='Msvm_SettingsDefineState',
             wmi_result_class='Msvm_VirtualSystemSettingData')[0]
@@ -172,7 +148,7 @@ class LiveMigrationUtils(object):
 
         LOG.debug("Updating remote planned VM disk paths for VM: %s",
                   vm_name)
-        vsmsvc = conn_v2_remote.Msvm_VirtualSystemManagementService()[0]
+        vsmsvc = conn_v2_local.Msvm_VirtualSystemManagementService()[0]
         (res_settings, job_path, ret_val) = vsmsvc.ModifyResourceSettings(
             ResourceSettings=updated_resource_setting_data)
         self._jobutils.check_ret_val(ret_val, job_path)
@@ -213,10 +189,10 @@ class LiveMigrationUtils(object):
             NewResourceSettingData=new_resource_setting_data)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def _get_remote_ip_address_list(self, conn_v2_remote, dest_host):
-        LOG.debug("Getting live migration networks for remote host: %s",
-                  dest_host)
-        migr_svc_rmt = conn_v2_remote.Msvm_VirtualSystemMigrationService()[0]
+    def _get_ip_address_list(self, conn_v2, hostname):
+        LOG.debug("Getting live migration networks for host: %s",
+                  hostname)
+        migr_svc_rmt = conn_v2.Msvm_VirtualSystemMigrationService()[0]
         return migr_svc_rmt.MigrationServiceListenerIPAddressList
 
     def live_migrate_vm(self, vm_name, dest_host):
@@ -226,27 +202,45 @@ class LiveMigrationUtils(object):
         conn_v2_remote = self._get_conn_v2(dest_host)
 
         vm = self._get_vm(conn_v2_local, vm_name)
-        self._check_existing_planned_vm(conn_v2_remote, vm)
 
-        rmt_ip_addr_list = self._get_remote_ip_address_list(conn_v2_remote,
-                                                            dest_host)
+        rmt_ip_addr_list = self._get_ip_address_list(conn_v2_remote,
+                                                     dest_host)
 
-        planned_vm = None
-        disk_paths = self._get_physical_disk_paths(vm_name)
-        if disk_paths:
-            vmutils_remote = vmutils.VMUtils(dest_host)
-            disk_paths_remote = self._get_remote_disk_data(vmutils_remote,
-                                                           disk_paths,
-                                                           dest_host)
+        planned_vms = self._get_planned_vms(conn_v2_remote, vm)
+        if len(planned_vms) > 1:
+            err_msg = _("Multiple planned VMs were found for VM %(vm_name)s "
+                        "on host %(dest_host)s")
+            raise exceptions.OSWinException(
+                err_msg % dict(vm_name=vm_name,
+                               dest_host=dest_host))
 
-            planned_vm = self._create_remote_planned_vm(conn_v2_local,
-                                                        conn_v2_remote,
-                                                        vm, rmt_ip_addr_list,
-                                                        dest_host)
-
-            self._update_planned_vm_disk_resources(conn_v2_remote, planned_vm,
-                                                   vm_name, disk_paths_remote)
+        planned_vm = planned_vms[0] if planned_vms else None
 
         new_resource_setting_data = self._get_vhd_setting_data(vm)
         self._live_migrate_vm(conn_v2_local, vm, planned_vm, rmt_ip_addr_list,
                               new_resource_setting_data, dest_host)
+
+    def create_planned_vm(self, vm_name, src_host, disk_path_mapping):
+        # This is run on the destination host.
+        dest_host = platform.node()
+        vmutils_remote = vmutils.VMUtils(src_host)
+
+        conn_v2_local = self._get_conn_v2()
+        conn_v2_remote = self._get_conn_v2(src_host)
+        vm = self._get_vm(conn_v2_remote, vm_name)
+
+        # Make sure there are no planned VMs already.
+        self._destroy_existing_planned_vms(conn_v2_local, vm)
+
+        ip_addr_list = self._get_ip_address_list(conn_v2_local,
+                                                 dest_host)
+
+        disk_paths = self._get_disk_data(vm_name, vmutils_remote,
+                                         disk_path_mapping)
+
+        planned_vm = self._create_planned_vm(conn_v2_local,
+                                             conn_v2_remote,
+                                             vm, ip_addr_list,
+                                             dest_host)
+        self._update_planned_vm_disk_resources(conn_v2_local, planned_vm,
+                                               vm_name, disk_paths)
