@@ -121,8 +121,17 @@ class HostUtilsTestCase(base.BaseTestCase):
         os = mock.MagicMock()
         os.Version = version
         self._hostutils._conn_cimv2.Win32_OperatingSystem.return_value = [os]
+        hostutils.HostUtils._windows_version = None
         self.assertEqual(expected,
                          self._hostutils.check_min_windows_version(6, 2))
+
+    def test_get_windows_version(self):
+        os = mock.MagicMock()
+        os.Version = self._FAKE_VERSION_GOOD
+        self._hostutils._conn_cimv2.Win32_OperatingSystem.return_value = [os]
+        hostutils.HostUtils._windows_version = None
+        self.assertEqual(self._FAKE_VERSION_GOOD,
+                         self._hostutils.get_windows_version())
 
     def _test_host_power_action(self, action):
         fake_win32 = mock.MagicMock()
