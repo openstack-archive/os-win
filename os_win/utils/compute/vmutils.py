@@ -91,6 +91,7 @@ class VMUtils(object):
                             constants.HYPERV_VM_STATE_SUSPENDED: 6}
 
     def __init__(self, host='.'):
+        self._vs_man_svc_attr = None
         self._jobutils = jobutils.JobUtils()
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
@@ -105,6 +106,13 @@ class VMUtils(object):
 
     def _init_hyperv_wmi_conn(self, host):
         self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
+
+    @property
+    def _vs_man_svc(self):
+        if not self._vs_man_svc_attr:
+            self._vs_man_svc_attr = (
+                self._conn.Msvm_VirtualSystemManagementService()[0])
+        return self._vs_man_svc_attr
 
     def list_instance_notes(self):
         instance_notes = []
@@ -128,13 +136,12 @@ class VMUtils(object):
     def get_vm_summary_info(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         vmsettings = vm.associators(
             wmi_association_class=self._SETTINGS_DEFINE_STATE_CLASS,
             wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)
         settings_paths = [v.path_() for v in vmsettings]
         # See http://msdn.microsoft.com/en-us/library/cc160706%28VS.85%29.aspx
-        (ret_val, summary_info) = vs_man_svc.GetSummaryInformation(
+        (ret_val, summary_info) = self._vs_man_svc.GetSummaryInformation(
             [constants.VM_SUMMARY_NUM_PROCS,
              constants.VM_SUMMARY_ENABLED_STATE,
              constants.VM_SUMMARY_MEMORY_USAGE,
@@ -250,10 +257,9 @@ class VMUtils(object):
     def create_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
                   dynamic_memory_ratio, vm_gen, instance_path, notes=None):
         """Creates a VM."""
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
 
         LOG.debug('Creating VM %s', vm_name)
-        vm = self._create_vm_obj(vs_man_svc, vm_name, vm_gen, notes,
+        vm = self._create_vm_obj(vm_name, vm_gen, notes,
                                  dynamic_memory_ratio, instance_path)
 
         vmsetting = self._get_vm_setting_data(vm)
@@ -264,7 +270,7 @@ class VMUtils(object):
         LOG.debug('Set vCPUs for vm %s', vm_name)
         self._set_vm_vcpus(vmsetting, vcpus_num, limit_cpu_features)
 
-    def _create_vm_obj(self, vs_man_svc, vm_name, vm_gen, notes,
+    def _create_vm_obj(self, vm_name, vm_gen, notes,
                        dynamic_memory_ratio, instance_path):
         vs_data = self._conn.Msvm_VirtualSystemSettingData.new()
         vs_data.ElementName = vm_name
@@ -290,16 +296,16 @@ class VMUtils(object):
 
         (job_path,
          vm_path,
-         ret_val) = vs_man_svc.DefineSystem(ResourceSettings=[],
-                                            ReferenceConfiguration=None,
-                                            SystemSettings=vs_data.GetText_(1))
+         ret_val) = self._vs_man_svc.DefineSystem(
+            ResourceSettings=[], ReferenceConfiguration=None,
+            SystemSettings=vs_data.GetText_(1))
         job = self._jobutils.check_ret_val(ret_val, job_path)
         if not vm_path and job:
             vm_path = job.associators(self._AFFECTED_JOB_ELEMENT_CLASS)[0]
         return self._get_wmi_obj(vm_path)
 
-    def _modify_virtual_system(self, vs_man_svc, vmsetting):
-        (job_path, ret_val) = vs_man_svc.ModifySystemSettings(
+    def _modify_virtual_system(self, vmsetting):
+        (job_path, ret_val) = self._vs_man_svc.ModifySystemSettings(
             SystemSettings=vmsetting.GetText_(1))
         self._jobutils.check_ret_val(ret_val, job_path)
 
@@ -566,9 +572,8 @@ class VMUtils(object):
     def destroy_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name)
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         # Remove the VM. It does not destroy any associated virtual disk.
-        (job_path, ret_val) = vs_man_svc.DestroySystem(vm.path_())
+        (job_path, ret_val) = self._vs_man_svc.DestroySystem(vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_wmi_obj(self, path):
@@ -811,8 +816,7 @@ class VMUtils(object):
         vm = self._lookup_vm_check(vm_name)
         vs_data = self._get_vm_setting_data(vm)
         self._set_secure_boot(vs_data, msft_ca_required)
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        self._modify_virtual_system(vs_man_svc, vs_data)
+        self._modify_virtual_system(vs_data)
 
     def _set_secure_boot(self, vs_data, msft_ca_required):
         vs_data.SecureBootEnabled = True
@@ -866,11 +870,10 @@ class VMUtils(object):
     def _set_boot_order_gen1(self, vm_name, device_boot_order):
         vm = self._lookup_vm_check(vm_name)
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         vssd = self._get_vm_setting_data(vm)
         vssd.BootOrder = tuple(device_boot_order)
 
-        self._modify_virtual_system(vs_man_svc, vssd)
+        self._modify_virtual_system(vssd)
 
     def _set_boot_order_gen2(self, vm_name, device_boot_order):
         new_boot_order = [(self._drive_to_boot_source(device)).path_()
@@ -878,9 +881,8 @@ class VMUtils(object):
 
         vm = self._lookup_vm_check(vm_name)
 
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         vssd = self._get_vm_setting_data(vm)
         old_boot_order = vssd.BootSourceOrder
         network_boot_devs = set(old_boot_order) ^ set(new_boot_order)
         vssd.BootSourceOrder = tuple(new_boot_order) + tuple(network_boot_devs)
-        self._modify_virtual_system(vs_man_svc, vssd)
+        self._modify_virtual_system(vssd)
