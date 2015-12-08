@@ -23,6 +23,7 @@ from oslo_log import log as logging
 from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils.compute import vmutils
+from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class LiveMigrationUtils(object):
 
     def __init__(self):
         self._vmutils = vmutils.VMUtils()
+        self._jobutils = jobutils.JobUtils()
         self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
@@ -78,7 +80,7 @@ class LiveMigrationUtils(object):
                   planned_vm.ElementName)
         vs_man_svc = conn_v2_remote.Msvm_VirtualSystemManagementService()[0]
         (job_path, ret_val) = vs_man_svc.DestroySystem(planned_vm.path_())
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _check_existing_planned_vm(self, conn_v2_remote, vm):
         # Make sure that there's not yet a remote planned VM on the target
@@ -103,7 +105,7 @@ class LiveMigrationUtils(object):
             ComputerSystem=vm.path_(),
             DestinationHost=dest_host,
             MigrationSettingData=migration_setting_data)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
         return conn_v2_remote.Msvm_PlannedComputerSystem(Name=vm.Name)[0]
 
@@ -142,9 +144,8 @@ class LiveMigrationUtils(object):
 
         return disk_paths_remote
 
-    def _update_planned_vm_disk_resources(self, vmutils_remote, conn_v2_remote,
-                                          planned_vm, vm_name,
-                                          disk_paths_remote):
+    def _update_planned_vm_disk_resources(self, conn_v2_remote, planned_vm,
+                                          vm_name, disk_paths_remote):
         vm_settings = planned_vm.associators(
             wmi_association_class='Msvm_SettingsDefineState',
             wmi_result_class='Msvm_VirtualSystemSettingData')[0]
@@ -174,7 +175,7 @@ class LiveMigrationUtils(object):
         vsmsvc = conn_v2_remote.Msvm_VirtualSystemManagementService()[0]
         (res_settings, job_path, ret_val) = vsmsvc.ModifyResourceSettings(
             ResourceSettings=updated_resource_setting_data)
-        vmutils_remote.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_vhd_setting_data(self, vm):
         vm_settings = vm.associators(
@@ -210,7 +211,7 @@ class LiveMigrationUtils(object):
             DestinationHost=dest_host,
             MigrationSettingData=migration_setting_data,
             NewResourceSettingData=new_resource_setting_data)
-        self._vmutils.check_ret_val(ret_val, job_path)
+        self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_remote_ip_address_list(self, conn_v2_remote, dest_host):
         LOG.debug("Getting live migration networks for remote host: %s",
@@ -243,8 +244,7 @@ class LiveMigrationUtils(object):
                                                         vm, rmt_ip_addr_list,
                                                         dest_host)
 
-            self._update_planned_vm_disk_resources(vmutils_remote,
-                                                   conn_v2_remote, planned_vm,
+            self._update_planned_vm_disk_resources(conn_v2_remote, planned_vm,
                                                    vm_name, disk_paths_remote)
 
         new_resource_setting_data = self._get_vhd_setting_data(vm)

@@ -35,6 +35,7 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
         self.liveutils = livemigrationutils.LiveMigrationUtils()
         self.liveutils._vmutils = mock.MagicMock()
         self.liveutils._iscsi_initiator = mock.MagicMock()
+        self.liveutils._jobutils = mock.Mock()
 
         self._conn = mock.MagicMock()
         self.liveutils._get_conn_v2 = mock.MagicMock(return_value=self._conn)
@@ -181,8 +182,6 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
             disk_paths)
 
     def test_update_planned_vm_disk_resources(self):
-        mock_vm_utils = mock.MagicMock()
-
         self._prepare_vm_mocks(self._RESOURCE_TYPE_DISK,
                                self._RESOURCE_SUB_TYPE_DISK)
         mock_vm = self._conn.Msvm_ComputerSystem.return_value[0]
@@ -191,7 +190,7 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
         mock_vsmsvc = self._conn.Msvm_VirtualSystemManagementService()[0]
 
         self.liveutils._update_planned_vm_disk_resources(
-            mock_vm_utils, self._conn, mock_vm, mock.sentinel.FAKE_VM_NAME,
+            self._conn, mock_vm, mock.sentinel.FAKE_VM_NAME,
             {sasd.path.return_value.RelPath: mock.sentinel.FAKE_RASD_PATH})
 
         mock_vsmsvc.ModifyResourceSettings.assert_called_once_with(
@@ -268,8 +267,8 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
 
             mocked_method = self.liveutils._update_planned_vm_disk_resources
             mocked_method.assert_called_once_with(
-                mock_vm_utils_remote, self._conn, mock_vm,
-                mock.sentinel.FAKE_VM_NAME, mock_disk_paths)
+                self._conn, mock_vm, mock.sentinel.FAKE_VM_NAME,
+                mock_disk_paths)
 
             self.liveutils._live_migrate_vm.assert_called_once_with(
                 self._conn, mock_vm, mock_vm,
