@@ -821,8 +821,7 @@ class VMUtils(object):
                 _('UEFI SecureBoot is supported only on Windows instances for '
                   'this Hyper-V version.'))
 
-    def set_disk_qos_specs(self, vm_name, disk_path,
-                            max_iops=None, min_iops=None):
+    def set_disk_qos_specs(self, disk_path, max_iops=None, min_iops=None):
         if min_iops is None and max_iops is None:
             LOG.debug("Skipping setting disk QoS specs as no "
                       "value was provided.")

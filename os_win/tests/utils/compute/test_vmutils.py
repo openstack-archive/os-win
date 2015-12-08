@@ -862,8 +862,7 @@ class VMUtilsTestCase(base.BaseTestCase):
     def test_set_disk_qos_specs(self, mock_get_disk_resource):
         mock_disk = mock_get_disk_resource.return_value
 
-        self._vmutils.set_disk_qos_specs(mock.sentinel.vm_name,
-                                         mock.sentinel.disk_path,
+        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path,
                                          max_iops=mock.sentinel.max_iops,
                                          min_iops=mock.sentinel.min_iops)
 
@@ -877,8 +876,7 @@ class VMUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(vmutils.VMUtils,
                        '_get_mounted_disk_resource_from_path')
     def test_set_disk_qos_specs_missing_values(self, mock_get_disk_resource):
-        self._vmutils.set_disk_qos_specs(mock.sentinel.vm_name,
-                                         mock.sentinel.disk_path)
+        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path)
 
         self.assertFalse(mock_get_disk_resource.called)
 
