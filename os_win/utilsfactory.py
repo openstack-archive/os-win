@@ -59,6 +59,12 @@ utils_map = {
             'max_version': None,
             'path': 'os_win.utils.storage.target.iscsi_target_utils.'
                     'ISCSITargetUtils'}},
+    'fc_utils': {
+        'FCUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.initiator.fc_utils.'
+                    'FCUtils'}},
     'livemigrationutils': {
         'LiveMigrationUtils': {
             'min_version': 6.2,
@@ -169,3 +175,7 @@ def get_iscsi_target_utils():
 
 def get_named_pipe_handler(*args, **kwargs):
     return namedpipe.NamedPipeHandler(*args, **kwargs)
+
+
+def get_fc_utils():
+    return _get_class(class_type='fc_utils')

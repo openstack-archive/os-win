@@ -20,6 +20,7 @@ Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
 
+import re
 import sys
 import uuid
 
@@ -97,6 +98,9 @@ class VMUtils(object):
                                     six.iteritems(self._vm_power_states_map)}
         if sys.platform == 'win32':
             self._init_hyperv_wmi_conn(host)
+
+        # Physical device names look like \\.\PHYSICALDRIVE1
+        self._phys_dev_name_regex = re.compile(r'\\\\.*\\[\w]*([\d])')
 
     def _init_hyperv_wmi_conn(self, host):
         self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
@@ -700,6 +704,14 @@ class VMUtils(object):
             if disk_resource.HostResource:
                 if disk_resource.HostResource[0].lower() == disk_path.lower():
                     return disk_resource
+
+    def get_device_number_from_device_name(self, device_name):
+        matches = self._phys_dev_name_regex.findall(device_name)
+        if matches:
+            return matches[0]
+        else:
+            err_msg = _("Could not find device number for device: %s")
+            raise exceptions.HyperVException(err_msg % device_name)
 
     def get_mounted_disk_by_drive_number(self, device_number):
         mounted_disks = self._conn.query("SELECT * FROM Msvm_DiskDrive "

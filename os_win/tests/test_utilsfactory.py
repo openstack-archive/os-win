@@ -111,3 +111,9 @@ class TestHyperVUtilsFactory(base.BaseTestCase):
 
         actual_class = type(utilsfactory.get_iscsi_initiator_utils())
         self.assertEqual(expected_class, actual_class)
+
+    @mock.patch('os_win.utils.storage.initiator.fc_utils.FCUtils')
+    def test_get_fc_utils(self, mock_cls_fcutils):
+        self._check_get_class(
+            expected_class=type(mock_cls_fcutils.return_value),
+            class_type='fc_utils')
