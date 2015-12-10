@@ -443,11 +443,27 @@ class VMUtils(object):
             diskdrive.ElementName = serial
             self._jobutils.modify_virt_resource(diskdrive)
 
+    def get_vm_physical_disk_mapping(self, vm_name):
+        mapping = {}
+        physical_disks = self.get_vm_disks(vm_name)[1]
+        for diskdrive in physical_disks:
+            mapping[diskdrive.ElementName] = dict(
+                resource_path=diskdrive.Path_(),
+                mounted_disk_path=diskdrive.HostResource[0])
+        return mapping
+
     def _get_disk_resource_address(self, disk_resource):
         return disk_resource.AddressOnParent
 
+    def set_disk_host_res(self, disk_res_path, mounted_disk_path):
+        diskdrive = wmi.WMI(moniker=disk_res_path)
+        diskdrive.HostResource = [mounted_disk_path]
+        self._jobutils.modify_virt_resource(diskdrive)
+
     def set_disk_host_resource(self, vm_name, controller_path, address,
                                mounted_disk_path):
+        # TODO(lpetrut): remove this method after the patch fixing
+        # swapped disks after host reboot merges in Nova.
         disk_found = False
         vm = self._lookup_vm_check(vm_name)
         (disk_resources, volume_resources) = self._get_vm_disks(vm)
@@ -548,6 +564,10 @@ class VMUtils(object):
                 [c for c in self._get_disk_resource_disk_path(disk_resource)])
 
         return (disk_files, volume_drives)
+
+    def get_vm_disks(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+        return self._get_vm_disks(vm)
 
     def _get_vm_disks(self, vm):
         vmsettings = vm.associators(
