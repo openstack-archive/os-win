@@ -37,6 +37,14 @@ class JobUtilsTestCase(base.BaseTestCase):
         self.jobutils = jobutils.JobUtils()
         self.jobutils._conn = mock.MagicMock()
 
+    def test_vs_man_svc(self):
+        expected = self.jobutils._conn.Msvm_VirtualSystemManagementService()[0]
+        self.assertEqual(expected, self.jobutils._vs_man_svc)
+
+    def test_vs_man_svc_cached(self):
+        self.jobutils._vs_man_svc_attr = mock.sentinel.fake_svc
+        self.assertEqual(mock.sentinel.fake_svc, self.jobutils._vs_man_svc)
+
     @mock.patch.object(jobutils.JobUtils, '_wait_for_job')
     def test_check_ret_val_started(self, mock_wait_for_job):
         self.jobutils.check_ret_val(constants.WMI_JOB_STATUS_STARTED,
@@ -149,7 +157,7 @@ class JobUtilsTestCase(base.BaseTestCase):
     @mock.patch('eventlet.greenthread.sleep')
     def _check_modify_virt_resource_max_retries(
             self, mock_sleep, side_effect, num_calls=1, expected_fail=False):
-        mock_svc = self.jobutils._conn.Msvm_VirtualSystemManagementService()[0]
+        mock_svc = self.jobutils._vs_man_svc
         mock_svc.ModifyResourceSettings.side_effect = side_effect
         mock_res_setting_data = mock.MagicMock()
         mock_res_setting_data.GetText_.return_value = mock.sentinel.res_data
@@ -188,7 +196,7 @@ class JobUtilsTestCase(base.BaseTestCase):
 
     def _test_virt_method(self, vsms_method_name, return_count,
                           utils_method_name, with_mock_vm, *args, **kwargs):
-        mock_svc = self.jobutils._conn.Msvm_VirtualSystemManagementService()[0]
+        mock_svc = self.jobutils._vs_man_svc
         vsms_method = getattr(mock_svc, vsms_method_name)
         mock_rsd = self._mock_vsms_method(vsms_method, return_count)
         if with_mock_vm:

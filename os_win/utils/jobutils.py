@@ -48,11 +48,19 @@ class JobUtils(object):
                              constants.JOB_STATE_COMPLETED_WITH_WARNINGS]
 
     def __init__(self, host='.'):
+        self._vs_man_svc_attr = None
         if sys.platform == 'win32':
             self._init_hyperv_wmi_conn(host)
 
     def _init_hyperv_wmi_conn(self, host):
         self._conn = wmi.WMI(moniker=self._WMI_NAMESPACE % host)
+
+    @property
+    def _vs_man_svc(self):
+        if not self._vs_man_svc_attr:
+            self._vs_man_svc_attr = (
+                self._conn.Msvm_VirtualSystemManagementService()[0])
+        return self._vs_man_svc_attr
 
     def check_ret_val(self, ret_val, job_path, success_values=[0]):
         if ret_val in [constants.WMI_JOB_STATUS_STARTED,
@@ -121,8 +129,8 @@ class JobUtils(object):
         return job.JobState in self._completed_job_states
 
     def add_virt_resource(self, virt_resource, parent):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, new_resources, ret_val) = vs_man_svc.AddResourceSettings(
+        (job_path, new_resources,
+         ret_val) = self._vs_man_svc.AddResourceSettings(
             parent.path_(), [virt_resource.GetText_(1)])
         self.check_ret_val(ret_val, job_path)
         return new_resources
@@ -132,14 +140,13 @@ class JobUtils(object):
     @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
                                 exceptions=(exceptions.HyperVException, ))
     def modify_virt_resource(self, virt_resource):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, out_set_data, ret_val) = vs_man_svc.ModifyResourceSettings(
+        (job_path, out_set_data,
+         ret_val) = self._vs_man_svc.ModifyResourceSettings(
             ResourceSettings=[virt_resource.GetText_(1)])
         self.check_ret_val(ret_val, job_path)
 
     def remove_virt_resource(self, virt_resource):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job, ret_val) = vs_man_svc.RemoveResourceSettings(
+        (job, ret_val) = self._vs_man_svc.RemoveResourceSettings(
             ResourceSettings=[virt_resource.path_()])
         self.check_ret_val(ret_val, job)
 
@@ -149,8 +156,8 @@ class JobUtils(object):
     @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
                                 exceptions=(exceptions.HyperVException, ))
     def add_multiple_virt_features(self, virt_features, parent):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, out_set_data, ret_val) = vs_man_svc.AddFeatureSettings(
+        (job_path, out_set_data,
+         ret_val) = self._vs_man_svc.AddFeatureSettings(
             parent.path_(), [f.GetText_(1) for f in virt_features])
         self.check_ret_val(ret_val, job_path)
 
@@ -158,7 +165,6 @@ class JobUtils(object):
         self.remove_multiple_virt_features([virt_feature])
 
     def remove_multiple_virt_features(self, virt_features):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.RemoveFeatureSettings(
+        (job_path, ret_val) = self._vs_man_svc.RemoveFeatureSettings(
             FeatureSettings=[f.path_() for f in virt_features])
         self.check_ret_val(ret_val, job_path)
