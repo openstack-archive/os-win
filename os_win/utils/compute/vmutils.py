@@ -64,8 +64,17 @@ class VMUtils(object):
     _SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS = (
         'Msvm_SyntheticEthernetPortSettingData')
     _AFFECTED_JOB_ELEMENT_CLASS = "Msvm_AffectedJobElement"
+    _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'Cim_ResourceAllocationSettingData'
     _COMPUTER_SYSTEM_CLASS = "Msvm_ComputerSystem"
     _LOGICAL_IDENTITY_CLASS = 'Msvm_LogicalIdentity'
+
+    _S3_DISP_CTRL_RES_SUB_TYPE = 'Microsoft:Hyper-V:S3 Display Controller'
+    _SYNTH_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic Display '
+                                     'Controller')
+    _SYNTH_3D_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic 3D '
+                                        'Display Controller')
+    _SYNTH_3D_DISP_ALLOCATION_SETTING_DATA_CLASS = (
+        'Msvm_Synthetic3DDisplayControllerSettingData')
 
     _VIRTUAL_SYSTEM_SUBTYPE = 'VirtualSystemSubType'
     _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
@@ -81,6 +90,26 @@ class VMUtils(object):
     _SHUTDOWN_COMPONENT = "Msvm_ShutdownComponent"
     _VIRTUAL_SYSTEM_CURRENT_SETTINGS = 3
     _AUTOMATIC_STARTUP_ACTION_NONE = 2
+
+    _remote_fx_res_map = {
+        constants.REMOTEFX_MAX_RES_1024x768: 0,
+        constants.REMOTEFX_MAX_RES_1280x1024: 1,
+        constants.REMOTEFX_MAX_RES_1600x1200: 2,
+        constants.REMOTEFX_MAX_RES_1920x1200: 3,
+        constants.REMOTEFX_MAX_RES_2560x1600: 4
+    }
+
+    _remotefx_max_monitors_map = {
+        # defines the maximum number of monitors for a given
+        # resolution
+        constants.REMOTEFX_MAX_RES_1024x768: 4,
+        constants.REMOTEFX_MAX_RES_1280x1024: 4,
+        constants.REMOTEFX_MAX_RES_1600x1200: 3,
+        constants.REMOTEFX_MAX_RES_1920x1200: 2,
+        constants.REMOTEFX_MAX_RES_2560x1600: 1
+    }
+
+    _DISP_CTRL_ADDRESS_DX_11 = "02C1,00000000,01"
 
     _vm_power_states_map = {constants.HYPERV_VM_STATE_ENABLED: 2,
                             constants.HYPERV_VM_STATE_DISABLED: 3,
@@ -963,3 +992,72 @@ class VMUtils(object):
         network_boot_devs = set(old_boot_order) ^ set(new_boot_order)
         vssd.BootSourceOrder = tuple(new_boot_order) + tuple(network_boot_devs)
         self._modify_virtual_system(vssd)
+
+    def vm_gen_supports_remotefx(self, vm_gen):
+        """RemoteFX is supported only for generation 1 virtual machines
+        on Windows 8 / Windows Server 2012 and 2012R2.
+
+        :returns: True if the given vm_gen is 1, False otherwise
+        """
+        return vm_gen == constants.VM_GEN_1
+
+    def _validate_remotefx_params(self, monitor_count, max_resolution,
+                                  vram_bytes=None):
+        max_res_value = self._remote_fx_res_map.get(max_resolution)
+        if max_res_value is None:
+            raise exceptions.HyperVRemoteFXException(
+                _("Unsupported RemoteFX resolution: %s") % max_resolution)
+
+        if monitor_count > self._remotefx_max_monitors_map[max_resolution]:
+            raise exceptions.HyperVRemoteFXException(
+                _("Unsuported RemoteFX monitor count: %(count)s for "
+                  "this resolution %(res)s. Hyper-V supports a maximum "
+                  "of %(max_monitors)s monitors for this resolution.")
+                  % {'count': monitor_count,
+                     'res': max_resolution,
+                     'max_monitors': self._remotefx_max_monitors_map[
+                        max_resolution]})
+
+    def _add_3d_display_controller(self, vm, monitor_count,
+                                   max_resolution, vram_bytes=None):
+        synth_3d_disp_ctrl_res = self._get_new_resource_setting_data(
+            self._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE,
+            self._SYNTH_3D_DISP_ALLOCATION_SETTING_DATA_CLASS)
+
+        synth_3d_disp_ctrl_res.MaximumMonitors = monitor_count
+        synth_3d_disp_ctrl_res.MaximumScreenResolution = max_resolution
+
+        self._jobutils.add_virt_resource(synth_3d_disp_ctrl_res, vm)
+
+    def enable_remotefx_video_adapter(self, vm_name, monitor_count,
+                                      max_resolution, vram_bytes=None):
+        vm = self._lookup_vm_check(vm_name)
+
+        self._validate_remotefx_params(monitor_count, max_resolution,
+                                       vram_bytes=vram_bytes)
+
+        vmsettings = vm.associators(
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)
+        rasds = vmsettings[0].associators(
+            wmi_result_class=self._CIM_RES_ALLOC_SETTING_DATA_CLASS)
+        if [r for r in rasds if r.ResourceSubType ==
+                self._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE]:
+            raise exceptions.HyperVRemoteFXException(
+                _("RemoteFX is already configured for this VM"))
+
+        synth_disp_ctrl_res_list = [r for r in rasds if r.ResourceSubType ==
+                                    self._SYNTH_DISP_CTRL_RES_SUB_TYPE]
+        if synth_disp_ctrl_res_list:
+            self._jobutils.remove_virt_resource(synth_disp_ctrl_res_list[0])
+
+        max_res_value = self._remote_fx_res_map.get(max_resolution)
+        self._add_3d_display_controller(vm, monitor_count, max_res_value,
+                                        vram_bytes)
+        if self._vm_has_s3_controller(vm.ElementName):
+            s3_disp_ctrl_res = [r for r in rasds if r.ResourceSubType ==
+                                self._S3_DISP_CTRL_RES_SUB_TYPE][0]
+            s3_disp_ctrl_res.Address = self._DISP_CTRL_ADDRESS_DX_11
+            self._jobutils.modify_virt_resource(s3_disp_ctrl_res)
+
+    def _vm_has_s3_controller(self, vm_name):
+        return True

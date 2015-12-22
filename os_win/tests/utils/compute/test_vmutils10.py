@@ -14,6 +14,8 @@
 
 import mock
 
+from os_win import constants
+from os_win import exceptions
 from os_win.tests import test_base
 from os_win.utils.compute import vmutils10
 
@@ -39,3 +41,35 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
                          vs_data.SecureBootTemplateId)
         mock_vssd.assert_called_once_with(
             ElementName=self._vmutils._UEFI_CERTIFICATE_AUTH)
+
+    def test_vm_gen_supports_remotefx(self):
+        ret = self._vmutils.vm_gen_supports_remotefx(mock.sentinel.VM_GEN)
+
+        self.assertTrue(ret)
+
+    def test_validate_remotefx_monitor_count(self):
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils._validate_remotefx_params,
+                          10, constants.REMOTEFX_MAX_RES_1024x768)
+
+    def test_validate_remotefx_max_resolution(self):
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils._validate_remotefx_params,
+                          1, '1024x700')
+
+    def test_validate_remotefx_vram(self):
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils._validate_remotefx_params,
+                          1, constants.REMOTEFX_MAX_RES_1024x768,
+                          vram_bytes=10000)
+
+    @mock.patch.object(vmutils10.VMUtils10, 'get_vm_generation')
+    def _test_vm_has_s3_controller(self, vm_gen, mock_get_vm_gen):
+        mock_get_vm_gen.return_value = vm_gen
+        return self._vmutils._vm_has_s3_controller(mock.sentinel.fake_vm_name)
+
+    def test_vm_has_s3_controller_gen1(self):
+        self.assertTrue(self._test_vm_has_s3_controller(constants.VM_GEN_1))
+
+    def test_vm_has_s3_controller_gen2(self):
+        self.assertFalse(self._test_vm_has_s3_controller(constants.VM_GEN_2))
