@@ -366,15 +366,33 @@ class VMUtilsTestCase(base.BaseTestCase):
             mock_get_new_rsd.return_value, mock_vm)
 
     @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
-    def test_attach_volume_to_controller(self, mock_get_new_rsd):
+    @mock.patch.object(vmutils, 'wmi', create=True)
+    def _test_attach_volume_to_controller(self, mock_wmi, mock_get_new_rsd,
+                                          disk_serial=None):
         mock_vm = self._lookup_vm()
+        mock_diskdrive = mock.MagicMock()
+        jobutils = self._vmutils._jobutils
+        jobutils.add_virt_resource.return_value = [mock_diskdrive]
+        mock_wmi.WMI.return_value = mock_diskdrive
 
         self._vmutils.attach_volume_to_controller(
             self._FAKE_VM_NAME, self._FAKE_CTRL_PATH, self._FAKE_CTRL_ADDR,
-            self._FAKE_MOUNTED_DISK_PATH)
+            self._FAKE_MOUNTED_DISK_PATH, serial=disk_serial)
 
         self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
             mock_get_new_rsd.return_value, mock_vm)
+
+        if disk_serial:
+            jobutils.modify_virt_resource.assert_called_once_with(
+                mock_diskdrive)
+            self.assertEqual(disk_serial, mock_diskdrive.ElementName)
+
+    def test_attach_volume_to_controller_without_disk_serial(self):
+        self._test_attach_volume_to_controller()
+
+    def test_attach_volume_to_controller_with_disk_serial(self):
+        self._test_attach_volume_to_controller(
+            disk_serial=mock.sentinel.serial)
 
     @mock.patch.object(vmutils.VMUtils, '_get_new_setting_data')
     def test_create_nic(self, mock_get_new_virt_res):
