@@ -19,8 +19,8 @@ from oslotest import base
 import os
 import six
 
+from os_win import constants
 from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils.io import ioutils
 
 

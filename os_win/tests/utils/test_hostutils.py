@@ -15,8 +15,8 @@
 import mock
 from oslotest import base
 
+from os_win import constants
 from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils import hostutils
 
 

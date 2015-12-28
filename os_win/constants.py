@@ -14,7 +14,7 @@
 #    under the License.
 
 """
-Constants used in ops classes
+Hyper-V / Windows related constants.
 """
 
 HYPERV_VM_STATE_OTHER = 1
@@ -34,6 +34,31 @@ VM_SUMMARY_NUM_PROCS = 4
 VM_SUMMARY_ENABLED_STATE = 100
 VM_SUMMARY_MEMORY_USAGE = 103
 VM_SUMMARY_UPTIME = 105
+
+
+ARCH_I686 = 0
+ARCH_MIPS = 1
+ARCH_ALPHA = 2
+ARCH_PPC = 3
+ARCH_ARMV7 = 5
+ARCH_IA64 = 6
+ARCH_X86_64 = 9
+
+
+PROCESSOR_FEATURE = {
+    3: 'mmx',
+    6: 'sse',
+    7: '3dnow',
+    8: 'rdtsc',
+    9: 'pae',
+    10: 'sse2',
+    12: 'nx',
+    13: 'sse3',
+    17: 'xsave',
+    20: 'slat',
+    21: 'vmx',
+}
+
 
 CTRL_TYPE_IDE = "IDE"
 CTRL_TYPE_SCSI = "SCSI"

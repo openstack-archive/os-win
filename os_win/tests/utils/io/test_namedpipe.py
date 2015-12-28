@@ -18,8 +18,8 @@ import mock
 from oslotest import base
 from six.moves import builtins
 
+from os_win import constants
 from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils.io import ioutils
 from os_win.utils.io import namedpipe
 
