@@ -741,6 +741,8 @@ class VMUtils(object):
             _("Exceeded the maximum number of slots"))
 
     def get_vm_serial_port_connection(self, vm_name, update_connection=None):
+        # TODO(lpetrut): Remove this method after the patch implementing
+        # serial console access support merges in Nova.
         vm = self._lookup_vm_check(vm_name)
 
         vmsettings = vm.associators(
@@ -757,6 +759,33 @@ class VMUtils(object):
 
         if len(serial_port.Connection) > 0:
             return serial_port.Connection[0]
+
+    def _get_vm_serial_ports(self, vm):
+        vmsettings = vm.associators(
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)
+        rasds = vmsettings[0].associators(
+            wmi_result_class=self._SERIAL_PORT_SETTING_DATA_CLASS)
+        serial_ports = (
+            [r for r in rasds if
+             r.ResourceSubType == self._SERIAL_PORT_RES_SUB_TYPE]
+        )
+        return serial_ports
+
+    def set_vm_serial_port_connection(self, vm_name, port_number, pipe_path):
+        vm = self._lookup_vm_check(vm_name)
+
+        serial_port = self._get_vm_serial_ports(vm)[port_number - 1]
+        serial_port.Connection = [pipe_path]
+
+        self._modify_virt_resource(serial_port, vm.path_())
+
+    def get_vm_serial_port_connections(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+        serial_ports = self._get_vm_serial_ports(vm)
+        conns = [serial_port.Connection[0]
+                 for serial_port in serial_ports
+                 if serial_port.Connection and serial_port.Connection[0]]
+        return conns
 
     def get_active_instances(self):
         """Return the names of all the active instances known to Hyper-V."""
