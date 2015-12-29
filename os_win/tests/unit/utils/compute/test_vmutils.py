@@ -361,7 +361,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_create_vm_obj')
-    def test_vnuma_create_vm(self, mock_create_vm_obj, mock_set_mem):
+    def test_create_vm(self, mock_create_vm_obj, mock_set_mem):
         self._vmutils._vs_man_svc.DefineSystem.return_value = (
             None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
         self._vmutils.create_vm(self._FAKE_VM_NAME,
@@ -373,33 +373,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             self._FAKE_VM_NAME, mock.sentinel.vnuma_enabled,
             self._VM_GEN, None, mock.sentinel.instance_path)
         self.assertFalse(mock_set_mem.called)
-
-    @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
-    @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
-    def test_old_create_vm(self, mock_set_mem, mock_set_vcpus):
-        mock_vmsetting = self._lookup_vm()
-        mock_svc = self._vmutils._vs_man_svc
-        getattr(mock_svc, self._DEFINE_SYSTEM).return_value = (
-            None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-
-        self._vmutils.create_vm(self._FAKE_VM_NAME, self._FAKE_MEMORY_MB,
-                                self._FAKE_VCPUS_NUM, False,
-                                self._FAKE_DYNAMIC_MEMORY_RATIO,
-                                self._VM_GEN,
-                                mock.sentinel.instance_path)
-
-        self.assertTrue(getattr(mock_svc, self._DEFINE_SYSTEM).called)
-        mock_set_mem.assert_called_once_with(
-            mock_vmsetting,
-            self._FAKE_MEMORY_MB,
-            None,
-            self._FAKE_DYNAMIC_MEMORY_RATIO)
-
-        mock_set_vcpus.assert_called_once_with(
-            mock_vmsetting,
-            self._FAKE_VCPUS_NUM,
-            None,
-            False)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_get_vm_scsi_controller(self, mock_get_element_associated_class):

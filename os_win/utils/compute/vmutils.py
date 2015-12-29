@@ -327,41 +327,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
         if not self._compat_conn.Msvm_VirtualSystemManagementService():
             raise exceptions.HyperVAuthorizationException()
 
-    def create_vm(self, *args, **kwargs):
-        # TODO(claudiub): method signature changed. Fix this when the usage
-        # for this method was updated.
-        # update_vm should be called in order to set VM's memory and vCPUs.
-        try:
-            self._create_vm(*args, **kwargs)
-        except TypeError:
-            # the method call was updated to use the _vnuma_create_vm interface
-            self._vnuma_create_vm(*args, **kwargs)
-
-    def _vnuma_create_vm(self, vm_name, vnuma_enabled, vm_gen, instance_path,
-                         notes=None):
+    def create_vm(self, vm_name, vnuma_enabled, vm_gen, instance_path,
+                  notes=None):
         LOG.debug('Creating VM %s', vm_name)
         self._create_vm_obj(vm_name, vnuma_enabled, vm_gen, notes,
                             instance_path)
-
-    def _create_vm(self, vm_name, memory_mb, vcpus_num, limit_cpu_features,
-                   dynamic_memory_ratio, vm_gen, instance_path, notes=None):
-        """Creates a VM."""
-
-        LOG.debug('Creating VM %s', vm_name)
-
-        # vNUMA and dynamic memory are mutually exclusive
-        vnuma_enabled = False if dynamic_memory_ratio > 1 else True
-
-        self._create_vm_obj(vm_name, vnuma_enabled, vm_gen, notes,
-                            instance_path)
-
-        vmsetting = self._lookup_vm_check(vm_name)
-
-        LOG.debug('Setting memory for vm %s', vm_name)
-        self._set_vm_memory(vmsetting, memory_mb, None, dynamic_memory_ratio)
-
-        LOG.debug('Set vCPUs for vm %s', vm_name)
-        self._set_vm_vcpus(vmsetting, vcpus_num, None, limit_cpu_features)
 
     def _create_vm_obj(self, vm_name, vnuma_enabled, vm_gen, notes,
                        instance_path):
