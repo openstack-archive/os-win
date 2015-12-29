@@ -13,12 +13,12 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
+from os_win.tests import test_base
 from os_win.utils.compute import vmutils10
 
 
-class VMUtils10TestCase(base.BaseTestCase):
+class VMUtils10TestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V VMUtils10 class."""
 
     def setUp(self):

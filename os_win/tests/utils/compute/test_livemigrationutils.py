@@ -14,15 +14,15 @@
 #    under the License.
 
 import mock
-from oslotest import base
 import platform
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils.compute import livemigrationutils
 from os_win.utils.compute import vmutils
 
 
-class LiveMigrationUtilsTestCase(base.BaseTestCase):
+class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V LiveMigrationUtils class."""
 
     _FAKE_VM_NAME = 'fake_vm_name'
@@ -34,14 +34,13 @@ class LiveMigrationUtilsTestCase(base.BaseTestCase):
     _RESOURCE_SUB_TYPE_DISK = 'Microsoft:Hyper-V:Physical Disk Drive'
 
     def setUp(self):
+        super(LiveMigrationUtilsTestCase, self).setUp()
         self.liveutils = livemigrationutils.LiveMigrationUtils()
         self.liveutils._vmutils = mock.MagicMock()
         self.liveutils._jobutils = mock.Mock()
 
         self._conn = mock.MagicMock()
         self.liveutils._get_conn_v2 = mock.MagicMock(return_value=self._conn)
-
-        super(LiveMigrationUtilsTestCase, self).setUp()
 
     def test_check_live_migration_config(self):
         mock_migr_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]

@@ -14,9 +14,9 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils import constants
 from os_win.utils.storage.target import iscsi_target_utils as tg_utils
 
@@ -28,22 +28,15 @@ class FakeWMIExc(Exception):
         super(FakeWMIExc, self).__init__()
 
 
-class ISCSITargetUtilsTestCase(base.BaseTestCase):
+class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils, 'hostutils')
     def setUp(self, mock_hostutils):
         super(ISCSITargetUtilsTestCase, self).setUp()
 
-        self._mock_wmi()
+        self._mock_wmi.x_wmi = FakeWMIExc
 
         self._tgutils = tg_utils.ISCSITargetUtils()
         self._tgutils._pathutils = mock.Mock()
-
-        self.addCleanup(mock.patch.stopall)
-
-    def _mock_wmi(self):
-        mock_wmi = mock.Mock()
-        mock_wmi.x_wmi = FakeWMIExc
-        mock.patch.object(tg_utils, 'wmi', mock_wmi, create=True).start()
 
     def test_ensure_wt_provider_unavailable(self):
         self._tgutils._conn_wmi = None

@@ -14,16 +14,15 @@
 #    under the License.
 
 import mock
-from oslotest import base
-
 from six.moves import range  # noqa
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils.compute import vmutils
 from os_win.utils import constants
 
 
-class VMUtilsTestCase(base.BaseTestCase):
+class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V VMUtils class."""
 
     _FAKE_VM_NAME = 'fake_vm'
@@ -66,12 +65,11 @@ class VMUtilsTestCase(base.BaseTestCase):
     _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
 
     def setUp(self):
+        super(VMUtilsTestCase, self).setUp()
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn = mock.MagicMock()
         self._vmutils._jobutils = mock.MagicMock()
         self._vmutils._pathutils = mock.MagicMock()
-
-        super(VMUtilsTestCase, self).setUp()
 
     def test_vs_man_svc(self):
         expected = self._vmutils._conn.Msvm_VirtualSystemManagementService()[0]
