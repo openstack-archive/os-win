@@ -19,6 +19,7 @@ from os_win.utils.compute import vmutils
 class VMUtils10(vmutils.VMUtils):
 
     _UEFI_CERTIFICATE_AUTH = 'MicrosoftUEFICertificateAuthority'
+    _SERIAL_PORT_SETTING_DATA_CLASS = "Msvm_SerialPortSettingData"
 
     def _set_secure_boot(self, vs_data, msft_ca_required):
         vs_data.SecureBootEnabled = True

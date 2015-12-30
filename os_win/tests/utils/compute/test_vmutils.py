@@ -81,19 +81,6 @@ class VMUtilsTestCase(base.BaseTestCase):
         self._vmutils._vs_man_svc_attr = mock.sentinel.fake_svc
         self.assertEqual(mock.sentinel.fake_svc, self._vmutils._vs_man_svc)
 
-    @mock.patch('os_win.utils.hostutils.HostUtils'
-                '.check_min_windows_version')
-    @mock.patch.object(vmutils, 'sys')
-    @mock.patch.object(vmutils, 'wmi', create=True)
-    def test_serial_port_setting_data_win_version_10(self, mock_wmi, mock_sys,
-                                                     mock_check_version):
-        mock_sys.platform = 'win32'
-        mock_check_version.return_value = True
-        _vmutils = vmutils.VMUtils()
-
-        self.assertEqual("Msvm_SerialPortSettingData",
-                         _vmutils._SERIAL_PORT_SETTING_DATA_CLASS)
-
     def test_get_vm_summary_info(self):
         self._lookup_vm()
 
