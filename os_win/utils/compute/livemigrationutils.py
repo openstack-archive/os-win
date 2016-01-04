@@ -22,7 +22,6 @@ from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils.compute import migrationutils
 from os_win.utils.compute import vmutils
-from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -37,7 +36,6 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
 
     def __init__(self):
         super(LiveMigrationUtils, self).__init__()
-        self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
         try:
@@ -106,42 +104,6 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
         self._jobutils.check_ret_val(ret_val, job_path)
 
         return conn_v2_local.Msvm_PlannedComputerSystem(Name=vm.Name)[0]
-
-    def _get_physical_disk_paths(self, vm_name):
-        # TODO(claudiub): Remove this after the livemigrationutils usage has
-        # been updated to create planned VM on the destination host beforehand.
-        ide_ctrl_path = self._vmutils.get_vm_ide_controller(vm_name, 0)
-        if ide_ctrl_path:
-            ide_paths = self._vmutils.get_controller_volume_paths(
-                ide_ctrl_path)
-        else:
-            ide_paths = {}
-
-        scsi_ctrl_path = self._vmutils.get_vm_scsi_controller(vm_name)
-        scsi_paths = self._vmutils.get_controller_volume_paths(scsi_ctrl_path)
-
-        return dict(list(ide_paths.items()) + list(scsi_paths.items()))
-
-    def _get_remote_disk_data(self, vmutils_remote, disk_paths, dest_host):
-        # TODO(claudiub): Remove this after the livemigrationutils usage has
-        # been updated to create planned VM on the destination host beforehand.
-        remote_iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils(
-            dest_host)
-
-        disk_paths_remote = {}
-        for (rasd_rel_path, disk_path) in disk_paths.items():
-            target = self._iscsi_initiator.get_target_from_disk_path(disk_path)
-            if target:
-                (target_iqn, target_lun) = target
-                dev_num = remote_iscsi_initiator.get_device_number_for_target(
-                    target_iqn, target_lun)
-                disk_path_remote = (
-                    vmutils_remote.get_mounted_disk_by_drive_number(dev_num))
-                disk_paths_remote[rasd_rel_path] = disk_path_remote
-            else:
-                LOG.debug("Could not retrieve iSCSI target "
-                          "from disk path: %s", disk_path)
-        return disk_paths_remote
 
     def _get_disk_data(self, vm_name, vmutils_remote, disk_path_mapping):
         disk_paths = {}
@@ -233,23 +195,6 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
                                                      dest_host)
 
         planned_vm = self._get_planned_vm(vm_name, conn_v2_remote)
-        if not planned_vm:
-            # TODO(claudiub): Remove this branch after the livemigrationutils
-            # usage has been updated to create planned VM on the destination
-            # host beforehand.
-            planned_vm = None
-            disk_paths = self._get_physical_disk_paths(vm_name)
-            if disk_paths:
-                vmutils_remote = vmutils.VMUtils(dest_host)
-                disk_paths_remote = self._get_remote_disk_data(vmutils_remote,
-                                                               disk_paths,
-                                                               dest_host)
-                planned_vm = self._create_planned_vm(conn_v2_remote,
-                                                     self._compat_conn,
-                                                     vm, rmt_ip_addr_list,
-                                                     dest_host)
-                self._update_planned_vm_disk_resources(
-                    conn_v2_remote, planned_vm, vm_name, disk_paths_remote)
 
         if migrate_disks:
             new_resource_setting_data = self._get_vhd_setting_data(vm)
