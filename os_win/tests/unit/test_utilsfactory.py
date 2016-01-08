@@ -32,7 +32,6 @@ from os_win.utils import hostutils
 from os_win.utils.network import networkutils
 from os_win.utils import pathutils
 from os_win.utils.storage import diskutils
-from os_win.utils.storage.initiator import iscsi_cli_utils
 from os_win.utils.storage.initiator import iscsi_utils
 from os_win.utils.storage import smbutils
 from os_win.utils.storage.virtdisk import vhdutils
@@ -107,25 +106,9 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(expected_class=rdpconsoleutils.RDPConsoleUtils,
                               class_type='rdpconsoleutils')
 
-    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils, '__init__',
-                       lambda *args, **kwargs: None)
     def test_get_iscsi_initiator_utils(self):
-        self._test_get_initiator_utils(
-            expected_class=iscsi_utils.ISCSIInitiatorUtils)
-
-    def test_get_iscsi_initiator_utils_force_v1(self):
-        self._test_get_initiator_utils(
-            expected_class=iscsi_cli_utils.ISCSIInitiatorCLIUtils,
-            force_v1=True)
-
-    @mock.patch.object(utilsfactory.utils, 'get_windows_version')
-    def _test_get_initiator_utils(self, mock_get_windows_version,
-                                  expected_class, force_v1=False):
-        CONF.set_override('force_volumeutils_v1', force_v1, 'hyperv')
-        mock_get_windows_version.return_value = '6.2'
-
-        actual_class = type(utilsfactory.get_iscsi_initiator_utils())
-        self.assertEqual(expected_class, actual_class)
+        self._check_get_class(expected_class=iscsi_utils.ISCSIInitiatorUtils,
+                              class_type='iscsi_initiator_utils')
 
     @mock.patch('os_win.utils.storage.initiator.fc_utils.FCUtils')
     def test_get_fc_utils(self, mock_cls_fcutils):
