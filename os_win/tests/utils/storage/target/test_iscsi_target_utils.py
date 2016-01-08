@@ -15,9 +15,9 @@
 
 import mock
 
+from os_win import constants
 from os_win import exceptions
 from os_win.tests import test_base
-from os_win.utils import constants
 from os_win.utils.storage.target import iscsi_target_utils as tg_utils
 
 

@@ -17,8 +17,8 @@ import os
 import mock
 from oslotest import base
 
+from os_win import constants
 from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils.storage.virtdisk import (
     virtdisk_constants as vdisk_const)
 from os_win.utils.storage.virtdisk import vhdutils

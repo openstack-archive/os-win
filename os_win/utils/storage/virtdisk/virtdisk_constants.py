@@ -15,7 +15,7 @@
 
 from oslo_utils import units
 
-from os_win.utils import constants
+from os_win import constants
 
 VHD_SIGNATURE = b'conectix'
 VHDX_SIGNATURE = b'vhdxfile'

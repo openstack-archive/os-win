@@ -16,10 +16,10 @@
 import mock
 from six.moves import range  # noqa
 
+from os_win import constants
 from os_win import exceptions
 from os_win.tests import test_base
 from os_win.utils.compute import vmutils
-from os_win.utils import constants
 
 
 class VMUtilsTestCase(test_base.OsWinBaseTestCase):

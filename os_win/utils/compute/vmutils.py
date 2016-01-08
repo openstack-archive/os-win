@@ -34,8 +34,8 @@ import six
 from six.moves import range  # noqa
 
 from os_win._i18n import _, _LW
+from os_win import constants
 from os_win import exceptions
-from os_win.utils import constants
 from os_win.utils import jobutils
 from os_win.utils import pathutils
 
