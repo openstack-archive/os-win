@@ -38,6 +38,7 @@ class HostUtils(object):
     _DEFAULT_VM_GENERATION = constants.IMAGE_PROP_VM_GEN_1
 
     FEATURE_RDS_VIRTUALIZATION = 322
+    FEATURE_MPIO = 57
 
     def __init__(self):
         self._virt_v2 = None
@@ -141,3 +142,6 @@ class HostUtils(object):
 
     def get_default_vm_generation(self):
         return self._DEFAULT_VM_GENERATION
+
+    def check_server_feature(self, feature_id):
+        return len(self._conn_cimv2.Win32_ServerFeature(ID=feature_id)) > 0

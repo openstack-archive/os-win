@@ -175,3 +175,14 @@ class HostUtilsTestCase(base.BaseTestCase):
             mock_check_win.return_value = False
             result = self._hostutils.get_supported_vm_types()
             self.assertEqual([constants.IMAGE_PROP_VM_GEN_1], result)
+
+    def test_check_server_feature(self):
+        mock_sv_feature_cls = self._hostutils._conn_cimv2.Win32_ServerFeature
+        mock_sv_feature_cls.return_value = [mock.sentinel.sv_feature]
+
+        feature_enabled = self._hostutils.check_server_feature(
+            mock.sentinel.feature_id)
+        self.assertTrue(feature_enabled)
+
+        mock_sv_feature_cls.assert_called_once_with(
+            ID=mock.sentinel.feature_id)
