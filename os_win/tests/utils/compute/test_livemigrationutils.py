@@ -37,6 +37,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         super(LiveMigrationUtilsTestCase, self).setUp()
         self.liveutils = livemigrationutils.LiveMigrationUtils()
         self.liveutils._vmutils = mock.MagicMock()
+        self.liveutils._iscsi_initiator = mock.MagicMock()
         self.liveutils._jobutils = mock.Mock()
 
         self._conn = mock.MagicMock()
@@ -155,6 +156,68 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.FAKE_JOB_PATH,
             self._FAKE_RET_VAL)
 
+    def test_get_physical_disk_paths(self):
+        ide_path = {mock.sentinel.IDE_PATH: mock.sentinel.IDE_HOST_RESOURCE}
+        scsi_path = {mock.sentinel.SCSI_PATH: mock.sentinel.SCSI_HOST_RESOURCE}
+        ide_ctrl = self.liveutils._vmutils.get_vm_ide_controller.return_value
+        scsi_ctrl = self.liveutils._vmutils.get_vm_scsi_controller.return_value
+        mock_get_controller_paths = (
+            self.liveutils._vmutils.get_controller_volume_paths)
+
+        mock_get_controller_paths.side_effect = [ide_path, scsi_path]
+
+        result = self.liveutils._get_physical_disk_paths(mock.sentinel.VM_NAME)
+
+        expected = dict(ide_path)
+        expected.update(scsi_path)
+        self.assertDictContainsSubset(expected, result)
+        calls = [mock.call(ide_ctrl), mock.call(scsi_ctrl)]
+        mock_get_controller_paths.assert_has_calls(calls)
+
+    def test_get_physical_disk_paths_no_ide(self):
+        scsi_path = {mock.sentinel.SCSI_PATH: mock.sentinel.SCSI_HOST_RESOURCE}
+        scsi_ctrl = self.liveutils._vmutils.get_vm_scsi_controller.return_value
+        mock_get_controller_paths = (
+            self.liveutils._vmutils.get_controller_volume_paths)
+
+        self.liveutils._vmutils.get_vm_ide_controller.return_value = None
+        mock_get_controller_paths.return_value = scsi_path
+
+        result = self.liveutils._get_physical_disk_paths(mock.sentinel.VM_NAME)
+
+        self.assertEqual(scsi_path, result)
+        mock_get_controller_paths.assert_called_once_with(scsi_ctrl)
+
+    @mock.patch.object(livemigrationutils.iscsi_wmi_utils,
+                       'ISCSIInitiatorWMIUtils')
+    def test_get_remote_disk_data(self, mock_iscsi_initiator_class):
+        m_remote_iscsi_init = mock_iscsi_initiator_class.return_value
+        m_local_iscsi_init = self.liveutils._iscsi_initiator
+
+        mock_vm_utils = mock.MagicMock()
+        disk_paths = {
+            mock.sentinel.FAKE_RASD_PATH: mock.sentinel.FAKE_DISK_PATH}
+        m_local_iscsi_init.get_target_from_disk_path.return_value = (
+            mock.sentinel.FAKE_IQN, mock.sentinel.FAKE_LUN)
+        m_remote_iscsi_init.get_device_number_for_target.return_value = (
+            mock.sentinel.FAKE_DEV_NUM)
+        mock_vm_utils.get_mounted_disk_by_drive_number.return_value = (
+            mock.sentinel.FAKE_DISK_PATH)
+
+        disk_paths = self.liveutils._get_remote_disk_data(
+            mock_vm_utils, disk_paths, mock.sentinel.FAKE_HOST)
+
+        m_local_iscsi_init.get_target_from_disk_path.assert_called_with(
+            mock.sentinel.FAKE_DISK_PATH)
+        m_remote_iscsi_init.get_device_number_for_target.assert_called_with(
+            mock.sentinel.FAKE_IQN, mock.sentinel.FAKE_LUN)
+        mock_vm_utils.get_mounted_disk_by_drive_number.assert_called_once_with(
+            mock.sentinel.FAKE_DEV_NUM)
+
+        self.assertEqual(
+            {mock.sentinel.FAKE_RASD_PATH: mock.sentinel.FAKE_DISK_PATH},
+            disk_paths)
+
     def test_get_disk_data(self):
         mock_vmutils_remote = mock.MagicMock()
         mock_disk = mock.MagicMock()
@@ -228,6 +291,52 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                           self.liveutils.live_migrate_vm,
                           mock.sentinel.vm_name,
                           mock.sentinel.host)
+
+    @mock.patch.object(livemigrationutils, 'vmutils')
+    def test_live_migrate_no_planned_vm(self, mock_vm_utils):
+        mock_vm_utils_remote = mock_vm_utils.VMUtils.return_value
+        mock_vm = self._get_vm()
+
+        mock_migr_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]
+        mock_migr_svc.MigrationServiceListenerIPAddressList = [
+            mock.sentinel.FAKE_REMOTE_IP_ADDR]
+
+        # patches, call and assertions.
+        with mock.patch.multiple(
+                self.liveutils,
+                _get_physical_disk_paths=mock.DEFAULT,
+                _get_remote_disk_data=mock.DEFAULT,
+                _create_planned_vm=mock.DEFAULT,
+                _update_planned_vm_disk_resources=mock.DEFAULT,
+                _get_vhd_setting_data=mock.DEFAULT,
+                _live_migrate_vm=mock.DEFAULT):
+
+            self._conn.Msvm_PlannedComputerSystem.return_value = []
+            disk_paths = {
+                mock.sentinel.FAKE_IDE_PATH: mock.sentinel.FAKE_SASD_RESOURCE}
+            self.liveutils._get_physical_disk_paths.return_value = disk_paths
+            mock_disk_paths = [mock.sentinel.FAKE_DISK_PATH]
+            self.liveutils._get_remote_disk_data.return_value = (
+                mock_disk_paths)
+            self.liveutils._create_planned_vm.return_value = mock_vm
+
+            self.liveutils.live_migrate_vm(mock.sentinel.vm_name,
+                                           mock.sentinel.FAKE_HOST)
+
+            self.liveutils._get_remote_disk_data.assert_called_once_with(
+                mock_vm_utils_remote, disk_paths, mock.sentinel.FAKE_HOST)
+            self.liveutils._create_planned_vm.assert_called_once_with(
+                self._conn, self._conn, mock_vm,
+                [mock.sentinel.FAKE_REMOTE_IP_ADDR], mock.sentinel.FAKE_HOST)
+            mocked_method = self.liveutils._update_planned_vm_disk_resources
+            mocked_method.assert_called_once_with(
+                self._conn, mock_vm, mock.sentinel.vm_name,
+                mock_disk_paths)
+            self.liveutils._live_migrate_vm.assert_called_once_with(
+                self._conn, mock_vm, mock_vm,
+                [mock.sentinel.FAKE_REMOTE_IP_ADDR],
+                self.liveutils._get_vhd_setting_data.return_value,
+                mock.sentinel.FAKE_HOST)
 
     def test_live_migrate_single_planned_vm(self):
         mock_vm = self._get_vm()
