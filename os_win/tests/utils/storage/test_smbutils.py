@@ -26,6 +26,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._smbutils = smbutils.SMBUtils()
         self._smbutils._win32_utils = mock.Mock()
+        self._smbutils._smb_conn = mock.Mock()
         self._mock_run = self._smbutils._win32_utils.run_and_check_output
 
     @mock.patch.object(smbutils.SMBUtils, 'unmount_smb_share')

@@ -32,8 +32,9 @@ LOG = logging.getLogger(__name__)
 
 class SMBUtils(object):
     def __init__(self):
-        self._smb_conn = wmi.WMI(moniker=r"root\Microsoft\Windows\SMB")
         self._win32_utils = win32utils.Win32Utils()
+        if sys.platform == "win32":
+            self._smb_conn = wmi.WMI(moniker=r"root\Microsoft\Windows\SMB")
 
     def check_smb_mapping(self, share_path, remove_unavailable_mapping=False):
         mappings = self._smb_conn.Msft_SmbMapping(RemotePath=share_path)
