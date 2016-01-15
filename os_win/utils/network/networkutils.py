@@ -18,6 +18,7 @@ Utility class for network related operations.
 Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
+import re
 
 from eventlet import greenthread
 import sys
@@ -78,8 +79,42 @@ class NetworkUtils(object):
 
     def __init__(self):
         self._jobutils = jobutils.JobUtils()
+        self._switch_ports = {}
+        self._vlan_sds = {}
+        self._vsid_sds = {}
         if sys.platform == 'win32':
             self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
+
+    def init_caches(self):
+        # map between switch port ID and switch port WMI object.
+        for port in self._conn.Msvm_EthernetPortAllocationSettingData():
+            self._switch_ports[port.ElementName] = port
+
+        # VLAN and VSID setting data's InstanceID will contain the switch
+        # port's InstanceID.
+        switch_port_id_regex = re.compile(
+            "Microsoft:[0-9A-F-]*\\\\[0-9A-F-]*\\\\[0-9A-F-]",
+            flags=re.IGNORECASE)
+
+        # map between switch port's InstanceID and their VLAN setting data WMI
+        # objects.
+        for vlan_sd in self._conn.Msvm_EthernetSwitchPortVlanSettingData():
+            match = switch_port_id_regex.match(vlan_sd.InstanceID)
+            if match:
+                self._vlan_sds[match.group()] = vlan_sd
+
+        # map between switch port's InstanceID and their VSID setting data WMI
+        # objects.
+        for vsid_sd in self._conn.Msvm_EthernetSwitchPortSecuritySettingData():
+            match = switch_port_id_regex.match(vsid_sd.InstanceID)
+            if match:
+                self._vsid_sds[match.group()] = vsid_sd
+
+    def update_cache(self):
+        # map between switch port ID and switch port WMI object.
+        self._switch_ports = {
+            port.ElementName: port for port in
+            self._conn.Msvm_EthernetPortAllocationSettingData()}
 
     def get_external_vswitch(self, vswitch_name):
         if vswitch_name:
@@ -210,6 +245,9 @@ class NetworkUtils(object):
 
         if delete_port:
             self._jobutils.remove_virt_resource(sw_port)
+            self._switch_ports.pop(switch_port_name, None)
+            self._vlan_sds.pop(sw_port.InstanceID, None)
+            self._vsid_sds.pop(sw_port.InstanceID, None)
         else:
             sw_port.EnabledState = self._STATE_DISABLED
             self._jobutils.modify_virt_resource(sw_port)
@@ -231,7 +269,11 @@ class NetworkUtils(object):
             # due to a wmi exception.
             self._jobutils.remove_virt_feature(vlan_settings)
 
-        (vlan_settings, found) = self._get_vlan_setting_data(switch_port_name)
+            # remove from cache.
+            self._vlan_sds.pop(port_alloc.InstanceID, None)
+
+        vlan_settings = self._get_default_setting_data(
+            self._PORT_VLAN_SET_DATA)
         vlan_settings.AccessVlanId = vlan_id
         vlan_settings.OperationMode = self._OPERATION_MODE_ACCESS
         self._jobutils.add_virt_feature(vlan_settings, port_alloc)
@@ -253,32 +295,46 @@ class NetworkUtils(object):
             # due to a wmi exception.
             self._jobutils.remove_virt_feature(vsid_settings)
 
-        (vsid_settings, found) = self._get_security_setting_data(
-            switch_port_name)
+            # remove from cache.
+            self._vsid_sds.pop(port_alloc.InstanceID, None)
+
+        vsid_settings = self._get_default_setting_data(
+            self._PORT_SECURITY_SET_DATA)
         vsid_settings.VirtualSubnetId = vsid
         self._jobutils.add_virt_feature(vsid_settings, port_alloc)
 
     def _get_vlan_setting_data_from_port_alloc(self, port_alloc):
-        return self._get_first_item(port_alloc.associators(
-            wmi_result_class=self._PORT_VLAN_SET_DATA))
+        return self._get_setting_data_from_port_alloc(
+            port_alloc, self._vlan_sds, self._PORT_VLAN_SET_DATA)
 
     def _get_security_setting_data_from_port_alloc(self, port_alloc):
-        return self._get_first_item(port_alloc.associators(
-            wmi_result_class=self._PORT_SECURITY_SET_DATA))
+        return self._get_setting_data_from_port_alloc(
+            port_alloc, self._vsid_sds, self._PORT_SECURITY_SET_DATA)
 
-    def _get_vlan_setting_data(self, switch_port_name, create=True):
-        return self._get_setting_data(
-            self._PORT_VLAN_SET_DATA,
-            switch_port_name, create)
+    def _get_setting_data_from_port_alloc(self, port_alloc, cache, data_class):
+        if port_alloc.InstanceID in cache:
+            return cache[port_alloc.InstanceID]
 
-    def _get_security_setting_data(self, switch_port_name, create=True):
-        return self._get_setting_data(
-            self._PORT_SECURITY_SET_DATA, switch_port_name, create)
+        setting_data = self._get_first_item(port_alloc.associators(
+            wmi_result_class=data_class))
+        if setting_data:
+            cache[port_alloc.InstanceID] = setting_data
+        return setting_data
 
     def _get_switch_port_allocation(self, switch_port_name, create=False):
-        return self._get_setting_data(
+        if switch_port_name in self._switch_ports:
+            return self._switch_ports[switch_port_name], True
+
+        switch_port, found = self._get_setting_data(
             self._PORT_ALLOC_SET_DATA,
             switch_port_name, create)
+
+        if found:
+            # newly created setting data cannot be cached, they do not
+            # represent real objects yet.
+            # if it was found, it means that it was not created.
+            self._switch_ports[switch_port_name] = switch_port
+        return switch_port, found
 
     def _get_setting_data(self, class_name, element_name, create=True):
         element_name = element_name.replace("'", '"')
