@@ -37,11 +37,12 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         super(LiveMigrationUtilsTestCase, self).setUp()
         self.liveutils = livemigrationutils.LiveMigrationUtils()
+        self._conn = mock.MagicMock()
+        self.liveutils._conn = self._conn
         self.liveutils._vmutils = mock.MagicMock()
         self.liveutils._iscsi_initiator = mock.MagicMock()
         self.liveutils._jobutils = mock.Mock()
 
-        self._conn = mock.MagicMock()
         self.liveutils._get_conn_v2 = mock.MagicMock(return_value=self._conn)
         self.liveutils._conn_v2 = self._conn
 

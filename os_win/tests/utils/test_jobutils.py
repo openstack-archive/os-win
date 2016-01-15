@@ -37,14 +37,6 @@ class JobUtilsTestCase(base.BaseTestCase):
         self.jobutils = jobutils.JobUtils()
         self.jobutils._conn = mock.MagicMock()
 
-    def test_vs_man_svc(self):
-        expected = self.jobutils._conn.Msvm_VirtualSystemManagementService()[0]
-        self.assertEqual(expected, self.jobutils._vs_man_svc)
-
-    def test_vs_man_svc_cached(self):
-        self.jobutils._vs_man_svc_attr = mock.sentinel.fake_svc
-        self.assertEqual(mock.sentinel.fake_svc, self.jobutils._vs_man_svc)
-
     @mock.patch.object(jobutils.JobUtils, '_wait_for_job')
     def test_check_ret_val_started(self, mock_wait_for_job):
         self.jobutils.check_ret_val(constants.WMI_JOB_STATUS_STARTED,
@@ -96,8 +88,8 @@ class JobUtilsTestCase(base.BaseTestCase):
         job = self.jobutils._wait_for_job(self._FAKE_JOB_PATH)
         self.assertEqual(mock_job, job)
 
-    @mock.patch.object(jobutils, 'wmi', create=True)
-    def test_stop_jobs(self, mock_wmi):
+    @mock.patch.object(jobutils.JobUtils, '_get_wmi_obj')
+    def test_stop_jobs(self, mock_get_wmi_obj):
         mock_job1 = mock.MagicMock(Cancellable=True)
         mock_job2 = mock.MagicMock(Cancellable=True)
         mock_job3 = mock.MagicMock(Cancellable=True)
@@ -105,7 +97,7 @@ class JobUtilsTestCase(base.BaseTestCase):
         mock_job2.JobState = 3
         mock_job3.JobState = constants.JOB_STATE_KILLED
 
-        mock_wmi.WMI.side_effect = [mock_job1, mock_job2, mock_job3]
+        mock_get_wmi_obj.side_effect = [mock_job1, mock_job2, mock_job3]
 
         mock_vm = mock.MagicMock()
         mock_vm_jobs = [mock_job1, mock_job2, mock_job3]
@@ -135,10 +127,10 @@ class JobUtilsTestCase(base.BaseTestCase):
         mock_job.Description = self._FAKE_JOB_DESCRIPTION
         mock_job.ElapsedTime = self._FAKE_ELAPSED_TIME
 
-        wmi_patcher = mock.patch.object(jobutils, 'wmi', create=True)
+        wmi_patcher = mock.patch.object(jobutils.JobUtils, '_get_wmi_obj')
         mock_wmi = wmi_patcher.start()
         self.addCleanup(wmi_patcher.stop)
-        mock_wmi.WMI.return_value = mock_job
+        mock_wmi.return_value = mock_job
         return mock_job
 
     def test_modify_virt_resource(self):

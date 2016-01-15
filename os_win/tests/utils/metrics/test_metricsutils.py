@@ -30,7 +30,12 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     def setUp(self, mock_cache_metrics_defs):
         super(MetricsUtilsTestCase, self).setUp()
         self.utils = metricsutils.MetricsUtils()
-        self.utils._conn_obj = mock.MagicMock()
+        self.utils._conn = mock.MagicMock()
+
+    def test_cache_metrics_defs_no_conn(self):
+        self.utils._conn = None
+        self.utils._cache_metrics_defs()
+        self.assertEqual({}, self.utils._metrics_defs)
 
     @mock.patch.object(metricsutils.MetricsUtils, '_enable_metrics')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')

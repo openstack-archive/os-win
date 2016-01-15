@@ -19,20 +19,16 @@ Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
 
-import sys
-
-if sys.platform == 'win32':
-    import wmi
-
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
 from os_win import exceptions
+from os_win.utils import baseutils
 
 LOG = logging.getLogger(__name__)
 
 
-class MetricsUtils(object):
+class MetricsUtils(baseutils.BaseUtilsVirt):
 
     _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
     _DVD_DISK_RES_SUB_TYPE = 'Microsoft:Hyper-V:Virtual CD/DVD Disk'
@@ -56,18 +52,10 @@ class MetricsUtils(object):
 
     _METRICS_ENABLED = 2
 
-    _wmi_namespace = '//./root/virtualization/v2'
-
     def __init__(self, host='.'):
-        self._conn_obj = None
+        super(MetricsUtils, self).__init__(host)
         self._metrics_svc_obj = None
         self._cache_metrics_defs()
-
-    @property
-    def _conn(self):
-        if not self._conn_obj:
-            self._conn_obj = wmi.WMI(moniker=self._wmi_namespace)
-        return self._conn_obj
 
     @property
     def _metrics_svc(self):
@@ -77,6 +65,11 @@ class MetricsUtils(object):
 
     def _cache_metrics_defs(self):
         self._metrics_defs = {}
+        if not self._conn:
+            # NOTE(claudiub): self._conn is None on Linux, causing unit tests
+            # to fail.
+            return
+
         for metrics_def in self._conn.CIM_BaseMetricDefinition():
             self._metrics_defs[metrics_def.ElementName] = metrics_def
 

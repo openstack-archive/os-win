@@ -26,22 +26,21 @@ import sys
 
 if sys.platform == 'win32':
     from six.moves import winreg
-    import wmi
 
 from oslo_log import log as logging
 
 from os_win._i18n import _LI
+from os_win.utils import baseutils
 
 LOG = logging.getLogger(__name__)
 
 
-class BaseISCSIInitiatorUtils(object):
+class BaseISCSIInitiatorUtils(baseutils.BaseUtils):
     _FILE_DEVICE_DISK = 7
 
     def __init__(self, host='.'):
-        if sys.platform == 'win32':
-            self._conn_wmi = wmi.WMI(moniker='//%s/root/wmi' % host)
-            self._conn_cimv2 = wmi.WMI(moniker='//%s/root/cimv2' % host)
+        self._conn_wmi = self._get_wmi_conn('//%s/root/wmi' % host)
+        self._conn_cimv2 = self._get_wmi_conn('//%s/root/cimv2' % host)
         self._drive_number_regex = re.compile(r'DeviceID=\"[^,]*\\(\d+)\"')
 
     @abc.abstractmethod

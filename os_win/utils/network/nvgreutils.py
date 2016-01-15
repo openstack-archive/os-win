@@ -13,23 +13,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LI, _LW, _LE  # noqa
 from os_win import constants
 from os_win import exceptions
+from os_win.utils import baseutils
 from os_win.utils.network import networkutils
-
-# Check needed for unit testing on Unix
-if sys.platform == 'win32':
-    import wmi
 
 LOG = logging.getLogger(__name__)
 
 
-class NvgreUtils(object):
+class NvgreUtils(baseutils.BaseUtils):
     _HYPERV_VIRT_ADAPTER = 'Hyper-V Virtual Ethernet Adapter'
     _IPV4_ADDRESS_FAMILY = 2
 
@@ -45,8 +40,7 @@ class NvgreUtils(object):
         super(NvgreUtils, self).__init__()
         self._utils = networkutils.NetworkUtils()
         self._net_if_indexes = {}
-        if sys.platform == 'win32':
-            self._scimv2 = wmi.WMI(moniker=self._STDCIMV2_NAMESPACE)
+        self._scimv2 = self._get_wmi_conn(moniker=self._STDCIMV2_NAMESPACE)
 
     def create_provider_address(self, network_name, provider_vlan_id):
         iface_index = self._get_network_iface_index(network_name)

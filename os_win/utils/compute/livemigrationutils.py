@@ -24,6 +24,7 @@ from oslo_log import log as logging
 from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils import _wqlutils
+from os_win.utils import baseutils
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
@@ -31,19 +32,19 @@ from os_win.utils.storage.initiator import iscsi_wmi_utils
 LOG = logging.getLogger(__name__)
 
 
-class LiveMigrationUtils(object):
+class LiveMigrationUtils(baseutils.BaseUtilsVirt):
     _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
     _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'CIM_ResourceAllocationSettingData'
 
     def __init__(self):
-        self._conn_v2 = self._get_conn_v2()
+        super(LiveMigrationUtils, self).__init__()
         self._vmutils = vmutils.VMUtils()
         self._jobutils = jobutils.JobUtils()
         self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
         try:
-            return wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
+            return self._get_wmi_conn(self._wmi_namespace % host)
         except wmi.x_wmi as ex:
             LOG.exception(_LE('Get version 2 connection error'))
             if ex.com_error.hresult == -2147217394:
@@ -57,9 +58,9 @@ class LiveMigrationUtils(object):
             raise exceptions.HyperVException(msg)
 
     def check_live_migration_config(self):
-        migration_svc = self._conn_v2.Msvm_VirtualSystemMigrationService()[0]
+        migration_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]
         vsmssd = (
-            self._conn_v2.Msvm_VirtualSystemMigrationServiceSettingData()[0])
+            self._conn.Msvm_VirtualSystemMigrationServiceSettingData()[0])
         if not vsmssd.EnableVirtualSystemMigration:
             raise exceptions.HyperVException(
                 _('Live migration is not enabled on this host'))
@@ -163,7 +164,7 @@ class LiveMigrationUtils(object):
                                           disk_paths_remote):
         updated_resource_setting_data = []
         sasds = _wqlutils.get_element_associated_class(
-            self._conn_v2, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
+            self._conn, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
             element_uuid=planned_vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 17 and sasd.ResourceSubType ==
@@ -192,7 +193,7 @@ class LiveMigrationUtils(object):
     def _get_vhd_setting_data(self, vm):
         new_resource_setting_data = []
         sasds = _wqlutils.get_element_associated_class(
-            self._conn_v2, self._STORAGE_ALLOC_SETTING_DATA_CLASS,
+            self._conn, self._STORAGE_ALLOC_SETTING_DATA_CLASS,
             element_uuid=vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 31 and sasd.ResourceSubType ==
@@ -230,10 +231,9 @@ class LiveMigrationUtils(object):
     def live_migrate_vm(self, vm_name, dest_host):
         self.check_live_migration_config()
 
-        conn_v2_local = self._conn_v2
         conn_v2_remote = self._get_conn_v2(dest_host)
 
-        vm = self._get_vm(conn_v2_local, vm_name)
+        vm = self._get_vm(self._conn, vm_name)
 
         rmt_ip_addr_list = self._get_ip_address_list(conn_v2_remote,
                                                      dest_host)
@@ -257,7 +257,7 @@ class LiveMigrationUtils(object):
                                                                disk_paths,
                                                                dest_host)
                 planned_vm = self._create_planned_vm(conn_v2_remote,
-                                                     conn_v2_local,
+                                                     self._conn,
                                                      vm, rmt_ip_addr_list,
                                                      dest_host)
                 self._update_planned_vm_disk_resources(
@@ -266,7 +266,7 @@ class LiveMigrationUtils(object):
             planned_vm = planned_vms[0]
 
         new_resource_setting_data = self._get_vhd_setting_data(vm)
-        self._live_migrate_vm(conn_v2_local, vm, planned_vm, rmt_ip_addr_list,
+        self._live_migrate_vm(self._conn, vm, planned_vm, rmt_ip_addr_list,
                               new_resource_setting_data, dest_host)
 
     def create_planned_vm(self, vm_name, src_host, disk_path_mapping):
@@ -274,22 +274,21 @@ class LiveMigrationUtils(object):
         dest_host = platform.node()
         vmutils_remote = vmutils.VMUtils(src_host)
 
-        conn_v2_local = self._conn_v2
         conn_v2_remote = self._get_conn_v2(src_host)
         vm = self._get_vm(conn_v2_remote, vm_name)
 
         # Make sure there are no planned VMs already.
-        self._destroy_existing_planned_vms(conn_v2_local, vm)
+        self._destroy_existing_planned_vms(self._conn, vm)
 
-        ip_addr_list = self._get_ip_address_list(conn_v2_local,
+        ip_addr_list = self._get_ip_address_list(self._conn,
                                                  dest_host)
 
         disk_paths = self._get_disk_data(vm_name, vmutils_remote,
                                          disk_path_mapping)
 
-        planned_vm = self._create_planned_vm(conn_v2_local,
+        planned_vm = self._create_planned_vm(self._conn,
                                              conn_v2_remote,
                                              vm, ip_addr_list,
                                              dest_host)
-        self._update_planned_vm_disk_resources(conn_v2_local, planned_vm,
+        self._update_planned_vm_disk_resources(self._conn, planned_vm,
                                                vm_name, disk_paths)
