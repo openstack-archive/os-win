@@ -83,8 +83,40 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_esw = mock_lep1.associators()[0]
         mock_esw.associators.return_value = [mock_vswitch]
 
+    @mock.patch.object(networkutils.NetworkUtils, '_get_vswitch_external_port')
+    def test_get_vswitch_external_network_name(self, mock_get_vswitch_port):
+        mock_get_vswitch_port.return_value.ElementName = (
+            mock.sentinel.network_name)
+        result = self.netutils.get_vswitch_external_network_name(
+            mock.sentinel.vswitch_name)
+        self.assertEqual(mock.sentinel.network_name, result)
+
+    def test_get_vswitch_external_port(self):
+        vswitch = mock.MagicMock(Name=mock.sentinel.vswitch_name)
+        self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = [vswitch]
+
+        ext_port = mock.MagicMock()
+        lan_endpoint1 = mock.MagicMock()
+        ext_port.associators.return_value = [lan_endpoint1]
+        lan_endpoint2 = mock.MagicMock(SystemName=mock.sentinel.vswitch_name)
+        lan_endpoint1.associators.return_value = [lan_endpoint2]
+
+        self.netutils._conn.Msvm_ExternalEthernetPort.return_value = [ext_port]
+
+        result = self.netutils._get_vswitch_external_port(mock.sentinel.name)
+        self.assertEqual(ext_port, result)
+
     def test_vswitch_port_needed(self):
         self.assertFalse(self.netutils.vswitch_port_needed())
+
+    @mock.patch.object(networkutils.NetworkUtils, '_get_vnic_settings')
+    def test_get_vnic_mac_address(self, mock_get_vnic_settings):
+        mock_vnic = mock.MagicMock(Address=mock.sentinel.mac_address)
+        mock_get_vnic_settings.return_value = mock_vnic
+
+        actual_mac_address = self.netutils.get_vnic_mac_address(
+            mock.sentinel.switch_port_name)
+        self.assertEqual(mock.sentinel.mac_address, actual_mac_address)
 
     def test_connect_vnic_to_vswitch_found(self):
         self._test_connect_vnic_to_vswitch(True)
@@ -199,6 +231,62 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertFalse(mock_remove_feature.called)
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         self.assertFalse(mock_add_feature.called)
+
+    @mock.patch.object(networkutils.NetworkUtils, '_get_security_setting_data')
+    def test_set_vswitch_port_vsid(self, mock_get_security_sd):
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+
+        mock_vsid_settings = mock.MagicMock()
+        mock_port_alloc.associators.return_value = [mock_vsid_settings]
+        mock_get_security_sd.return_value = (mock_vsid_settings, True)
+
+        self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
+                                            mock.sentinel.switch_port_name)
+
+        mock_remove_feature = self.netutils._jobutils.remove_virt_feature
+        mock_remove_feature.assert_called_once_with(mock_vsid_settings)
+        mock_add_feature = self.netutils._jobutils.add_virt_feature
+        mock_add_feature.assert_called_once_with(mock_vsid_settings,
+                                                 mock_port_alloc)
+
+    def test_set_vswitch_port_vsid_already_set(self):
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+
+        mock_vsid_settings = mock.MagicMock(VirtualSubnetId=mock.sentinel.vsid)
+        mock_port_alloc.associators.return_value = (mock_vsid_settings, True)
+
+        self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
+                                            mock.sentinel.switch_port_name)
+
+        self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_switch_port_allocation')
+    def test_set_vswitch_port_vsid_port_not_found(self, mock_get_port):
+        mock_get_port.return_value = None, False
+        self.assertRaises(exceptions.HyperVPortNotFoundException,
+                          self.netutils.set_vswitch_port_vsid,
+                          mock.sentinel.vsid, mock.sentinel.port_name)
+
+    def test_get_security_setting_data_from_port_alloc(self):
+        mock_port = mock.MagicMock()
+        mock_port.associators.return_value = [mock.sentinel.associated]
+        result = self.netutils._get_security_setting_data_from_port_alloc(
+            mock_port)
+
+        self.assertEqual(mock.sentinel.associated, result)
+        mock_port.associators.assert_called_once_with(
+            wmi_result_class=self.netutils._PORT_SECURITY_SET_DATA)
+
+    @mock.patch.object(networkutils.NetworkUtils, '_get_setting_data')
+    def test_get_security_setting_data(self, mock_get_set_data):
+        result = self.netutils._get_security_setting_data(
+            mock.sentinel.port_name, False)
+
+        self.assertEqual(mock_get_set_data.return_value, result)
+        mock_get_set_data.assert_called_once_with(
+            self.netutils._PORT_SECURITY_SET_DATA,
+            mock.sentinel.port_name, False)
 
     def test_get_setting_data(self):
         self.netutils._get_first_item = mock.MagicMock(return_value=None)
