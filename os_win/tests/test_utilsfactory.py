@@ -22,6 +22,7 @@ from oslo_config import cfg
 
 from os_win import exceptions
 from os_win.tests import test_base
+from os_win.utils.compute import clusterutils
 from os_win.utils.compute import livemigrationutils
 from os_win.utils.compute import rdpconsoleutils
 from os_win.utils.compute import vmutils
@@ -130,3 +131,13 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=diskutils.DiskUtils,
             class_type='diskutils')
+
+    def test_get_clusterutils(self):
+        self._check_get_class(
+            expected_class=clusterutils.ClusterUtils,
+            class_type='clusterutils')
+
+    def test_get_cluster_failover_monitor(self):
+        self._check_get_class(
+            expected_class=clusterutils.ClusterFailoverMonitor,
+            class_type='cluster_failover_monitor')

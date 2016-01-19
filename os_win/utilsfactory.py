@@ -124,6 +124,17 @@ utils_map = {
             'min_version': 10,
             'max_version': None,
             'path': 'os_win.utils.compute.vmutils10.VMUtils10'}},
+    'clusterutils': {
+        'ClusterUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.compute.clusterutils.ClusterUtils'}},
+    'cluster_failover_monitor': {
+        'ClusterFailoverMonitor': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.compute.clusterutils.ClusterFailoverMonitor'
+        }},
 }
 
 
@@ -210,3 +221,11 @@ def get_fc_utils():
 
 def get_diskutils():
     return _get_class(class_type='diskutils')
+
+
+def get_clusterutils():
+    return _get_class(class_type='clusterutils')
+
+
+def get_cluster_failover_monitor():
+    return _get_class(class_type='cluster_failover_monitor')

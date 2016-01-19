@@ -136,3 +136,7 @@ class DiskNotFound(NotFound):
 
 class HyperVRemoteFXException(HyperVException):
     pass
+
+
+class HyperVClusterException(HyperVException):
+    pass
