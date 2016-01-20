@@ -37,6 +37,11 @@ LOG = logging.getLogger(__name__)
 utils = hostutils.HostUtils()
 
 utils_map = {
+    'diskutils': {
+        'DiskUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.storage.diskutils.DiskUtils'}},
     'hostutils': {
         'HostUtils': {
             'min_version': 6.2,
@@ -179,3 +184,7 @@ def get_named_pipe_handler(*args, **kwargs):
 
 def get_fc_utils():
     return _get_class(class_type='fc_utils')
+
+
+def get_diskutils():
+    return _get_class(class_type='diskutils')
