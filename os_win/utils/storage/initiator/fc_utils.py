@@ -22,10 +22,14 @@ import textwrap
 if sys.platform == 'win32':
     hbaapi = ctypes.cdll.hbaapi
 
-from os_win._i18n import _
+from oslo_log import log as logging
+
+from os_win._i18n import _, _LW
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils import win32utils
+
+LOG = logging.getLogger(__name__)
 
 HBA_STATUS_OK = 0
 HBA_STATUS_ERROR_MORE_DATA = 7
@@ -111,27 +115,38 @@ class FCUtils(object):
             hba_handle, ctypes.byref(hba_attributes))
         return hba_attributes
 
+    def _get_fc_hba_adapter_ports(self, adapter_name):
+        hba_ports = []
+        with self._get_hba_handle(
+                adapter_name=adapter_name) as hba_handle:
+            adapter_attributes = self._get_adapter_attributes(hba_handle)
+            port_count = adapter_attributes.NumberOfPorts
+
+            for port_index in range(port_count):
+                port_attributes = self._get_adapter_port_attributes(
+                    hba_handle,
+                    port_index)
+                wwnn = self._wwn_array_to_hex_str(port_attributes.NodeWWN)
+                wwpn = self._wwn_array_to_hex_str(port_attributes.PortWWN)
+
+                hba_port_info = dict(node_name=wwnn,
+                                     port_name=wwpn)
+                hba_ports.append(hba_port_info)
+        return hba_ports
+
     def get_fc_hba_ports(self):
         hba_ports = []
 
         adapter_count = self.get_fc_hba_count()
         for adapter_index in range(adapter_count):
             adapter_name = self._get_adapter_name(adapter_index)
-            with self._get_hba_handle(
-                    adapter_name=adapter_name) as hba_handle:
-                adapter_attributes = self._get_adapter_attributes(hba_handle)
-                port_count = adapter_attributes.NumberOfPorts
-
-                for port_index in range(port_count):
-                    port_attributes = self._get_adapter_port_attributes(
-                        hba_handle,
-                        port_index)
-                    wwnn = self._wwn_array_to_hex_str(port_attributes.NodeWWN)
-                    wwpn = self._wwn_array_to_hex_str(port_attributes.PortWWN)
-
-                    hba_port_info = dict(node_name=wwnn,
-                                         port_name=wwpn)
-                    hba_ports.append(hba_port_info)
+            try:
+                hba_ports += self._get_fc_hba_adapter_ports(adapter_name)
+            except Exception as exc:
+                msg = _LW("Could not retrieve FC HBA ports for "
+                          "adapter: %(adapter_name)s. "
+                          "Exception: %(exc)s")
+                LOG.warning(msg, dict(adapter_name=adapter_name, exc=exc))
 
         return hba_ports
 
