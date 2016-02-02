@@ -812,7 +812,7 @@ class VMUtils(object):
         serial_port = self._get_vm_serial_ports(vm)[port_number - 1]
         serial_port.Connection = [pipe_path]
 
-        self._modify_virt_resource(serial_port, vm.path_())
+        self._jobutils.modify_virt_resource(serial_port)
 
     def get_vm_serial_port_connections(self, vm_name):
         vm = self._lookup_vm_check(vm_name)

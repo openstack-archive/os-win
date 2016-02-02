@@ -752,13 +752,12 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(mock_rasds, ret_val)
 
     def test_set_vm_serial_port_conn(self):
-        mock_vm = self._lookup_vm()
+        self._lookup_vm()
         mock_com_1 = mock.Mock()
         mock_com_2 = mock.Mock()
 
         self._vmutils._get_vm_serial_ports = mock.Mock(
             return_value=[mock_com_1, mock_com_2])
-        self._vmutils._modify_virt_resource = mock.Mock()
 
         self._vmutils.set_vm_serial_port_connection(
             mock.sentinel.vm_name,
@@ -766,8 +765,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             pipe_path=mock.sentinel.pipe_path)
 
         self.assertEqual([mock.sentinel.pipe_path], mock_com_1.Connection)
-        self._vmutils._modify_virt_resource.assert_called_once_with(
-            mock_com_1, mock_vm.path_())
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_com_1)
 
     def test_get_serial_port_conns(self):
         self._lookup_vm()
