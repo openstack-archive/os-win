@@ -105,6 +105,10 @@ class WMIException(OSWinException):
         super(WMIException, self).__init__(message)
 
 
+class WqlException(OSWinException):
+    pass
+
+
 class ISCSITargetException(OSWinException):
     pass
 

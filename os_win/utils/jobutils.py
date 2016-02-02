@@ -117,13 +117,18 @@ class JobUtils(object):
         return job
 
     def stop_jobs(self, element):
-        jobs = element.associators(wmi_result_class=self._CONCRETE_JOB_CLASS)
+        element_jobs = []
+        jobs_affecting_element = self._conn.Msvm_AffectedJobElement(
+            AffectedElement=element.path_())
+        for job in jobs_affecting_element:
+            element_jobs.append(
+                wmi.WMI(moniker=job.AffectingElement.replace('\\', '/')))
 
-        for job in jobs:
+        for job in element_jobs:
             if job and job.Cancellable and not self._is_job_completed(job):
                 job.RequestStateChange(self._KILL_JOB_STATE_CHANGE_REQUEST)
 
-        return jobs
+        return element_jobs
 
     def _is_job_completed(self, job):
         return job.JobState in self._completed_job_states

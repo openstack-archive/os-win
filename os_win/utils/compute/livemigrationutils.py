@@ -23,6 +23,7 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
 from os_win import exceptions
+from os_win.utils import _wqlutils
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
@@ -31,8 +32,11 @@ LOG = logging.getLogger(__name__)
 
 
 class LiveMigrationUtils(object):
+    _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
+    _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'CIM_ResourceAllocationSettingData'
 
     def __init__(self):
+        self._conn_v2 = self._get_conn_v2()
         self._vmutils = vmutils.VMUtils()
         self._jobutils = jobutils.JobUtils()
         self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
@@ -53,12 +57,9 @@ class LiveMigrationUtils(object):
             raise exceptions.HyperVException(msg)
 
     def check_live_migration_config(self):
-        conn_v2 = self._get_conn_v2()
-        migration_svc = conn_v2.Msvm_VirtualSystemMigrationService()[0]
-        vsmssds = migration_svc.associators(
-            wmi_association_class='Msvm_ElementSettingData',
-            wmi_result_class='Msvm_VirtualSystemMigrationServiceSettingData')
-        vsmssd = vsmssds[0]
+        migration_svc = self._conn_v2.Msvm_VirtualSystemMigrationService()[0]
+        vsmssd = (
+            self._conn_v2.Msvm_VirtualSystemMigrationServiceSettingData()[0])
         if not vsmssd.EnableVirtualSystemMigration:
             raise exceptions.HyperVException(
                 _('Live migration is not enabled on this host'))
@@ -160,13 +161,10 @@ class LiveMigrationUtils(object):
     def _update_planned_vm_disk_resources(self, conn_v2_local,
                                           planned_vm, vm_name,
                                           disk_paths_remote):
-        vm_settings = planned_vm.associators(
-            wmi_association_class='Msvm_SettingsDefineState',
-            wmi_result_class='Msvm_VirtualSystemSettingData')[0]
-
         updated_resource_setting_data = []
-        sasds = vm_settings.associators(
-            wmi_association_class='Msvm_VirtualSystemSettingDataComponent')
+        sasds = _wqlutils.get_element_associated_class(
+            self._conn_v2, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
+            element_uuid=planned_vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 17 and sasd.ResourceSubType ==
                     "Microsoft:Hyper-V:Physical Disk Drive" and
@@ -192,14 +190,10 @@ class LiveMigrationUtils(object):
         self._jobutils.check_ret_val(ret_val, job_path)
 
     def _get_vhd_setting_data(self, vm):
-        vm_settings = vm.associators(
-            wmi_association_class='Msvm_SettingsDefineState',
-            wmi_result_class='Msvm_VirtualSystemSettingData')[0]
-
         new_resource_setting_data = []
-        sasds = vm_settings.associators(
-            wmi_association_class='Msvm_VirtualSystemSettingDataComponent',
-            wmi_result_class='Msvm_StorageAllocationSettingData')
+        sasds = _wqlutils.get_element_associated_class(
+            self._conn_v2, self._STORAGE_ALLOC_SETTING_DATA_CLASS,
+            element_uuid=vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 31 and sasd.ResourceSubType ==
                     "Microsoft:Hyper-V:Virtual Hard Disk"):
@@ -236,7 +230,7 @@ class LiveMigrationUtils(object):
     def live_migrate_vm(self, vm_name, dest_host):
         self.check_live_migration_config()
 
-        conn_v2_local = self._get_conn_v2()
+        conn_v2_local = self._conn_v2
         conn_v2_remote = self._get_conn_v2(dest_host)
 
         vm = self._get_vm(conn_v2_local, vm_name)
@@ -280,7 +274,7 @@ class LiveMigrationUtils(object):
         dest_host = platform.node()
         vmutils_remote = vmutils.VMUtils(src_host)
 
-        conn_v2_local = self._get_conn_v2()
+        conn_v2_local = self._conn_v2
         conn_v2_remote = self._get_conn_v2(src_host)
         vm = self._get_vm(conn_v2_remote, vm_name)
 
