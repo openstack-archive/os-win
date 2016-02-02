@@ -290,14 +290,19 @@ class VHDUtilsTestCase(base.BaseTestCase):
 
         mock_open.return_value = mock.sentinel.handle
         mock_get_vhd_info_member.return_value = fake_vhd_info
+        open_params_struct = (
+            self._vdisk_struct.Win32_OPEN_VIRTUAL_DISK_PARAMETERS_V2)
 
         ret_val = self._vhdutils.get_vhd_info(mock.sentinel.vhd_path,
                                               [fake_info_member])
 
         self.assertEqual(fake_vhd_info, ret_val)
+        open_params_struct.assert_called_once_with(GetInfoOnly=True,
+                                                   ReadOnly=True)
         mock_open.assert_called_once_with(
             mock.sentinel.vhd_path,
-            open_access_mask=vdisk_const.VIRTUAL_DISK_ACCESS_GET_INFO)
+            open_access_mask=vdisk_const.VIRTUAL_DISK_ACCESS_NONE,
+            open_params=self._ctypes.byref(open_params_struct.return_value))
         self._vhdutils._get_vhd_info_member.assert_called_once_with(
             mock.sentinel.handle,
             fake_info_member)

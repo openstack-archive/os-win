@@ -196,9 +196,12 @@ class VHDUtils(object):
         vhd_info = {}
         info_members = info_members or self._vhd_info_members
 
+        open_params = vdisk_struct.Win32_OPEN_VIRTUAL_DISK_PARAMETERS_V2(
+            GetInfoOnly=True, ReadOnly=True)
         handle = self._open(
             vhd_path,
-            open_access_mask=vdisk_const.VIRTUAL_DISK_ACCESS_GET_INFO)
+            open_access_mask=vdisk_const.VIRTUAL_DISK_ACCESS_NONE,
+            open_params=ctypes.byref(open_params))
 
         try:
             for member in info_members:
