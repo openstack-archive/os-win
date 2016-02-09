@@ -87,34 +87,6 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual({mock.sentinel.port_name: mock_port},
                          self.netutils._switch_ports)
 
-    def test_get_external_vswitch(self):
-        mock_vswitch = mock.MagicMock()
-        mock_vswitch.path_.return_value = mock.sentinel.FAKE_VSWITCH_PATH
-        getattr(self.netutils._conn,
-                self._MSVM_VIRTUAL_SWITCH).return_value = [mock_vswitch]
-
-        switch_path = self.netutils.get_external_vswitch(
-            mock.sentinel.FAKE_VSWITCH_NAME)
-
-        self.assertEqual(mock.sentinel.FAKE_VSWITCH_PATH, switch_path)
-
-    def test_get_external_vswitch_not_found(self):
-        self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = []
-
-        self.assertRaises(exceptions.HyperVException,
-                          self.netutils.get_external_vswitch,
-                          mock.sentinel.FAKE_VSWITCH_NAME)
-
-    def test_get_external_vswitch_no_name(self):
-        mock_vswitch = mock.MagicMock()
-        mock_vswitch.path_.return_value = mock.sentinel.FAKE_VSWITCH_PATH
-
-        mock_ext_port = self.netutils._conn.Msvm_ExternalEthernetPort()[0]
-        self._prepare_external_port(mock_vswitch, mock_ext_port)
-
-        switch_path = self.netutils.get_external_vswitch(None)
-        self.assertEqual(mock.sentinel.FAKE_VSWITCH_PATH, switch_path)
-
     def _prepare_external_port(self, mock_vswitch, mock_ext_port):
         mock_lep = mock_ext_port.associators()[0]
         mock_lep1 = mock_lep.associators()[0]
