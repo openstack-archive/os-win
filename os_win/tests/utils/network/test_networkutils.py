@@ -493,6 +493,8 @@ class NetworkUtilsTestCase(base.BaseTestCase):
                                                 mock.sentinel.FAKE_WEIGHT)
         mock_add_features = self.netutils._jobutils.add_multiple_virt_features
         mock_add_features.assert_called_once_with([m_acl], m_port)
+        self.assertEqual([m_acl, fake_rule],
+                         self.netutils._sg_acl_sds[m_port.ElementName])
 
     @mock.patch.object(networkutils.NetworkUtils, '_get_new_weights')
     @mock.patch.object(networkutils.NetworkUtils, '_filter_security_acls')
@@ -507,9 +509,32 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.netutils._bind_security_rules(m_port, [fake_rule])
         mock_filtered_acls.assert_called_once_with(fake_rule, [m_acl])
         mock_get_weights.assert_called_once_with([fake_rule], [m_acl])
+        self.assertEqual([m_acl],
+                         self.netutils._sg_acl_sds[m_port.ElementName])
+
+    def test_get_port_security_acls_cached(self):
+        mock_port = mock.MagicMock(ElementName=mock.sentinel.port_name)
+        self.netutils._sg_acl_sds = {
+            mock.sentinel.port_name: [mock.sentinel.fake_acl]}
+
+        acls = self.netutils._get_port_security_acls(mock_port)
+
+        self.assertEqual([mock.sentinel.fake_acl], acls)
+
+    def test_get_port_security_acls(self):
+        mock_port = mock.MagicMock()
+        mock_port.associators.return_value = [mock.sentinel.fake_acl]
+
+        acls = self.netutils._get_port_security_acls(mock_port)
+
+        self.assertEqual([mock.sentinel.fake_acl], acls)
+        self.assertEqual({mock_port.ElementName: [mock.sentinel.fake_acl]},
+                         self.netutils._sg_acl_sds)
 
     @mock.patch.object(networkutils.NetworkUtils, '_filter_security_acls')
     def test_remove_security_rules(self, mock_filter):
+        mock_port, mock_acl = self._setup_security_rule_test()
+        mock_port.associators.return_value.append(mock.sentinel.fake_acl)
         mock_acl = self._setup_security_rule_test()[1]
         fake_rule = mock.MagicMock()
         mock_filter.return_value = [mock_acl]
@@ -521,6 +546,10 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_remove_features.assert_called_once_with([mock_acl])
 
     def test_remove_all_security_rules(self):
+        mock_port, mock_acl = self._setup_security_rule_test()
+        self.netutils._sg_acl_sds[mock_port.ElementName] = [
+            mock.sentinel.fake_acl]
+
         mock_acl = self._setup_security_rule_test()[1]
         self.netutils.remove_all_security_rules(self._FAKE_PORT_NAME)
         mock_remove_features = (
