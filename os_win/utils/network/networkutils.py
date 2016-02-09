@@ -79,6 +79,7 @@ class NetworkUtils(object):
 
     def __init__(self):
         self._jobutils = jobutils.JobUtils()
+        self._switches = {}
         self._switch_ports = {}
         self._vlan_sds = {}
         self._vsid_sds = {}
@@ -86,6 +87,9 @@ class NetworkUtils(object):
             self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
 
     def init_caches(self):
+        for vswitch in self._conn.Msvm_VirtualEthernetSwitch():
+            self._switches[vswitch.ElementName] = vswitch
+
         # map between switch port ID and switch port WMI object.
         for port in self._conn.Msvm_EthernetPortAllocationSettingData():
             self._switch_ports[port.ElementName] = port
@@ -126,11 +130,16 @@ class NetworkUtils(object):
             return ext_port.ElementName
 
     def _get_vswitch(self, vswitch_name):
+        if vswitch_name in self._switches:
+            return self._switches[vswitch_name]
+
         vswitch = self._conn.Msvm_VirtualEthernetSwitch(
             ElementName=vswitch_name)
         if not len(vswitch):
             raise exceptions.HyperVException(_('VSwitch not found: %s') %
                                              vswitch_name)
+
+        self._switches[vswitch_name] = vswitch[0]
         return vswitch[0]
 
     def _get_vswitch_external_port(self, vswitch_name):
