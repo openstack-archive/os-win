@@ -57,6 +57,10 @@ class HyperVVMNotFoundException(NotFound, HyperVException):
     msg_fmt = _("VM not found: %(vm_name)s")
 
 
+class HyperVPortNotFoundException(NotFound, HyperVException):
+    msg_fmt = _("Switch port not found: %(port_name)s")
+
+
 class SMBException(OSWinException):
     pass
 

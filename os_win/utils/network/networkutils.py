@@ -108,6 +108,11 @@ class NetworkUtils(object):
         vswitch = self._get_vswitch(vswitch_name)
         return vswitch.Name
 
+    def get_vswitch_external_network_name(self, vswitch_name):
+        ext_port = self._get_vswitch_external_port(vswitch_name)
+        if ext_port:
+            return ext_port.ElementName
+
     def _get_vswitch(self, vswitch_name):
         vswitch = self._conn.Msvm_VirtualEthernetSwitch(
             ElementName=vswitch_name)
@@ -115,6 +120,19 @@ class NetworkUtils(object):
             raise exceptions.HyperVException(_('VSwitch not found: %s') %
                                              vswitch_name)
         return vswitch[0]
+
+    def _get_vswitch_external_port(self, vswitch_name):
+        vswitch = self._get_vswitch(vswitch_name)
+        ext_ports = self._conn.Msvm_ExternalEthernetPort()
+        for ext_port in ext_ports:
+            lan_endpoint_list = ext_port.associators(
+                wmi_result_class=self._LAN_ENDPOINT)
+            if lan_endpoint_list:
+                lan_endpoint_list = lan_endpoint_list[0].associators(
+                    wmi_result_class=self._LAN_ENDPOINT)
+                if (lan_endpoint_list and
+                        lan_endpoint_list[0].SystemName == vswitch.Name):
+                    return ext_port
 
     def vswitch_port_needed(self):
         return False
@@ -145,6 +163,10 @@ class NetworkUtils(object):
             p.ElementName
             for p in self._conn.Msvm_SyntheticEthernetPortSettingData()
             if p.ElementName is not None)
+
+    def get_vnic_mac_address(self, switch_port_name):
+        vnic = self._get_vnic_settings(switch_port_name)
+        return vnic.Address
 
     def _get_vnic_settings(self, vnic_name):
         vnic_settings = self._conn.Msvm_SyntheticEthernetPortSettingData(
@@ -214,14 +236,44 @@ class NetworkUtils(object):
         vlan_settings.OperationMode = self._OPERATION_MODE_ACCESS
         self._jobutils.add_virt_feature(vlan_settings, port_alloc)
 
+    def set_vswitch_port_vsid(self, vsid, switch_port_name):
+        port_alloc, found = self._get_switch_port_allocation(switch_port_name)
+        if not found:
+            raise exceptions.HyperVPortNotFoundException(
+                port_name=switch_port_name)
+
+        vsid_settings = self._get_security_setting_data_from_port_alloc(
+            port_alloc)
+
+        if vsid_settings:
+            if vsid_settings.VirtualSubnetId == vsid:
+                # VSID already added, no need to readd it.
+                return
+            # Removing the feature because it cannot be modified
+            # due to a wmi exception.
+            self._jobutils.remove_virt_feature(vsid_settings)
+
+        (vsid_settings, found) = self._get_security_setting_data(
+            switch_port_name)
+        vsid_settings.VirtualSubnetId = vsid
+        self._jobutils.add_virt_feature(vsid_settings, port_alloc)
+
     def _get_vlan_setting_data_from_port_alloc(self, port_alloc):
         return self._get_first_item(port_alloc.associators(
             wmi_result_class=self._PORT_VLAN_SET_DATA))
+
+    def _get_security_setting_data_from_port_alloc(self, port_alloc):
+        return self._get_first_item(port_alloc.associators(
+            wmi_result_class=self._PORT_SECURITY_SET_DATA))
 
     def _get_vlan_setting_data(self, switch_port_name, create=True):
         return self._get_setting_data(
             self._PORT_VLAN_SET_DATA,
             switch_port_name, create)
+
+    def _get_security_setting_data(self, switch_port_name, create=True):
+        return self._get_setting_data(
+            self._PORT_SECURITY_SET_DATA, switch_port_name, create)
 
     def _get_switch_port_allocation(self, switch_port_name, create=False):
         return self._get_setting_data(
