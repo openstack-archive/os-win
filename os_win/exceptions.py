@@ -33,6 +33,10 @@ class OSWinException(Exception):
         super(OSWinException, self).__init__(message)
 
 
+class NotFound(OSWinException):
+    msg_fmt = _("Resource could not be found.")
+
+
 class HyperVException(OSWinException):
     pass
 
@@ -49,7 +53,7 @@ class HyperVAuthorizationException(HyperVException):
                 "Hyper-V related operations.")
 
 
-class HyperVVMNotFoundException(HyperVException):
+class HyperVVMNotFoundException(NotFound, HyperVException):
     msg_fmt = _("VM not found: %(vm_name)s")
 
 
@@ -106,4 +110,8 @@ class ISCSITargetWMIException(ISCSITargetException, WMIException):
 
 
 class Win32IOException(Win32Exception):
+    pass
+
+
+class DiskNotFound(NotFound):
     pass

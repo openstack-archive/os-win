@@ -18,7 +18,6 @@ import mock
 from oslotest import base
 import six
 
-from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils.storage.initiator import fc_utils
@@ -303,14 +302,6 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_open_adapter.assert_called_once_with(adapter_wwn=mock_node_wwn)
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter.return_value)
-
-    @mock.patch.object(_utils, 'execute')
-    def test_rescan_disks(self, mock_execute):
-        cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
-
-        self._fc_utils.rescan_disks()
-
-        mock_execute.assert_called_once_with(*cmd)
 
     def test_refresh_hba_configuration(self):
         self._fc_utils.refresh_hba_configuration()

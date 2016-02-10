@@ -657,21 +657,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(mock_disk_2, physical_disk)
 
-    def test_get_dev_number_from_dev_name(self):
-        fake_physical_device_name = r'\\.\PhysicalDrive1'
-        expected_device_number = '1'
-
-        get_dev_number = self._vmutils.get_device_number_from_device_name
-        resulted_dev_number = get_dev_number(fake_physical_device_name)
-        self.assertEqual(expected_device_number, resulted_dev_number)
-
-    def test_get_device_number_from_invalid_device_name(self):
-        fake_physical_device_name = ''
-
-        self.assertRaises(exceptions.HyperVException,
-                          self._vmutils.get_device_number_from_device_name,
-                          fake_physical_device_name)
-
     def test_get_controller_volume_paths(self):
         self._prepare_mock_disk()
         mock_disks = {self._FAKE_RES_PATH: self._FAKE_HOST_RESOURCE}

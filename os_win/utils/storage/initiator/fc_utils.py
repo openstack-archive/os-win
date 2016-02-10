@@ -23,7 +23,6 @@ if sys.platform == 'win32':
     hbaapi = ctypes.cdll.hbaapi
 
 from os_win._i18n import _
-from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils import win32utils
@@ -157,11 +156,6 @@ class FCUtils(object):
                                lun=entry.ScsiId.ScsiOSLun)
                 mappings.append(mapping)
         return mappings
-
-    def rescan_disks(self):
-        # TODO(lpetrut): find a better way to do this.
-        cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
-        _utils.execute(*cmd)
 
     def refresh_hba_configuration(self):
         hbaapi.HBA_RefreshAdapterConfiguration()
