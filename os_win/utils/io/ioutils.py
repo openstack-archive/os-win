@@ -245,13 +245,19 @@ class IOUtils(object):
                                    completion_routine)
         self._wait_io_completion(overlapped_structure.hEvent)
 
-    def get_buffer(self, buff_size):
-        return (ctypes.c_ubyte * buff_size)()
+    @classmethod
+    def get_buffer(cls, buff_size, data=None):
+        buff = (ctypes.c_ubyte * buff_size)()
+        if data:
+            cls.write_buffer_data(buff, data)
+        return buff
 
-    def get_buffer_data(self, buff, num_bytes):
+    @staticmethod
+    def get_buffer_data(buff, num_bytes):
         return bytes(bytearray(buff[:num_bytes]))
 
-    def write_buffer_data(self, buff, data):
+    @staticmethod
+    def write_buffer_data(buff, data):
         for i, c in enumerate(data):
             buff[i] = struct.unpack('B', six.b(c))[0]
 

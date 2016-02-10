@@ -247,13 +247,12 @@ class IOUtilsTestCase(base.BaseTestCase):
                                                **self._run_args)
         mock_wait_io_completion.assert_called_once_with(mock_event)
 
-    def test_get_write_buffer_data(self):
+    def test_buffer_ops(self):
         mock.patch.stopall()
 
         fake_data = 'fake data'
-        buff = self._ioutils.get_buffer(len(fake_data))
 
-        self._ioutils.write_buffer_data(buff, fake_data)
+        buff = self._ioutils.get_buffer(len(fake_data), data=fake_data)
         buff_data = self._ioutils.get_buffer_data(buff, len(fake_data))
 
         self.assertEqual(six.b(fake_data), buff_data)

@@ -53,11 +53,11 @@ utils_map = {
             'max_version': 6.2,
             'path': 'os_win.utils.storage.initiator.iscsi_cli_utils.'
                     'ISCSIInitiatorCLIUtils'},
-        'ISCSIInitiatorWMIUtils': {
+        'ISCSIInitiatorUtils': {
             'min_version': 6.2,
             'max_version': None,
-            'path': 'os_win.utils.storage.initiator.iscsi_wmi_utils.'
-                    'ISCSIInitiatorWMIUtils'}},
+            'path': 'os_win.utils.storage.initiator.iscsi_utils.'
+                    'ISCSIInitiatorUtils'}},
     'iscsi_target_utils': {
         'ISCSITargetUtils': {
             'min_version': 6.2,

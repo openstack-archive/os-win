@@ -36,9 +36,14 @@ class Win32UtilsTestCase(base.BaseTestCase):
         # passed by reference.
         self._ctypes.byref = lambda x: (x, "byref")
 
+        self._ctypes_patcher = mock.patch.multiple(
+            win32utils, ctypes=self._ctypes)
+        self._ctypes_patcher.start()
+
         mock.patch.multiple(win32utils,
-                            ctypes=self._ctypes, kernel32=mock.DEFAULT,
-                            wintypes=mock.DEFAULT, create=True).start()
+                            kernel32=mock.DEFAULT,
+                            wintypes=mock.DEFAULT,
+                            create=True).start()
 
     @mock.patch.object(win32utils.Win32Utils, 'get_error_message')
     @mock.patch.object(win32utils.Win32Utils, 'get_last_error')
@@ -47,6 +52,7 @@ class Win32UtilsTestCase(base.BaseTestCase):
                                    **kwargs):
         mock_func = mock.Mock()
         mock_func.return_value = ret_val
+        self._ctypes_patcher.stop()
 
         if expected_exc:
             self.assertRaises(expected_exc,
@@ -94,7 +100,7 @@ class Win32UtilsTestCase(base.BaseTestCase):
             expected_exc=exceptions.Win32Exception)
 
         mock_get_err_msg.assert_called_once_with(
-            mock_get_last_err.return_value)
+            win32utils.ctypes.c_ulong(mock_get_last_err).value)
 
     def test_run_and_check_output_ignored_error(self):
         ret_val = 1
@@ -108,6 +114,24 @@ class Win32UtilsTestCase(base.BaseTestCase):
         self._test_run_and_check_output(ret_val=ret_val,
                                         expected_exc=exceptions.Win32Exception,
                                         kernel32_lib_func=True)
+
+    def test_run_and_check_output_with_err_msg_dict(self):
+        self._ctypes_patcher.stop()
+
+        err_code = 1
+        err_msg = 'fake_err_msg'
+        err_msg_dict = {err_code: err_msg}
+
+        mock_func = mock.Mock()
+        mock_func.return_value = err_code
+
+        try:
+            self._win32_utils.run_and_check_output(mock_func,
+                                                   mock.sentinel.arg,
+                                                   error_msg_src=err_msg_dict)
+        except Exception as ex:
+            self.assertIsInstance(ex, exceptions.Win32Exception)
+            self.assertIn(err_msg, ex.message)
 
     def test_get_error_message(self):
         err_msg = self._win32_utils.get_error_message(mock.sentinel.err_code)

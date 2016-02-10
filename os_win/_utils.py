@@ -15,13 +15,18 @@
 #    under the License.
 
 import netaddr
+import types
 
+from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 from oslo_log import log as logging
 
 from os_win._i18n import _LE
 
 LOG = logging.getLogger(__name__)
+
+
+synchronized = lockutils.synchronized_with_prefix('oswin-')
 
 
 def execute(*cmd, **kwargs):
@@ -56,3 +61,24 @@ def parse_server_string(server_str):
     except (ValueError, netaddr.AddrFormatError):
         LOG.error(_LE('Invalid server_string: %s'), server_str)
         return ('', '')
+
+
+def get_wrapped_function(function):
+    """Get the method at the bottom of a stack of decorators."""
+    if not hasattr(function, '__closure__') or not function.__closure__:
+        return function
+
+    def _get_wrapped_function(function):
+        if not hasattr(function, '__closure__') or not function.__closure__:
+            return None
+
+        for closure in function.__closure__:
+            func = closure.cell_contents
+
+            deeper_func = _get_wrapped_function(func)
+            if deeper_func:
+                return deeper_func
+            elif isinstance(closure.cell_contents, types.FunctionType):
+                return closure.cell_contents
+
+    return _get_wrapped_function(function)
