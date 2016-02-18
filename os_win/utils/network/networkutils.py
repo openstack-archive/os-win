@@ -270,22 +270,23 @@ class NetworkUtils(object):
             wmi_result_class='Msvm_ComputerSystem')
         return vm[0]
 
-    def disconnect_switch_port(self, switch_port_name, vnic_deleted,
-                               delete_port):
-        """Disconnects the switch port."""
+    def remove_switch_port(self, switch_port_name, vnic_deleted=False):
+        """Removes the switch port."""
         sw_port, found = self._get_switch_port_allocation(switch_port_name)
         if not sw_port:
             # Port not found. It happens when the VM was already deleted.
             return
 
-        if delete_port:
-            self._jobutils.remove_virt_resource(sw_port)
-            self._switch_ports.pop(switch_port_name, None)
-            self._vlan_sds.pop(sw_port.InstanceID, None)
-            self._vsid_sds.pop(sw_port.InstanceID, None)
-        else:
-            sw_port.EnabledState = self._STATE_DISABLED
-            self._jobutils.modify_virt_resource(sw_port)
+        if not vnic_deleted:
+            try:
+                self._jobutils.remove_virt_resource(sw_port)
+            except wmi.x_wmi:
+                # port may have already been destroyed by Hyper-V
+                pass
+
+        self._switch_ports.pop(switch_port_name, None)
+        self._vlan_sds.pop(sw_port.InstanceID, None)
+        self._vsid_sds.pop(sw_port.InstanceID, None)
 
     def set_vswitch_port_vlan_id(self, vlan_id, switch_port_name):
         port_alloc, found = self._get_switch_port_allocation(switch_port_name)
