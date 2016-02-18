@@ -389,6 +389,9 @@ class NetworkUtils(object):
         return self._conn.query("SELECT * FROM %s WHERE InstanceID "
                                 "LIKE '%%\\Default'" % class_name)[0]
 
+    def _create_default_setting_data(self, class_name):
+        return getattr(self._conn, class_name).new()
+
     def _get_first_item(self, obj):
         if obj:
             return obj[0]
@@ -527,7 +530,9 @@ class NetworkUtils(object):
         return acl
 
     def _create_security_acl(self, sg_rule, weight):
-        acl = self._get_default_setting_data(self._PORT_EXT_ACL_SET_DATA)
+        # Acl instance can be created new eachtime, the object should be
+        # of type ExtendedEthernetSettingsData.
+        acl = self._create_default_setting_data(self._PORT_EXT_ACL_SET_DATA)
         acl.set(**sg_rule.to_dict())
         return acl
 
