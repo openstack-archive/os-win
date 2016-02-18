@@ -308,7 +308,7 @@ class NetworkUtils(object):
             # remove from cache.
             self._vlan_sds.pop(port_alloc.InstanceID, None)
 
-        vlan_settings = self._get_default_setting_data(
+        vlan_settings = self._create_default_setting_data(
             self._PORT_VLAN_SET_DATA)
         vlan_settings.AccessVlanId = vlan_id
         vlan_settings.OperationMode = self._OPERATION_MODE_ACCESS
@@ -334,7 +334,7 @@ class NetworkUtils(object):
             # remove from cache.
             self._vsid_sds.pop(port_alloc.InstanceID, None)
 
-        vsid_settings = self._get_default_setting_data(
+        vsid_settings = self._create_default_setting_data(
             self._PORT_SECURITY_SET_DATA)
         vsid_settings.VirtualSubnetId = vsid
         self._jobutils.add_virt_feature(vsid_settings, port_alloc)
@@ -522,7 +522,7 @@ class NetworkUtils(object):
             self._jobutils.add_multiple_virt_features(add_acls, port)
 
     def _create_acl(self, direction, acl_type, action):
-        acl = self._get_default_setting_data(self._PORT_ALLOC_ACL_SET_DATA)
+        acl = self._create_default_setting_data(self._PORT_ALLOC_ACL_SET_DATA)
         acl.set(Direction=direction,
                 AclType=acl_type,
                 Action=action,
