@@ -58,6 +58,9 @@ class NetworkUtilsTestCase(base.BaseTestCase):
     def test_init_caches(self):
         conn = self.netutils._conn
 
+        mock_vswitch = mock.MagicMock(ElementName=mock.sentinel.vswitch_name)
+        conn.Msvm_VirtualEthernetSwitch.return_value = [mock_vswitch]
+
         mock_port = mock.MagicMock(ElementName=mock.sentinel.port_name)
         conn.Msvm_EthernetPortAllocationSettingData.return_value = [
             mock_port]
@@ -71,6 +74,8 @@ class NetworkUtilsTestCase(base.BaseTestCase):
 
         self.netutils.init_caches()
 
+        self.assertEqual({mock.sentinel.vswitch_name: mock_vswitch},
+                         self.netutils._switches)
         self.assertEqual({mock.sentinel.port_name: mock_port},
                          self.netutils._switch_ports)
         self.assertEqual([mock_sd], list(self.netutils._vlan_sds.values()))
@@ -205,6 +210,8 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             self._FAKE_VSWITCH]
         vswitch = self.netutils._get_vswitch(self._FAKE_VSWITCH_NAME)
 
+        self.assertEqual({self._FAKE_VSWITCH_NAME: self._FAKE_VSWITCH},
+                         self.netutils._switches)
         self.assertEqual(self._FAKE_VSWITCH, vswitch)
 
     def test_get_vswitch_not_found(self):
