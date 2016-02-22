@@ -112,29 +112,6 @@ class NetworkUtils(object):
             port.ElementName: port for port in
             self._conn.Msvm_EthernetPortAllocationSettingData()}
 
-    def get_external_vswitch(self, vswitch_name):
-        if vswitch_name:
-            vswitches = self._conn.Msvm_VirtualEthernetSwitch(
-                ElementName=vswitch_name)
-            if not len(vswitches):
-                raise exceptions.HyperVException(_('vswitch "%s" not found')
-                                                 % vswitch_name)
-        else:
-            # Find the vswitch that is connected to the first physical nic.
-            ext_port = self._conn.Msvm_ExternalEthernetPort(IsBound='TRUE')[0]
-            lep = ext_port.associators(wmi_result_class='Msvm_LANEndpoint')[0]
-            lep1 = lep.associators(wmi_result_class='Msvm_LANEndpoint')[0]
-            esw = lep1.associators(
-                wmi_result_class='Msvm_EthernetSwitchPort')[0]
-            vswitches = esw.associators(
-                wmi_result_class='Msvm_VirtualEthernetSwitch')
-
-            if not len(vswitches):
-                raise exceptions.HyperVException(
-                    _('No external vswitch found'))
-
-        return vswitches[0].path_()
-
     def get_vswitch_id(self, vswitch_name):
         vswitch = self._get_vswitch(vswitch_name)
         return vswitch.Name
