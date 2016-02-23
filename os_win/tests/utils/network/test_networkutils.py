@@ -223,28 +223,21 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.addCleanup(patched.stop)
         return mock_port
 
-    def test_disconnect_switch_port_delete_port(self):
-        self._test_disconnect_switch_port(True)
-
-    def test_disconnect_switch_port_modify_port(self):
-        self._test_disconnect_switch_port(False)
-
-    def _test_disconnect_switch_port(self, delete_port):
+    @mock.patch.object(networkutils, 'wmi', create=True)
+    def test_remove_switch_port(self, mock_wmi):
         mock_sw_port = self._mock_get_switch_port_alloc()
         self.netutils._switch_ports[self._FAKE_PORT_NAME] = mock_sw_port
         self.netutils._vlan_sds[mock_sw_port.InstanceID] = mock.MagicMock()
+        mock_wmi.x_wmi = Exception
+        self.netutils._jobutils.remove_virt_resource.side_effect = (
+            mock_wmi.x_wmi)
 
-        self.netutils.disconnect_switch_port(self._FAKE_PORT_NAME,
-                                             True, delete_port)
+        self.netutils.remove_switch_port(self._FAKE_PORT_NAME, False)
 
-        if delete_port:
-            mock_remove_resource = self.netutils._jobutils.remove_virt_resource
-            mock_remove_resource.assert_called_once_with(mock_sw_port)
-            self.assertNotIn(self._FAKE_PORT_NAME, self.netutils._switch_ports)
-            self.assertNotIn(mock_sw_port.InstanceID, self.netutils._vlan_sds)
-        else:
-            mock_modify_resource = self.netutils._jobutils.modify_virt_resource
-            mock_modify_resource.assert_called_once_with(mock_sw_port)
+        self.netutils._jobutils.remove_virt_resource.assert_called_once_with(
+            mock_sw_port)
+        self.assertNotIn(self._FAKE_PORT_NAME, self.netutils._switch_ports)
+        self.assertNotIn(mock_sw_port.InstanceID, self.netutils._vlan_sds)
 
     def test_get_vswitch(self):
         self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = [
