@@ -33,6 +33,10 @@ from os_win.utils import jobutils
 
 class NetworkUtils(object):
 
+    EVENT_TYPE_CREATE = "__InstanceCreationEvent"
+    EVENT_TYPE_DELETE = "__InstanceDeletionEvent"
+
+    _VNIC_SET_DATA = 'Msvm_SyntheticEthernetPortSettingData'
     _EXTERNAL_PORT = 'Msvm_ExternalEthernetPort'
     _ETHERNET_SWITCH_PORT = 'Msvm_EthernetSwitchPort'
     _PORT_ALLOC_SET_DATA = 'Msvm_EthernetPortAllocationSettingData'
@@ -72,6 +76,8 @@ class NetworkUtils(object):
 
     # 2 directions x 2 address types = 4 ACLs
     _REJECT_ACLS_COUNT = 4
+
+    _VNIC_LISTENER_TIMEOUT_MS = 2000
 
     def __init__(self):
         self._jobutils = jobutils.JobUtils()
@@ -192,6 +198,49 @@ class NetworkUtils(object):
             raise exceptions.HyperVException(
                 message=_('Vnic not found: %s') % vnic_name)
         return vnic_settings[0]
+
+    def get_vnic_event_listener(self, event_type):
+        query = self._get_event_wql_query(cls=self._VNIC_SET_DATA,
+                                          event_type=event_type,
+                                          timeframe=2)
+        listener = self._conn.Msvm_SyntheticEthernetPortSettingData.watch_for(
+            query)
+
+        def _poll_events(callback):
+            while True:
+                # Retrieve one by one all the events that occurred in
+                # the checked interval.
+                try:
+                    event = listener(self._VNIC_LISTENER_TIMEOUT_MS)
+                    callback(event.ElementName)
+                except wmi.x_wmi_timed_out:
+                    # no new event published.
+                    pass
+
+        return _poll_events
+
+    def _get_event_wql_query(self, cls, event_type, timeframe=2, **where):
+        """Return a WQL query used for polling WMI events.
+
+            :param cls: the Hyper-V class polled for events.
+            :param event_type: the type of event expected.
+            :param timeframe: check for events that occurred in
+                              the specified timeframe.
+            :param where: key-value arguments which are to be included in the
+                          query. For example: like=dict(foo="bar").
+        """
+        like = where.pop('like', {})
+        like_str = " AND ".join("TargetInstance.%s LIKE '%s%%'" % (k, v)
+                                for k, v in like.items())
+        like_str = "AND " + like_str if like_str else ""
+
+        query = ("SELECT * FROM %(event_type)s WITHIN %(timeframe)s "
+                 "WHERE TargetInstance ISA '%(class)s' %(like)s" % {
+                     'class': cls,
+                     'event_type': event_type,
+                     'like': like_str,
+                     'timeframe': timeframe})
+        return query
 
     def connect_vnic_to_vswitch(self, vswitch_name, switch_port_name):
         port, found = self._get_switch_port_allocation(switch_port_name, True)
