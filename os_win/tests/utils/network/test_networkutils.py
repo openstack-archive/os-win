@@ -254,14 +254,15 @@ class NetworkUtilsTestCase(base.BaseTestCase):
                           self.netutils._get_vswitch,
                           self._FAKE_VSWITCH_NAME)
 
-    @mock.patch.object(networkutils.NetworkUtils, '_get_default_setting_data')
-    def test_set_vswitch_port_vlan_id(self, mock_get_default_sd):
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_set_vswitch_port_vlan_id(self, mock_create_default_sd):
         mock_port = self._mock_get_switch_port_alloc(found=True)
         old_vlan_settings = mock.MagicMock()
         self.netutils._get_vlan_setting_data_from_port_alloc = mock.MagicMock(
             return_value=old_vlan_settings)
         mock_vlan_settings = mock.MagicMock()
-        mock_get_default_sd.return_value = mock_vlan_settings
+        mock_create_default_sd.return_value = mock_vlan_settings
 
         self.netutils.set_vswitch_port_vlan_id(self._FAKE_VLAN_ID,
                                                self._FAKE_PORT_NAME)
@@ -287,13 +288,14 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         self.assertFalse(mock_add_feature.called)
 
-    @mock.patch.object(networkutils.NetworkUtils, '_get_default_setting_data')
-    def test_set_vswitch_port_vsid(self, mock_get_default_sd):
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_set_vswitch_port_vsid(self, mock_create_default_sd):
         mock_port_alloc = self._mock_get_switch_port_alloc()
 
         mock_vsid_settings = mock.MagicMock()
         mock_port_alloc.associators.return_value = [mock_vsid_settings]
-        mock_get_default_sd.return_value = mock_vsid_settings
+        mock_create_default_sd.return_value = mock_vsid_settings
 
         self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
                                             mock.sentinel.switch_port_name)
@@ -416,7 +418,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
 
         with mock.patch.multiple(
             self.netutils,
-            _get_default_setting_data=mock.MagicMock(return_value=mock_acl)):
+            _create_default_setting_data=mock.Mock(return_value=mock_acl)):
 
             self.netutils.enable_port_metrics_collection(self._FAKE_PORT_NAME)
 
@@ -586,8 +588,8 @@ class TestNetworkUtilsR2(base.BaseTestCase):
         self.netutils._conn = mock.MagicMock()
 
     @mock.patch.object(networkutils.NetworkUtilsR2,
-                       '_get_default_setting_data')
-    def test_create_security_acl(self, mock_get_default_setting_data):
+                       '_create_default_setting_data')
+    def test_create_security_acl(self, mock_create_default_setting_data):
         sg_rule = mock.MagicMock()
         sg_rule.to_dict.return_value = {}
 
