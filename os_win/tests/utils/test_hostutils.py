@@ -265,3 +265,46 @@ class HostUtilsTestCase(base.BaseTestCase):
         cpu_info = self._hostutils._get_numa_cpu_info([], [other])
 
         self.assertEqual([], cpu_info)
+
+    def test_get_remotefx_gpu_info(self):
+        fake_gpu = mock.MagicMock()
+        fake_gpu.Name = mock.sentinel.Fake_gpu_name
+        fake_gpu.TotalVideoMemory = mock.sentinel.Fake_gpu_total_memory
+        fake_gpu.AvailableVideoMemory = mock.sentinel.Fake_gpu_available_memory
+        fake_gpu.DirectXVersion = mock.sentinel.Fake_gpu_directx
+        fake_gpu.DriverVersion = mock.sentinel.Fake_gpu_driver_version
+
+        mock_phys_3d_proc = (
+            self._hostutils._conn_virt.Msvm_Physical3dGraphicsProcessor)
+        mock_phys_3d_proc.return_value = [fake_gpu]
+
+        return_gpus = self._hostutils.get_remotefx_gpu_info()
+        self.assertEqual(mock.sentinel.Fake_gpu_name, return_gpus[0]['name'])
+        self.assertEqual(mock.sentinel.Fake_gpu_driver_version,
+            return_gpus[0]['driver_version'])
+        self.assertEqual(mock.sentinel.Fake_gpu_total_memory,
+            return_gpus[0]['total_video_ram'])
+        self.assertEqual(mock.sentinel.Fake_gpu_available_memory,
+            return_gpus[0]['available_video_ram'])
+        self.assertEqual(mock.sentinel.Fake_gpu_directx,
+            return_gpus[0]['directx_version'])
+
+    def _set_verify_host_remotefx_capability_mocks(self, isGpuCapable=True,
+                                                   isSlatCapable=True):
+        s3d_video_pool = self._hostutils._conn_virt.Msvm_Synth3dVideoPool()[0]
+        s3d_video_pool.IsGpuCapable = isGpuCapable
+        s3d_video_pool.IsSlatCapable = isSlatCapable
+
+    def test_verify_host_remotefx_capability_unsupported_gpu(self):
+        self._set_verify_host_remotefx_capability_mocks(isGpuCapable=False)
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._hostutils.verify_host_remotefx_capability)
+
+    def test_verify_host_remotefx_capability_no_slat(self):
+        self._set_verify_host_remotefx_capability_mocks(isSlatCapable=False)
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._hostutils.verify_host_remotefx_capability)
+
+    def test_verify_host_remotefx_capability(self):
+        self._set_verify_host_remotefx_capability_mocks()
+        self._hostutils.verify_host_remotefx_capability()

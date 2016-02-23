@@ -50,6 +50,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_RES_NAME = 'fake_res_name'
     _FAKE_ADDRESS = "fake_address"
     _FAKE_DYNAMIC_MEMORY_RATIO = 1.0
+    _FAKE_MONITOR_COUNT = 1
 
     _FAKE_SUMMARY_INFO = {'NumberOfProcessors': 4,
                           'EnabledState': 2,
@@ -1125,3 +1126,73 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_modify_virtual_system.assert_called_once_with(mock_vssd)
         self.assertEqual(expected_boot_order, mock_vssd.BootSourceOrder)
+
+    def test_vm_gen_1_supports_remotefx(self):
+        ret = self._vmutils.vm_gen_supports_remotefx(constants.VM_GEN_1)
+        self.assertTrue(ret)
+
+    def test_vm_gen_2_supports_remotefx(self):
+        ret = self._vmutils.vm_gen_supports_remotefx(constants.VM_GEN_2)
+        self.assertFalse(ret)
+
+    def test_validate_remotefx_monitor_count(self):
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils._validate_remotefx_params,
+                          10, constants.REMOTEFX_MAX_RES_1024x768)
+
+    def test_validate_remotefx_max_resolution(self):
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils._validate_remotefx_params,
+                          1, '1024x700')
+
+    @mock.patch.object(vmutils.VMUtils, '_add_3d_display_controller')
+    @mock.patch.object(vmutils.VMUtils, '_vm_has_s3_controller')
+    def test_enable_remotefx_video_adapter(self,
+                                           mock_vm_has_s3_controller,
+                                           mock_add_3d_ctrl):
+        mock_vm = self._lookup_vm()
+
+        mock_r1 = mock.MagicMock()
+        mock_r1.ResourceSubType = self._vmutils._SYNTH_DISP_CTRL_RES_SUB_TYPE
+
+        mock_r2 = mock.MagicMock()
+        mock_r2.ResourceSubType = self._vmutils._S3_DISP_CTRL_RES_SUB_TYPE
+
+        mock_vm.associators()[0].associators.return_value = [mock_r1, mock_r2]
+
+        self._vmutils.enable_remotefx_video_adapter(
+            mock.sentinel.fake_vm_name,
+            self._FAKE_MONITOR_COUNT,
+            constants.REMOTEFX_MAX_RES_1024x768)
+
+        self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
+            mock_r1)
+
+        mock_add_3d_ctrl.assert_called_once_with(
+            mock_vm, self._FAKE_MONITOR_COUNT,
+            self._vmutils._remote_fx_res_map[
+                constants.REMOTEFX_MAX_RES_1024x768],
+            None)
+
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_r2)
+        self.assertEqual(self._vmutils._DISP_CTRL_ADDRESS_DX_11,
+                         mock_r2.Address)
+
+    def test_enable_remotefx_video_adapter_already_configured(self):
+        mock_vm = self._lookup_vm()
+
+        mock_r = mock.MagicMock()
+        mock_r.ResourceSubType = self._vmutils._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE
+
+        mock_vm.associators()[0].associators.return_value = [mock_r]
+
+        self.assertRaises(exceptions.HyperVRemoteFXException,
+                          self._vmutils.enable_remotefx_video_adapter,
+                          mock.sentinel.fake_vm_name, self._FAKE_MONITOR_COUNT,
+                          constants.REMOTEFX_MAX_RES_1024x768)
+
+    @mock.patch.object(vmutils.VMUtils, 'get_vm_generation')
+    def test_vm_has_s3_controller(self, mock_get_vm_generation):
+        self.assertTrue(self._vmutils._vm_has_s3_controller(
+            mock.sentinel.fake_vm_name))

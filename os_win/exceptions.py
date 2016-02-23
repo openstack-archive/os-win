@@ -128,3 +128,7 @@ class Win32IOException(Win32Exception):
 
 class DiskNotFound(NotFound):
     pass
+
+
+class HyperVRemoteFXException(HyperVException):
+    pass

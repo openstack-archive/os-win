@@ -212,3 +212,26 @@ class HostUtils(object):
                 cpu_info.append(proc)
 
         return cpu_info
+
+    def get_remotefx_gpu_info(self):
+        gpus = []
+        all_gpus = self._conn_virt.Msvm_Physical3dGraphicsProcessor(
+            EnabledForVirtualization=True)
+        for gpu in all_gpus:
+            gpus.append({'name': gpu.Name,
+                         'driver_version': gpu.DriverVersion,
+                         'total_video_ram': gpu.TotalVideoMemory,
+                         'available_video_ram': gpu.AvailableVideoMemory,
+                         'directx_version': gpu.DirectXVersion})
+        return gpus
+
+    def verify_host_remotefx_capability(self):
+        synth_3d_video_pool = self._conn_virt.Msvm_Synth3dVideoPool()[0]
+        if not synth_3d_video_pool.IsGpuCapable:
+            raise exceptions.HyperVRemoteFXException(
+                _("To enable RemoteFX on Hyper-V at least one GPU supporting "
+                  "DirectX 11 is required."))
+        if not synth_3d_video_pool.IsSlatCapable:
+            raise exceptions.HyperVRemoteFXException(
+                _("To enable RemoteFX on Hyper-V it is required that the host "
+                  "GPUs support SLAT."))
