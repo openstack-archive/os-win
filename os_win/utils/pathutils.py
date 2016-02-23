@@ -13,10 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import contextlib
 import ctypes
 import os
 import shutil
 import sys
+import tempfile
 import time
 
 if sys.platform == 'win32':
@@ -24,6 +26,7 @@ if sys.platform == 'win32':
     kernel32 = ctypes.windll.kernel32
 
 from oslo_log import log as logging
+from oslo_utils import fileutils
 import six
 
 from os_win._i18n import _
@@ -152,3 +155,23 @@ class PathUtils(object):
                                                target,
                                                target_is_dir,
                                                kernel32_lib_func=True)
+
+    def create_temporary_file(self, suffix=None, *args, **kwargs):
+        fd, tmp_file_path = tempfile.mkstemp(suffix=suffix, *args, **kwargs)
+        os.close(fd)
+        return tmp_file_path
+
+    @contextlib.contextmanager
+    def temporary_file(self, suffix=None, *args, **kwargs):
+        """Creates a random, temporary, closed file, returning the file's
+        path. It's different from tempfile.NamedTemporaryFile which returns
+        an open file descriptor.
+        """
+
+        tmp_file_path = None
+        try:
+            tmp_file_path = self.create_temporary_file(suffix, *args, **kwargs)
+            yield tmp_file_path
+        finally:
+            if tmp_file_path:
+                fileutils.delete_if_exists(tmp_file_path)
