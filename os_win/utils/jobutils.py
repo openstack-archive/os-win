@@ -25,9 +25,9 @@ if sys.platform == 'win32':
     import wmi
 
 from oslo_log import log as logging
-from oslo_service import loopingcall
 
 from os_win._i18n import _
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 
@@ -142,8 +142,7 @@ class JobUtils(object):
 
     # modify_virt_resource can fail, especially while setting up the VM's
     # serial port connection. Retrying the operation will yield success.
-    @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
-                                exceptions=(exceptions.HyperVException, ))
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def modify_virt_resource(self, virt_resource):
         (job_path, out_set_data,
          ret_val) = self._vs_man_svc.ModifyResourceSettings(
@@ -158,8 +157,7 @@ class JobUtils(object):
     def add_virt_feature(self, virt_feature, parent):
         self.add_multiple_virt_features([virt_feature], parent)
 
-    @loopingcall.RetryDecorator(max_retry_count=5, max_sleep_time=1,
-                                exceptions=(exceptions.HyperVException, ))
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_multiple_virt_features(self, virt_features, parent):
         (job_path, out_set_data,
          ret_val) = self._vs_man_svc.AddFeatureSettings(

@@ -15,11 +15,15 @@
 #    under the License.
 
 import netaddr
+import six
+import time
 import types
 
 from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 from oslo_log import log as logging
+from oslo_utils import excutils
+from oslo_utils import reflection
 
 from os_win._i18n import _LE
 
@@ -82,3 +86,45 @@ def get_wrapped_function(function):
                 return closure.cell_contents
 
     return _get_wrapped_function(function)
+
+
+def retry_decorator(max_retry_count=5, inc_sleep_time=1,
+                    max_sleep_time=1, exceptions=(), error_codes=()):
+    if isinstance(error_codes, six.integer_types):
+        error_codes = (error_codes, )
+
+    def wrapper(f):
+        def inner(*args, **kwargs):
+            try_count = 0
+            sleep_time = 0
+
+            while True:
+                try:
+                    return f(*args, **kwargs)
+                except exceptions as exc:
+                    with excutils.save_and_reraise_exception() as ctxt:
+                        err_code = getattr(exc, 'error_code', None)
+                        expected_err_code = (err_code in error_codes
+                                             or not error_codes)
+                        should_retry = (expected_err_code
+                                        and try_count < max_retry_count)
+                        ctxt.reraise = not should_retry
+
+                        if should_retry:
+                            try_count += 1
+                            func_name = reflection.get_callable_name(f)
+                            LOG.debug("Got expected exception %(exc)s while "
+                                      "calling function %(func_name)s. "
+                                      "Retries left: %(retries_left)d. "
+                                      "Retrying in %(sleep_time)s seconds.",
+                                      dict(exc=exc,
+                                           func_name=func_name,
+                                           retries_left=(
+                                               max_retry_count - try_count),
+                                           sleep_time=sleep_time))
+
+                            sleep_time = min(sleep_time + inc_sleep_time,
+                                             max_sleep_time)
+                            time.sleep(sleep_time)
+        return inner
+    return wrapper

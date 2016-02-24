@@ -17,10 +17,8 @@
 import ctypes
 import functools
 import inspect
-import six
 import socket
 import sys
-import time
 
 if sys.platform == 'win32':
     iscsidsc = ctypes.windll.iscsidsc
@@ -81,38 +79,15 @@ def ensure_buff_and_retrieve_items(struct_type=None,
     return wrapper
 
 
-def retry_for_err_codes(error_codes=(), max_retry_count=10,
-                        retry_interval=0.5):
-    if isinstance(error_codes, six.integer_types):
-        error_codes = (error_codes, )
-
-    def wrapper(f):
-        def inner(*args, **kwargs):
-            try_count = 0
-            while True:
-                try:
-                    return f(*args, **kwargs)
-                except exceptions.Win32Exception as ex:
-                    if (ex.error_code in error_codes and
-                            try_count < max_retry_count):
-                        try_count += 1
-                        LOG.debug("Got expected exception. %(ex_msg)s. "
-                                  "Retries left: %(retries_left)d. "
-                                  "Retrying in %(retry_interval)s seconds.",
-                                  dict(ex_msg=ex.message,
-                                       retries_left=(
-                                           max_retry_count - try_count),
-                                       retry_interval=retry_interval))
-                        time.sleep(retry_interval)
-                    else:
-                        raise
-        return inner
-    return wrapper
-
-
 def _get_items_from_buff(buff, item_type, element_count):
     array_type = item_type * element_count
     return ctypes.cast(buff, ctypes.POINTER(array_type)).contents
+
+
+retry_decorator = functools.partial(
+    _utils.retry_decorator,
+    max_retry_count=10,
+    exceptions=exceptions.ISCSIInitiatorAPIException)
 
 
 class ISCSIInitiatorUtils(object):
@@ -231,7 +206,7 @@ class ISCSIInitiatorUtils(object):
                 if session.TargetNodeName == target_name
                 and (session.ConnectionCount > 0 or not connected_only)]
 
-    @retry_for_err_codes(iscsierr.ISDSC_SESSION_BUSY)
+    @retry_decorator(error_codes=iscsierr.ISDSC_SESSION_BUSY)
     @ensure_buff_and_retrieve_items(
         struct_type=iscsi_struct.ISCSI_DEVICE_ON_SESSION,
         func_requests_buff_sz=False)
@@ -289,7 +264,7 @@ class ISCSIInitiatorUtils(object):
     def get_target_lun_count(self, target_name):
         return len(self.get_target_luns(target_name))
 
-    @retry_for_err_codes(iscsierr.ISDSC_SESSION_BUSY)
+    @retry_decorator(error_codes=iscsierr.ISDSC_SESSION_BUSY)
     def _logout_iscsi_target(self, session_id):
         self._run_and_check_output(
             iscsidsc.LogoutIScsiTarget,
@@ -432,7 +407,8 @@ class ISCSIInitiatorUtils(object):
         raise exceptions.ISCSILunNotAvailable(target_lun=target_lun,
                                               target_iqn=target_iqn)
 
-    @retry_for_err_codes(iscsierr.ISDSC_DEVICE_BUSY_ON_SESSION)
+    @retry_decorator(error_codes=(iscsierr.ISDSC_SESSION_BUSY,
+                                  iscsierr.ISDSC_DEVICE_BUSY_ON_SESSION))
     def logout_storage_target(self, target_iqn):
         LOG.debug("Logging out iSCSI target %(target_iqn)s",
                   dict(target_iqn=target_iqn))
