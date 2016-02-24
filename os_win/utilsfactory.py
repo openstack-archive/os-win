@@ -86,6 +86,11 @@ utils_map = {
             'min_version': 6.2,
             'max_version': None,
             'path': 'os_win.utils.network.networkutils.NetworkUtils'}},
+    'nvgreutils': {
+        'NvgreUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.network.nvgreutils.NvgreUtils'}},
     'pathutils': {
         'PathUtils': {
             'min_version': 6.2,
@@ -154,6 +159,10 @@ def get_metricsutils():
 
 def get_networkutils():
     return _get_class(class_type='networkutils')
+
+
+def get_nvgreutils():
+    return _get_class(class_type='nvgreutils')
 
 
 def get_hostutils():
