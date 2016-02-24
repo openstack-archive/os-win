@@ -66,8 +66,14 @@ class HostUtils(object):
             _("No connection to the 'root/virtualization/v2' WMI namespace."))
 
     def get_cpus_info(self):
-        cpus = self._conn_cimv2.query("SELECT * FROM Win32_Processor "
-                                      "WHERE ProcessorType = 3")
+        # NOTE(abalutoiu): Specifying exactly the fields that we need
+        # improves the speed of the query. The LoadPercentage field
+        # is the load capacity of each processor averaged to the last
+        # second, which is time wasted.
+        cpus = self._conn_cimv2.query(
+            "SELECT Architecture, Name, Manufacturer, NumberOfCores, "
+            "NumberOfLogicalProcessors FROM Win32_Processor "
+            "WHERE ProcessorType = 3")
         cpus_list = []
         for cpu in cpus:
             cpu_info = {'Architecture': cpu.Architecture,
@@ -156,12 +162,10 @@ class HostUtils(object):
     def get_numa_nodes(self):
         numa_nodes = self._conn_virt.Msvm_NumaNode()
         nodes_info = []
+        system_memory = self._conn_virt.Msvm_Memory(['NumberOfBlocks'])
+        processors = self._conn_virt.Msvm_Processor(['DeviceID'])
+
         for node in numa_nodes:
-            memory_info = self._get_numa_memory_info(node)
-            if not memory_info:
-                LOG.warning(_LW("Could not find memory information for NUMA "
-                                "node. Skipping node measurements."))
-                continue
             # Due to a bug in vmms, getting Msvm_Processor for the numa
             # node associators resulted in a vmms crash.
             # As an alternative to using associators we have to manually get
@@ -170,11 +174,18 @@ class HostUtils(object):
             # Msvm_NumaNode and Msvm_Processor. We need to use this class to
             # relate the two because using associators on Msvm_Processor
             # will also result in a crash.
-            processors = self._conn_virt.Msvm_Processor(['DeviceID'])
             numa_assoc = self._conn_virt.Msvm_HostedDependency(
                 Antecedent=node.path_())
-            numa_node_proc_paths = [item.Dependent for item in numa_assoc]
-            cpu_info = self._get_numa_cpu_info(numa_node_proc_paths,
+            numa_node_assoc_paths = [item.Dependent for item in numa_assoc]
+
+            memory_info = self._get_numa_memory_info(numa_node_assoc_paths,
+                                                     system_memory)
+            if not memory_info:
+                LOG.warning(_LW("Could not find memory information for NUMA "
+                                "node. Skipping node measurements."))
+                continue
+
+            cpu_info = self._get_numa_cpu_info(numa_node_assoc_paths,
                                                processors)
             if not cpu_info:
                 LOG.warning(_LW("Could not find CPU information for NUMA "
@@ -199,14 +210,19 @@ class HostUtils(object):
 
         return nodes_info
 
-    def _get_numa_memory_info(self, node):
-        memory_info = node.associators(wmi_result_class=self._MSVM_MEMORY)
+    def _get_numa_memory_info(self, numa_node_assoc_paths, system_memory):
+        memory_info = []
+        paths = [x.upper() for x in numa_node_assoc_paths]
+        for memory in system_memory:
+            if memory.path_().upper() in paths:
+                memory_info.append(memory)
+
         if memory_info:
             return memory_info[0]
 
-    def _get_numa_cpu_info(self, numa_node_proc_paths, processors):
+    def _get_numa_cpu_info(self, numa_node_assoc_paths, processors):
         cpu_info = []
-        paths = [x.upper() for x in numa_node_proc_paths]
+        paths = [x.upper() for x in numa_node_assoc_paths]
         for proc in processors:
             if proc.path_().upper() in paths:
                 cpu_info.append(proc)
