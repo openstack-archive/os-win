@@ -17,6 +17,7 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
+from os_win.utils import _wqlutils
 from os_win.utils.metrics import metricsutils
 
 
@@ -26,16 +27,18 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     _FAKE_RET_VAL = 0
     _FAKE_PORT = "fake's port name"
 
-    @mock.patch.object(metricsutils.MetricsUtils, '_cache_metrics_defs')
-    def setUp(self, mock_cache_metrics_defs):
+    def setUp(self):
         super(MetricsUtilsTestCase, self).setUp()
         self.utils = metricsutils.MetricsUtils()
         self.utils._conn_attr = mock.MagicMock()
 
-    def test_cache_metrics_defs_no_conn(self):
-        self.utils._conn_attr = None
+    def test_cache_metrics_defs(self):
+        mock_metric_def = mock.Mock(ElementName=mock.sentinel.elementname)
+        self.utils._conn.CIM_BaseMetricDefinition.return_value = [
+            mock_metric_def]
         self.utils._cache_metrics_defs()
-        self.assertEqual({}, self.utils._metrics_defs)
+        expected_cache_metrics = {mock.sentinel.elementname: mock_metric_def}
+        self.assertEqual(expected_cache_metrics, self.utils._metrics_defs_obj)
 
     @mock.patch.object(metricsutils.MetricsUtils, '_enable_metrics')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')
@@ -83,7 +86,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     def test_enable_metrics(self):
         metrics_name = self.utils._CPU_METRICS
         metrics_def = mock.MagicMock()
-        self.utils._metrics_defs = {metrics_name: metrics_def}
+        self.utils._metrics_defs_obj = {metrics_name: metrics_def}
         self._check_enable_metrics([metrics_name, mock.sentinel.metrics_name],
                                    metrics_def.path_.return_value)
 
@@ -96,7 +99,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
         fake_uptime = 1000
         fake_cpu_metrics_val = 2000
 
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._CPU_METRICS: mock.sentinel.metrics}
 
         mock_vm = mock_get_vm.return_value
@@ -124,7 +127,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm')
     def test_get_memory_metrics(self, mock_get_vm, mock_get_metrics):
         mock_vm = mock_get_vm.return_value
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._MEMORY_METRICS: mock.sentinel.metrics}
 
         metrics_memory = mock.MagicMock()
@@ -138,17 +141,19 @@ class MetricsUtilsTestCase(base.BaseTestCase):
         mock_get_metrics.assert_called_once_with(mock_vm,
                                                  mock.sentinel.metrics)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(metricsutils.MetricsUtils,
                        '_sum_metrics_values_by_defs')
     @mock.patch.object(metricsutils.MetricsUtils,
                        '_get_metrics_value_instances')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')
     def test_get_vnic_metrics(self, mock_get_vm_resources,
-                              mock_get_value_instances, mock_sum_by_defs):
+                              mock_get_value_instances, mock_sum_by_defs,
+                              mock_get_element_associated_class):
         fake_rx_mb = 1000
         fake_tx_mb = 2000
 
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._NET_IN_METRICS: mock.sentinel.net_in_metrics,
             self.utils._NET_OUT_METRICS: mock.sentinel.net_out_metrics}
 
@@ -174,7 +179,8 @@ class MetricsUtilsTestCase(base.BaseTestCase):
             mock.call(mock.sentinel.vm_name,
                       self.utils._SYNTH_ETH_PORT_SET_DATA)])
         mock_get_value_instances.assert_called_once_with(
-            mock_port.associators.return_value, self.utils._BASE_METRICS_VALUE)
+            mock_get_element_associated_class.return_value,
+            self.utils._BASE_METRICS_VALUE)
         mock_sum_by_defs.assert_called_once_with(
             mock_get_value_instances.return_value,
             [mock.sentinel.net_in_metrics, mock.sentinel.net_out_metrics])
@@ -186,7 +192,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
         fake_read_mb = 1000
         fake_write_mb = 2000
 
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._DISK_RD_METRICS: mock.sentinel.disk_rd_metrics,
             self.utils._DISK_WR_METRICS: mock.sentinel.disk_wr_metrics}
 
@@ -217,7 +223,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')
     def test_get_disk_latency_metrics(self, mock_get_vm_resources,
                                       mock_get_metrics_values):
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._DISK_LATENCY_METRICS: mock.sentinel.metrics}
 
         mock_disk = mock.MagicMock(HostResource=[mock.sentinel.host_resource],
@@ -243,7 +249,7 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')
     def test_get_disk_iops_metrics(self, mock_get_vm_resources,
                                    mock_get_metrics_values):
-        self.utils._metrics_defs = {
+        self.utils._metrics_defs_obj = {
             self.utils._DISK_IOPS_METRICS: mock.sentinel.metrics}
         mock_disk = mock.MagicMock(HostResource=[mock.sentinel.host_resource],
                                    InstanceID=mock.sentinel.instance_id)
@@ -281,30 +287,54 @@ class MetricsUtilsTestCase(base.BaseTestCase):
         self.assertEqual([0, 100], result)
 
     def test_get_metrics_value_instances(self):
-        mock_element = mock.MagicMock()
-        mock_associator = mock.MagicMock()
-        mock_element.associators.return_value = [mock_associator]
+        FAKE_CLASS_NAME = "FAKE_CLASS"
+        mock_el_metric = mock.MagicMock()
+        mock_el_metric_2 = mock.MagicMock()
+        mock_el_metric_2.path.return_value = mock.Mock(Class=FAKE_CLASS_NAME)
 
-        mock_element2 = mock.MagicMock()
-        mock_element2.associators.return_value = []
+        self.utils._conn.Msvm_MetricForME.side_effect = [
+            [], [mock.Mock(Dependent=mock_el_metric_2)]]
 
         returned = self.utils._get_metrics_value_instances(
-            [mock_element, mock_element2], mock.sentinel.result_class)
+            [mock_el_metric, mock_el_metric_2], FAKE_CLASS_NAME)
 
-        self.assertEqual([mock_associator], returned)
+        expected_return = [mock_el_metric_2]
+        self.assertEqual(expected_return, returned)
+
+    @mock.patch.object(metricsutils.MetricsUtils,
+                       '_sum_metrics_values_by_defs')
+    def test_get_metrics_values(self, mock_sum_by_defs):
+        mock_element = mock.MagicMock()
+        self.utils._conn.Msvm_MetricForME.return_value = [
+            mock.Mock(Dependent=mock.sentinel.metric),
+            mock.Mock(Dependent=mock.sentinel.another_metric)]
+
+        resulted_metrics_sum = self.utils._get_metrics_values(
+            mock_element, mock.sentinel.metrics_defs)
+
+        self.utils._conn.Msvm_MetricForME.assert_called_once_with(
+            Antecedent=mock_element.path_.return_value)
+        mock_sum_by_defs.assert_called_once_with(
+            [mock.sentinel.metric, mock.sentinel.another_metric],
+            mock.sentinel.metrics_defs)
+        expected_metrics_sum = mock_sum_by_defs.return_value
+        self.assertEqual(expected_metrics_sum, resulted_metrics_sum)
 
     @mock.patch.object(metricsutils.MetricsUtils, '_filter_metrics')
     def test_get_metrics(self, mock_filter_metrics):
         mock_metric = mock.MagicMock()
         mock_element = mock.MagicMock()
-        mock_element.associators.return_value = [mock_metric]
+        self.utils._conn.Msvm_MetricForME.return_value = [mock_metric]
 
         result = self.utils._get_metrics(mock_element,
                                          mock.sentinel.metrics_def)
 
         self.assertEqual(mock_filter_metrics.return_value, result)
-        mock_filter_metrics.assert_called_once_with([mock_metric],
-                                                    mock.sentinel.metrics_def)
+        self.utils._conn.Msvm_MetricForME.assert_called_once_with(
+            Antecedent=mock_element.path_.return_value)
+        mock_filter_metrics.assert_called_once_with(
+            [mock_metric.Dependent],
+            mock.sentinel.metrics_def)
 
     def test_filter_metrics(self):
         mock_metric = mock.MagicMock(MetricDefinitionId=mock.sentinel.def_id)
@@ -316,16 +346,20 @@ class MetricsUtilsTestCase(base.BaseTestCase):
 
         self.assertEqual([mock_metric], result)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_setting_data')
-    def test_get_vm_resources(self, mock_get_vm_setting_data):
+    def test_get_vm_resources(self, mock_get_vm_setting_data,
+                              mock_get_element_associated_class):
         result = self.utils._get_vm_resources(mock.sentinel.vm_name,
                                               mock.sentinel.resource_class)
 
-        associators = mock_get_vm_setting_data.return_value.associators
         mock_get_vm_setting_data.assert_called_once_with(mock.sentinel.vm_name)
-        associators.assert_called_once_with(
-            wmi_result_class=mock.sentinel.resource_class)
-        self.assertEqual(associators.return_value, result)
+        vm_setting_data = mock_get_vm_setting_data.return_value
+        mock_get_element_associated_class.assert_called_once_with(
+            self.utils._conn, mock.sentinel.resource_class,
+            element_instance_id=vm_setting_data.InstanceID)
+        self.assertEqual(mock_get_element_associated_class.return_value,
+                         result)
 
     @mock.patch.object(metricsutils.MetricsUtils, '_unique_result')
     def test_get_vm(self, mock_unique_result):
