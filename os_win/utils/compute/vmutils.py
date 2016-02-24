@@ -34,7 +34,6 @@ from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
-from os_win.utils.metrics import metricsutils
 from os_win.utils import pathutils
 
 CONF = cfg.CONF
@@ -117,7 +116,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def __init__(self, host='.'):
         super(VMUtils, self).__init__()
         self._jobutils = jobutils.JobUtils()
-        self._metricsutils = metricsutils.MetricsUtils()
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
                                     six.iteritems(self._vm_power_states_map)}
@@ -650,12 +648,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
         vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
         (job_path, ret_val) = vs_snap_svc.DestroySnapshot(snapshot_path)
         self._jobutils.check_ret_val(ret_val, job_path)
-
-    def enable_vm_metrics_collection(self, vm_name):
-        # TODO(claudiub): nova still calls this method, causing VMs to fail to
-        # spawn if metrics collection is enabled. Remove this when the nova
-        # compute HyperVDriver properly calls the metricsutils method instead.
-        self._metricsutils.enable_vm_metrics_collection(vm_name)
 
     def get_vm_dvd_disk_paths(self, vm_name):
         vmsettings = self._lookup_vm_check(vm_name)
