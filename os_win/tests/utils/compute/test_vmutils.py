@@ -922,8 +922,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         with mock.patch.object(self._vmutils,
                                '_get_event_wql_query') as mock_get_query:
             listener = self._vmutils.get_vm_power_state_change_listener(
-                mock.sentinel.timeframe,
-                mock.sentinel.filtered_states)
+                timeframe=mock.sentinel.timeframe,
+                filtered_states=mock.sentinel.filtered_states)
 
             mock_get_query.assert_called_once_with(
                 cls=self._vmutils._COMPUTER_SYSTEM_CLASS,
@@ -936,6 +936,31 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                 fields=[self._vmutils._VM_ENABLED_STATE_PROP])
 
             self.assertEqual(watcher.return_value, listener)
+
+    def test_vm_power_state_change_event_handler(self):
+        self._mock_wmi.x_wmi_timed_out = exceptions.HyperVException
+
+        enabled_state = constants.HYPERV_VM_STATE_ENABLED
+        hv_enabled_state = self._vmutils._vm_power_states_map[enabled_state]
+        fake_event = mock.Mock(ElementName=mock.sentinel.vm_name,
+                               EnabledState=hv_enabled_state)
+        fake_callback = mock.Mock()
+
+        fake_listener = (
+            self._vmutils._conn.Msvm_ComputerSystem.watch_for.return_value)
+        fake_listener.side_effect = (self._mock_wmi.x_wmi_timed_out,
+                                     fake_event, KeyboardInterrupt)
+
+        handler = self._vmutils.get_vm_power_state_change_listener(
+            get_handler=True)
+        # This is supposed to run as a daemon, so we'll just cause an
+        # exception in order to be able to test the method.
+        self.assertRaises(KeyboardInterrupt, handler, fake_callback)
+
+        fake_callback.assert_called_once_with(mock.sentinel.vm_name,
+                                              enabled_state)
+        fake_listener.assert_has_calls(
+            [mock.call(self._vmutils._DEFAULT_EVENT_TIMEOUT_MS)] * 3)
 
     def _test_get_vm_generation(self, vm_gen):
         mock_settings = self._lookup_vm()

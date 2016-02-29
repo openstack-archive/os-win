@@ -20,7 +20,11 @@ Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
 
+import sys
 import uuid
+
+if sys.platform == 'win32':
+    import wmi
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -113,6 +117,9 @@ class VMUtils(baseutils.BaseUtilsVirt):
                             constants.HYPERV_VM_STATE_REBOOT: 11,
                             constants.HYPERV_VM_STATE_PAUSED: 9,
                             constants.HYPERV_VM_STATE_SUSPENDED: 6}
+
+    _DEFAULT_EVENT_CHECK_TIMEFRAME = 60  # seconds
+    _DEFAULT_EVENT_TIMEOUT_MS = 2000
 
     def __init__(self, host='.'):
         super(VMUtils, self).__init__()
@@ -792,14 +799,34 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         return active_vm_names
 
-    def get_vm_power_state_change_listener(self, timeframe, filtered_states):
+    def get_vm_power_state_change_listener(
+            self, timeframe=_DEFAULT_EVENT_CHECK_TIMEFRAME,
+            event_timeout=_DEFAULT_EVENT_TIMEOUT_MS,
+            filtered_states=None, get_handler=False):
         field = self._VM_ENABLED_STATE_PROP
         query = self._get_event_wql_query(cls=self._COMPUTER_SYSTEM_CLASS,
                                           field=field,
                                           timeframe=timeframe,
                                           filtered_states=filtered_states)
-        return self._conn.Msvm_ComputerSystem.watch_for(raw_wql=query,
-                                                        fields=[field])
+        listener = self._conn.Msvm_ComputerSystem.watch_for(raw_wql=query,
+                                                            fields=[field])
+
+        def _handle_events(callback):
+            while True:
+                try:
+                    # Retrieve one by one all the events that occurred in
+                    # the checked interval.
+                    event = listener(event_timeout)
+
+                    vm_name = event.ElementName
+                    vm_state = event.EnabledState
+                    vm_power_state = self.get_vm_power_state(vm_state)
+
+                    callback(vm_name, vm_power_state)
+                except wmi.x_wmi_timed_out:
+                    pass
+
+        return _handle_events if get_handler else listener
 
     def _get_event_wql_query(self, cls, field,
                              timeframe, filtered_states=None):
