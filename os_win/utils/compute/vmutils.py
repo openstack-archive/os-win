@@ -33,6 +33,7 @@ import six
 from six.moves import range  # noqa
 
 from os_win._i18n import _, _LW
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
@@ -350,6 +351,7 @@ class VMUtils(object):
             SystemSettings=vs_data.GetText_(1))
         self._jobutils.check_ret_val(ret_val, job_path)
 
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def _modify_virtual_system(self, vmsetting):
         (job_path, ret_val) = self._vs_man_svc.ModifySystemSettings(
             SystemSettings=vmsetting.GetText_(1))

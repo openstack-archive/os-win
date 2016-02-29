@@ -22,6 +22,7 @@ import mock
 from oslotest import base
 
 from os_win import _utils
+from os_win import exceptions
 
 
 class UtilsTestCase(base.BaseTestCase):
@@ -56,3 +57,66 @@ class UtilsTestCase(base.BaseTestCase):
         self.assertEqual(('', ''), result)
         result = _utils.parse_server_string('')
         self.assertEqual(('', ''), result)
+
+    def _get_fake_func_with_retry_decorator(self, side_effect,
+                                            *args, **kwargs):
+        func_side_effect = mock.Mock(side_effect=side_effect)
+
+        @_utils.retry_decorator(*args, **kwargs)
+        def fake_func(*_args, **_kwargs):
+            return func_side_effect(*_args, **_kwargs)
+
+        return fake_func, func_side_effect
+
+    @mock.patch('time.sleep')
+    def test_retry_decorator(self, mock_sleep):
+        err_code = 1
+        max_retry_count = 5
+        max_sleep_time = 4
+
+        raised_exc = exceptions.Win32Exception(message='fake_exc',
+                                               error_code=err_code)
+        side_effect = [raised_exc] * max_retry_count
+        side_effect.append(mock.sentinel.ret_val)
+
+        fake_func = self._get_fake_func_with_retry_decorator(
+            error_codes=err_code,
+            exceptions=exceptions.Win32Exception,
+            max_retry_count=max_retry_count,
+            max_sleep_time=max_sleep_time,
+            side_effect=side_effect)[0]
+
+        ret_val = fake_func()
+        self.assertEqual(mock.sentinel.ret_val, ret_val)
+        mock_sleep.assert_has_calls([mock.call(sleep_time)
+                                     for sleep_time in [1, 2, 3, 4, 4]])
+
+    @mock.patch('time.sleep')
+    def _test_retry_decorator_no_retry(self, mock_sleep,
+                                       expected_exceptions=(),
+                                       expected_error_codes=()):
+        err_code = 1
+        raised_exc = exceptions.Win32Exception(message='fake_exc',
+                                               error_code=err_code)
+        fake_func, fake_func_side_effect = (
+            self._get_fake_func_with_retry_decorator(
+                error_codes=expected_error_codes,
+                exceptions=expected_exceptions,
+                side_effect=raised_exc))
+
+        self.assertRaises(exceptions.Win32Exception,
+                          fake_func, mock.sentinel.arg,
+                          fake_kwarg=mock.sentinel.kwarg)
+
+        self.assertFalse(mock_sleep.called)
+        fake_func_side_effect.assert_called_once_with(
+            mock.sentinel.arg, fake_kwarg=mock.sentinel.kwarg)
+
+    def test_retry_decorator_unexpected_err_code(self):
+        self._test_retry_decorator_no_retry(
+            expected_exceptions=exceptions.Win32Exception,
+            expected_error_codes=2)
+
+    def test_retry_decorator_unexpected_exc(self):
+        self._test_retry_decorator_no_retry(
+            expected_exceptions=(IOError, AttributeError))

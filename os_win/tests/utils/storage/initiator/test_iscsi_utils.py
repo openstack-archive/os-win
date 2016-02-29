@@ -153,29 +153,6 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.Win32Exception, fake_func,
                           self._initiator)
 
-    @mock.patch('time.sleep')
-    def test_retry_for_err_codes_decorator(self, mock_sleep):
-        err_code = 1
-        max_retry_count = 5
-        retry_interval = 1
-
-        raised_exc = exceptions.Win32Exception(message='fake_exc',
-                                               error_code=err_code)
-        side_effect = [raised_exc] * max_retry_count
-        side_effect.append(mock.sentinel.ret_val)
-        func_side_effect = mock.Mock(side_effect=side_effect)
-
-        @iscsi_utils.retry_for_err_codes(error_codes=err_code,
-                                         max_retry_count=max_retry_count,
-                                         retry_interval=retry_interval)
-        def fake_func(*args, **kwargs):
-            return func_side_effect(*args, **kwargs)
-
-        ret_val = fake_func()
-        self.assertEqual(mock.sentinel.ret_val, ret_val)
-        mock_sleep.assert_has_calls(
-            [mock.call(retry_interval)] * max_retry_count)
-
     def test_get_items_from_buff(self):
         fake_buff_contents = 'fake_buff_contents'
         fake_buff = (ctypes.c_wchar * len(fake_buff_contents))()
