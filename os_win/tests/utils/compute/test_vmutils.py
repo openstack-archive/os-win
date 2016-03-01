@@ -71,7 +71,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn = mock.MagicMock()
         self._vmutils._jobutils = mock.MagicMock()
-        self._vmutils._metricsutils = mock.MagicMock()
         self._vmutils._pathutils = mock.MagicMock()
 
     def test_get_vm_summary_info(self):
@@ -595,11 +594,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils.remove_vm_snapshot(self._FAKE_SNAPSHOT_PATH)
         getattr(mock_svc, self._DESTROY_SNAPSHOT).assert_called_with(
             self._FAKE_SNAPSHOT_PATH)
-
-    def test_enable_vm_metrics_collection(self):
-        self._vmutils.enable_vm_metrics_collection(mock.sentinel.vm_name)
-        method = self._vmutils._metricsutils.enable_vm_metrics_collection
-        method.assert_called_once_with(mock.sentinel.vm_name)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_get_vm_dvd_disk_paths(self, mock_get_element_associated_class):

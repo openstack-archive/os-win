@@ -28,7 +28,6 @@ import six
 
 from os_win._i18n import _
 from os_win import exceptions
-from os_win.utils.storage import smbutils
 from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ ERROR_DIR_IS_NOT_EMPTY = 145
 # are called from SMBUtils.
 
 
-class PathUtils(smbutils.SMBUtils):
+class PathUtils(object):
     _FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
 
     def __init__(self):
