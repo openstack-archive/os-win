@@ -47,34 +47,9 @@ class HostUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self._hostutils = hostutils.HostUtils()
         self._hostutils._conn_cimv2 = mock.MagicMock()
-        self._hostutils._virt_v2 = mock.MagicMock()
+        self._hostutils._conn = mock.MagicMock()
 
         super(HostUtilsTestCase, self).setUp()
-
-    @mock.patch.object(hostutils, 'wmi', create=True)
-    def test_init_wmi_virt_conn(self, mock_wmi):
-        self._hostutils._init_wmi_virt_conn()
-
-        self.assertEqual(mock_wmi.WMI.return_value, self._hostutils._virt_v2)
-        mock_wmi.WMI.assert_called_once_with(
-            moniker='//./root/virtualization/v2')
-
-    @mock.patch.object(hostutils, 'wmi', create=True)
-    def test_init_wmi_virt_conn_exception(self, mock_wmi):
-        self._hostutils._virt_v2 = None
-        mock_wmi.WMI.side_effect = Exception
-
-        self._hostutils._init_wmi_virt_conn()
-        self.assertIsNone(self._hostutils._virt_v2)
-
-    def test_conn_virt(self):
-        self._hostutils._virt_v2 = mock.sentinel.conn
-        self.assertEqual(mock.sentinel.conn, self._hostutils._conn_virt)
-
-    def test_conn_virt_uninitialized(self):
-        self._hostutils._virt_v2 = None
-        self.assertRaises(exceptions.HyperVException,
-                          getattr, self._hostutils, '_conn_virt')
 
     @mock.patch('os_win.utils.hostutils.ctypes')
     def test_get_host_tick_count64(self, mock_ctypes):
@@ -193,7 +168,7 @@ class HostUtilsTestCase(base.BaseTestCase):
 
     def _check_get_numa_nodes_missing_info(self):
         numa_node = mock.MagicMock()
-        self._hostutils._conn_virt.Msvm_NumaNode.return_value = [
+        self._hostutils._conn.Msvm_NumaNode.return_value = [
             numa_node, numa_node]
 
         nodes_info = self._hostutils.get_numa_nodes()
@@ -218,7 +193,7 @@ class HostUtilsTestCase(base.BaseTestCase):
         host_cpu = mock.MagicMock(DeviceID=self._DEVICE_ID)
         mock_get_cpu_info.return_value = [host_cpu]
         numa_node = mock.MagicMock(NodeID=self._NODE_ID)
-        self._hostutils._conn_virt.Msvm_NumaNode.return_value = [
+        self._hostutils._conn.Msvm_NumaNode.return_value = [
             numa_node, numa_node]
 
         nodes_info = self._hostutils.get_numa_nodes()
@@ -276,7 +251,7 @@ class HostUtilsTestCase(base.BaseTestCase):
         fake_gpu.DriverVersion = mock.sentinel.Fake_gpu_driver_version
 
         mock_phys_3d_proc = (
-            self._hostutils._conn_virt.Msvm_Physical3dGraphicsProcessor)
+            self._hostutils._conn.Msvm_Physical3dGraphicsProcessor)
         mock_phys_3d_proc.return_value = [fake_gpu]
 
         return_gpus = self._hostutils.get_remotefx_gpu_info()
@@ -292,7 +267,7 @@ class HostUtilsTestCase(base.BaseTestCase):
 
     def _set_verify_host_remotefx_capability_mocks(self, isGpuCapable=True,
                                                    isSlatCapable=True):
-        s3d_video_pool = self._hostutils._conn_virt.Msvm_Synth3dVideoPool()[0]
+        s3d_video_pool = self._hostutils._conn.Msvm_Synth3dVideoPool()[0]
         s3d_video_pool.IsGpuCapable = isGpuCapable
         s3d_video_pool.IsSlatCapable = isSlatCapable
 

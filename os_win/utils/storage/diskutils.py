@@ -14,25 +14,23 @@
 #    under the License.
 
 import re
-import sys
-
-if sys.platform == 'win32':
-    import wmi
 
 from oslo_log import log as logging
 
 from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
+from os_win.utils import baseutils
 
 LOG = logging.getLogger(__name__)
 
 
-class DiskUtils(object):
+class DiskUtils(baseutils.BaseUtils):
+
+    _wmi_namespace = 'root/microsoft/windows/storage'
+
     def __init__(self):
-        if sys.platform == 'win32':
-            self._conn_storage = wmi.WMI(
-                moniker='root/microsoft/windows/storage')
+        self._conn_storage = self._get_wmi_conn(self._wmi_namespace)
 
         # Physical device names look like \\.\PHYSICALDRIVE1
         self._phys_dev_name_regex = re.compile(r'\\\\.*\\[a-zA-Z]*([\d]+)')

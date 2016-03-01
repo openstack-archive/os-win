@@ -13,17 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
-if sys.platform == 'win32':
-    import wmi
+from os_win.utils import baseutils
 
 
-class RDPConsoleUtils(object):
-    def __init__(self):
-        if sys.platform == 'win32':
-            self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
-
+class RDPConsoleUtils(baseutils.BaseUtilsVirt):
     def get_rdp_console_port(self):
         rdp_setting_data = self._conn.Msvm_TerminalServiceSettingData()[0]
         return rdp_setting_data.ListenerPort

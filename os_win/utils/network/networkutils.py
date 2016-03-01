@@ -28,10 +28,11 @@ if sys.platform == 'win32':
 
 from os_win._i18n import _
 from os_win import exceptions
+from os_win.utils import baseutils
 from os_win.utils import jobutils
 
 
-class NetworkUtils(object):
+class NetworkUtils(baseutils.BaseUtilsVirt):
 
     EVENT_TYPE_CREATE = "__InstanceCreationEvent"
     EVENT_TYPE_DELETE = "__InstanceDeletionEvent"
@@ -80,14 +81,13 @@ class NetworkUtils(object):
     _VNIC_LISTENER_TIMEOUT_MS = 2000
 
     def __init__(self):
+        super(NetworkUtils, self).__init__()
         self._jobutils = jobutils.JobUtils()
         self._switches = {}
         self._switch_ports = {}
         self._vlan_sds = {}
         self._vsid_sds = {}
         self._sg_acl_sds = {}
-        if sys.platform == 'win32':
-            self._conn = wmi.WMI(moniker='//./root/virtualization/v2')
 
     def init_caches(self):
         for vswitch in self._conn.Msvm_VirtualEthernetSwitch():
@@ -426,11 +426,10 @@ class NetworkUtils(object):
         return True
 
     def _is_port_vm_started(self, port):
-        vs_man_svc = self._conn.Msvm_VirtualSystemManagementService()[0]
         vmsettings = port.associators(
             wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA)
         # See http://msdn.microsoft.com/en-us/library/cc160706%28VS.85%29.aspx
-        (ret_val, summary_info) = vs_man_svc.GetSummaryInformation(
+        (ret_val, summary_info) = self._vs_man_svc.GetSummaryInformation(
             [self._VM_SUMMARY_ENABLED_STATE],
             [v.path_() for v in vmsettings])
         if ret_val or not summary_info:

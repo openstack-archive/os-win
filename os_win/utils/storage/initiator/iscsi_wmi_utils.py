@@ -44,8 +44,7 @@ class ISCSIInitiatorWMIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
         super(ISCSIInitiatorWMIUtils, self).__init__(host)
 
         storage_namespace = '//%s/root/microsoft/windows/storage' % host
-        if sys.platform == 'win32':
-            self._conn_storage = wmi.WMI(moniker=storage_namespace)
+        self._conn_storage = self._get_wmi_conn(storage_namespace)
 
     def _login_target_portal(self, target_portal):
         (target_address,

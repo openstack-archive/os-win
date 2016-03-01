@@ -21,6 +21,7 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
 from os_win import exceptions
+from os_win.utils import baseutils
 from os_win.utils import win32utils
 
 if sys.platform == 'win32':
@@ -30,11 +31,10 @@ if sys.platform == 'win32':
 LOG = logging.getLogger(__name__)
 
 
-class SMBUtils(object):
+class SMBUtils(baseutils.BaseUtils):
     def __init__(self):
         self._win32_utils = win32utils.Win32Utils()
-        if sys.platform == "win32":
-            self._smb_conn = wmi.WMI(moniker=r"root\Microsoft\Windows\SMB")
+        self._smb_conn = self._get_wmi_conn(r"root\Microsoft\Windows\SMB")
 
     def check_smb_mapping(self, share_path, remove_unavailable_mapping=False):
         mappings = self._smb_conn.Msft_SmbMapping(RemotePath=share_path)

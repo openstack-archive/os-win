@@ -20,11 +20,7 @@ Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
 
-import sys
 import uuid
-
-if sys.platform == 'win32':
-    import wmi
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -37,6 +33,7 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
+from os_win.utils import baseutils
 from os_win.utils import jobutils
 from os_win.utils.metrics import metricsutils
 from os_win.utils import pathutils
@@ -45,7 +42,7 @@ CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
-class VMUtils(object):
+class VMUtils(baseutils.BaseUtilsVirt):
 
     # These constants can be overridden by inherited classes
     _PHYS_DISK_RES_SUB_TYPE = 'Microsoft:Hyper-V:Physical Disk Drive'
@@ -119,24 +116,12 @@ class VMUtils(object):
                             constants.HYPERV_VM_STATE_SUSPENDED: 6}
 
     def __init__(self, host='.'):
-        self._vs_man_svc_attr = None
+        super(VMUtils, self).__init__()
         self._jobutils = jobutils.JobUtils()
         self._metricsutils = metricsutils.MetricsUtils()
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
                                     six.iteritems(self._vm_power_states_map)}
-        if sys.platform == 'win32':
-            self._init_hyperv_wmi_conn(host)
-
-    def _init_hyperv_wmi_conn(self, host):
-        self._conn = wmi.WMI(moniker='//%s/root/virtualization/v2' % host)
-
-    @property
-    def _vs_man_svc(self):
-        if not self._vs_man_svc_attr:
-            self._vs_man_svc_attr = (
-                self._conn.Msvm_VirtualSystemManagementService()[0])
-        return self._vs_man_svc_attr
 
     def list_instance_notes(self):
         instance_notes = []
@@ -492,7 +477,7 @@ class VMUtils(object):
 
         if serial:
             # Apparently this can't be set when the resource is added.
-            diskdrive = wmi.WMI(moniker=diskdrive_path)
+            diskdrive = self._get_wmi_obj(diskdrive_path)
             diskdrive.ElementName = serial
             self._jobutils.modify_virt_resource(diskdrive)
 
@@ -509,7 +494,7 @@ class VMUtils(object):
         return disk_resource.AddressOnParent
 
     def set_disk_host_res(self, disk_res_path, mounted_disk_path):
-        diskdrive = wmi.WMI(moniker=disk_res_path)
+        diskdrive = self._get_wmi_obj(disk_res_path)
         diskdrive.HostResource = [mounted_disk_path]
         self._jobutils.modify_virt_resource(diskdrive)
 
@@ -648,9 +633,6 @@ class VMUtils(object):
         # Remove the VM. It does not destroy any associated virtual disk.
         (job_path, ret_val) = self._vs_man_svc.DestroySystem(vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
-
-    def _get_wmi_obj(self, path):
-        return wmi.WMI(moniker=path.replace('\\', '/'))
 
     def take_vm_snapshot(self, vm_name):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)

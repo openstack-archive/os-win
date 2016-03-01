@@ -15,21 +15,18 @@
 
 import ctypes
 import socket
-import sys
-
-if sys.platform == 'win32':
-    import wmi
 
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
 from os_win import constants
 from os_win import exceptions
+from os_win.utils import baseutils
 
 LOG = logging.getLogger(__name__)
 
 
-class HostUtils(object):
+class HostUtils(baseutils.BaseUtilsVirt):
 
     _windows_version = None
 
@@ -46,24 +43,12 @@ class HostUtils(object):
     FEATURE_RDS_VIRTUALIZATION = 322
     FEATURE_MPIO = 57
 
+    _wmi_cimv2_namespace = '//./root/cimv2'
+
     def __init__(self):
-        self._virt_v2 = None
-        if sys.platform == 'win32':
-            self._conn_cimv2 = wmi.WMI(privileges=["Shutdown"])
-            self._init_wmi_virt_conn()
-
-    def _init_wmi_virt_conn(self):
-        try:
-            self._virt_v2 = wmi.WMI(moniker='//./root/virtualization/v2')
-        except Exception:
-            pass
-
-    @property
-    def _conn_virt(self):
-        if self._virt_v2:
-            return self._virt_v2
-        raise exceptions.HyperVException(
-            _("No connection to the 'root/virtualization/v2' WMI namespace."))
+        super(HostUtils, self).__init__()
+        self._conn_cimv2 = self._get_wmi_conn(self._wmi_cimv2_namespace,
+                                              privileges=["Shutdown"])
 
     def get_cpus_info(self):
         # NOTE(abalutoiu): Specifying exactly the fields that we need
@@ -160,10 +145,10 @@ class HostUtils(object):
         return len(self._conn_cimv2.Win32_ServerFeature(ID=feature_id)) > 0
 
     def get_numa_nodes(self):
-        numa_nodes = self._conn_virt.Msvm_NumaNode()
+        numa_nodes = self._conn.Msvm_NumaNode()
         nodes_info = []
-        system_memory = self._conn_virt.Msvm_Memory(['NumberOfBlocks'])
-        processors = self._conn_virt.Msvm_Processor(['DeviceID'])
+        system_memory = self._conn.Msvm_Memory(['NumberOfBlocks'])
+        processors = self._conn.Msvm_Processor(['DeviceID'])
 
         for node in numa_nodes:
             # Due to a bug in vmms, getting Msvm_Processor for the numa
@@ -174,7 +159,7 @@ class HostUtils(object):
             # Msvm_NumaNode and Msvm_Processor. We need to use this class to
             # relate the two because using associators on Msvm_Processor
             # will also result in a crash.
-            numa_assoc = self._conn_virt.Msvm_HostedDependency(
+            numa_assoc = self._conn.Msvm_HostedDependency(
                 Antecedent=node.path_())
             numa_node_assoc_paths = [item.Dependent for item in numa_assoc]
 
@@ -231,7 +216,7 @@ class HostUtils(object):
 
     def get_remotefx_gpu_info(self):
         gpus = []
-        all_gpus = self._conn_virt.Msvm_Physical3dGraphicsProcessor(
+        all_gpus = self._conn.Msvm_Physical3dGraphicsProcessor(
             EnabledForVirtualization=True)
         for gpu in all_gpus:
             gpus.append({'name': gpu.Name,
@@ -242,7 +227,7 @@ class HostUtils(object):
         return gpus
 
     def verify_host_remotefx_capability(self):
-        synth_3d_video_pool = self._conn_virt.Msvm_Synth3dVideoPool()[0]
+        synth_3d_video_pool = self._conn.Msvm_Synth3dVideoPool()[0]
         if not synth_3d_video_pool.IsGpuCapable:
             raise exceptions.HyperVRemoteFXException(
                 _("To enable RemoteFX on Hyper-V at least one GPU supporting "
