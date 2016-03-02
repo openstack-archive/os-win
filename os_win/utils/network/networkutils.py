@@ -393,7 +393,7 @@ class NetworkUtils(object):
         if obj:
             return obj[0]
 
-    def enable_port_metrics_collection(self, switch_port_name):
+    def add_metrics_collection_acls(self, switch_port_name):
         port, found = self._get_switch_port_allocation(switch_port_name, False)
         if not found:
             return
@@ -410,7 +410,7 @@ class NetworkUtils(object):
                         acl_dir, acl_type, self._ACL_ACTION_METER)
                     self._jobutils.add_virt_feature(acl, port)
 
-    def can_enable_control_metrics(self, switch_port_name):
+    def is_metrics_collection_allowed(self, switch_port_name):
         port, found = self._get_switch_port_allocation(switch_port_name, False)
         if not found:
             return False
