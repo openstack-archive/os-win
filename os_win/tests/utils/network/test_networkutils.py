@@ -412,7 +412,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual(fake_class.new.return_value, result)
         fake_class.new.assert_called_once_with()
 
-    def test_enable_port_metrics_collection(self):
+    def test_add_metrics_collection_acls(self):
         mock_port = self._mock_get_switch_port_alloc()
         mock_acl = mock.MagicMock()
 
@@ -420,7 +420,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             self.netutils,
             _create_default_setting_data=mock.Mock(return_value=mock_acl)):
 
-            self.netutils.enable_port_metrics_collection(self._FAKE_PORT_NAME)
+            self.netutils.add_metrics_collection_acls(self._FAKE_PORT_NAME)
 
             mock_add_feature = self.netutils._jobutils.add_virt_feature
             actual_calls = len(mock_add_feature.mock_calls)
@@ -428,19 +428,18 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             mock_add_feature.assert_called_with(mock_acl, mock_port)
 
     @mock.patch.object(networkutils.NetworkUtils, '_is_port_vm_started')
-    def test_can_enable_control_metrics_true(self, mock_is_started):
+    def test_is_metrics_collection_allowed_true(self, mock_is_started):
         mock_acl = mock.MagicMock()
         mock_acl.Action = self.netutils._ACL_ACTION_METER
-        self._test_can_enable_control_metrics(mock_is_started,
-                                              [mock_acl, mock_acl], True)
+        self._test_is_metrics_collection_allowed(mock_is_started,
+                                                 [mock_acl, mock_acl], True)
 
     @mock.patch.object(networkutils.NetworkUtils, '_is_port_vm_started')
-    def test_can_enable_control_metrics_false(self, mock_is_started):
-        self._test_can_enable_control_metrics(mock_is_started, [],
-                                              False)
+    def test_is_metrics_collection_allowed_false(self, mock_is_started):
+        self._test_is_metrics_collection_allowed(mock_is_started, [], False)
 
-    def _test_can_enable_control_metrics(self, mock_vm_started, acls,
-                                         expected_result):
+    def _test_is_metrics_collection_allowed(self, mock_vm_started, acls,
+                                            expected_result):
         mock_port = self._mock_get_switch_port_alloc()
         mock_acl = mock.MagicMock()
         mock_acl.Action = self.netutils._ACL_ACTION_METER
@@ -448,7 +447,8 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_port.associators.return_value = acls
         mock_vm_started.return_value = True
 
-        result = self.netutils.can_enable_control_metrics(self._FAKE_PORT_NAME)
+        result = self.netutils.is_metrics_collection_allowed(
+            self._FAKE_PORT_NAME)
         self.assertEqual(expected_result, result)
 
     def test_is_port_vm_started_true(self):
