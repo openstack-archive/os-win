@@ -53,8 +53,8 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(utilsfactory.utils, 'get_windows_version')
     def _check_get_class(self, mock_get_windows_version, expected_class,
-                       class_type):
-        mock_get_windows_version.return_value = '6.2'
+                         class_type, windows_version='6.2'):
+        mock_get_windows_version.return_value = windows_version
 
         method = getattr(utilsfactory, 'get_%s' % class_type)
         instance = method()
@@ -71,6 +71,11 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
     def test_get_networkutils(self):
         self._check_get_class(expected_class=networkutils.NetworkUtils,
                               class_type='networkutils')
+
+    def test_get_networkutilsr2(self):
+        self._check_get_class(expected_class=networkutils.NetworkUtilsR2,
+                              class_type='networkutils',
+                              windows_version='6.3')
 
     def test_get_hostutils(self):
         self._check_get_class(expected_class=hostutils.HostUtils,

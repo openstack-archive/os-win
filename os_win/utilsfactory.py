@@ -84,8 +84,12 @@ utils_map = {
     'networkutils': {
         'NetworkUtils': {
             'min_version': 6.2,
+            'max_version': 6.3,
+            'path': 'os_win.utils.network.networkutils.NetworkUtils'},
+        'NetworkUtilsR2': {
+            'min_version': 6.3,
             'max_version': None,
-            'path': 'os_win.utils.network.networkutils.NetworkUtils'}},
+            'path': 'os_win.utils.network.networkutils.NetworkUtilsR2'}},
     'nvgreutils': {
         'NvgreUtils': {
             'min_version': 6.2,
