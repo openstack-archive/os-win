@@ -34,15 +34,11 @@ LOG = logging.getLogger(__name__)
 
 ERROR_DIR_IS_NOT_EMPTY = 145
 
-# TODO(claudiub): Remove PathUtils parent class when the SMB related methods
-# are called from SMBUtils.
-
 
 class PathUtils(object):
     _FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
 
     def __init__(self):
-        super(PathUtils, self).__init__()
         self._win32_utils = win32utils.Win32Utils()
 
     def open(self, path, mode):
