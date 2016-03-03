@@ -56,6 +56,10 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.netutils._jobutils = mock.MagicMock()
 
     def test_init_caches(self):
+        self.netutils._switches = {}
+        self.netutils._switch_ports = {}
+        self.netutils._vlan_sds = {}
+        self.netutils._vsid_sds = {}
         conn = self.netutils._conn
 
         mock_vswitch = mock.MagicMock(ElementName=mock.sentinel.vswitch_name)
@@ -249,6 +253,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual(self._FAKE_VSWITCH, vswitch)
 
     def test_get_vswitch_not_found(self):
+        self.netutils._switches = {}
         self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = []
         self.assertRaises(exceptions.HyperVException,
                           self.netutils._get_vswitch,
@@ -532,6 +537,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual([mock.sentinel.fake_acl], acls)
 
     def test_get_port_security_acls(self):
+        self.netutils._sg_acl_sds = {}
         mock_port = mock.MagicMock()
         mock_port.associators.return_value = [mock.sentinel.fake_acl]
 

@@ -80,14 +80,15 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
 
     _VNIC_LISTENER_TIMEOUT_MS = 2000
 
+    _switches = {}
+    _switch_ports = {}
+    _vlan_sds = {}
+    _vsid_sds = {}
+    _sg_acl_sds = {}
+
     def __init__(self):
         super(NetworkUtils, self).__init__()
         self._jobutils = jobutils.JobUtils()
-        self._switches = {}
-        self._switch_ports = {}
-        self._vlan_sds = {}
-        self._vsid_sds = {}
-        self._sg_acl_sds = {}
 
     def init_caches(self):
         for vswitch in self._conn.Msvm_VirtualEthernetSwitch():
