@@ -20,10 +20,6 @@ from oslotest import base
 from os_win.utils.storage.initiator import base_iscsi_utils
 
 
-def _exception_thrower():
-    raise Exception("Testing exception handling.")
-
-
 class BaseISCSIInitiatorUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V BaseISCSIInitiatorUtils class."""
 
@@ -45,7 +41,6 @@ class BaseISCSIInitiatorUtilsTestCase(base.BaseTestCase):
 
     def test_get_iscsi_initiator_ok(self):
         self._check_get_iscsi_initiator(
-            mock.MagicMock(return_value=mock.sentinel.FAKE_KEY),
             self._FAKE_INITIATOR_NAME)
 
     def test_get_iscsi_initiator_exception(self):
@@ -54,22 +49,36 @@ class BaseISCSIInitiatorUtilsTestCase(base.BaseTestCase):
             'domain': self._FAKE_DOMAIN_NAME
         }
 
-        self._check_get_iscsi_initiator(_exception_thrower, initiator_name)
+        self._check_get_iscsi_initiator(initiator_name,
+                                        side_effect=Exception)
 
-    def _check_get_iscsi_initiator(self, winreg_method, expected):
+    def _check_get_iscsi_initiator(self, expected=None, side_effect=None):
         mock_computer = mock.MagicMock()
         mock_computer.name = self._FAKE_COMPUTER_NAME
         mock_computer.Domain = self._FAKE_DOMAIN_NAME
         self._utils._conn_cimv2.Win32_ComputerSystem.return_value = [
             mock_computer]
 
+        expected_key_path = (
+            "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\"
+            "iSCSI\\Discovery")
+
         with mock.patch.object(base_iscsi_utils,
                                'winreg', create=True) as mock_winreg:
-            mock_winreg.OpenKey = winreg_method
-            mock_winreg.QueryValueEx = mock.MagicMock(return_value=[expected])
+            mock_winreg.CloseKey.side_effect = side_effect
+            mock_winreg.QueryValueEx.return_value = [expected]
+            mock_winreg.OpenKey.return_value = mock.sentinel.key
 
             initiator_name = self._utils.get_iscsi_initiator()
             self.assertEqual(expected, initiator_name)
+            mock_winreg.OpenKey.assert_called_once_with(
+                mock_winreg.HKEY_LOCAL_MACHINE,
+                expected_key_path,
+                0,
+                mock_winreg.KEY_WOW64_64KEY + mock_winreg.KEY_ALL_ACCESS)
+            mock_winreg.QueryValueEx.assert_called_once_with(
+                mock.sentinel.key, "DefaultInitiatorName")
+            mock_winreg.CloseKey.assert_called_once_with(mock.sentinel.key)
 
     def test_get_drive_number_from_disk_path(self):
         fake_disk_path = (
