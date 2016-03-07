@@ -113,6 +113,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def _is_job_completed(self, job):
         return job.JobState in self._completed_job_states
 
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_virt_resource(self, virt_resource, parent):
         (job_path, new_resources,
          ret_val) = self._vs_man_svc.AddResourceSettings(
@@ -129,6 +130,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
             ResourceSettings=[virt_resource.GetText_(1)])
         self.check_ret_val(ret_val, job_path)
 
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def remove_virt_resource(self, virt_resource):
         (job, ret_val) = self._vs_man_svc.RemoveResourceSettings(
             ResourceSettings=[virt_resource.path_()])
