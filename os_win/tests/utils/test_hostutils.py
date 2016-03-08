@@ -47,7 +47,7 @@ class HostUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         self._hostutils = hostutils.HostUtils()
         self._hostutils._conn_cimv2 = mock.MagicMock()
-        self._hostutils._conn = mock.MagicMock()
+        self._hostutils._conn_attr = mock.MagicMock()
 
         super(HostUtilsTestCase, self).setUp()
 

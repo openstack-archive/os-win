@@ -23,7 +23,7 @@ class RDPConsoleUtilsTestCase(base.BaseTestCase):
 
     def setUp(self):
         self._rdpconsoleutils = rdpconsoleutils.RDPConsoleUtils()
-        self._rdpconsoleutils._conn = mock.MagicMock()
+        self._rdpconsoleutils._conn_attr = mock.MagicMock()
 
         super(RDPConsoleUtilsTestCase, self).setUp()
 

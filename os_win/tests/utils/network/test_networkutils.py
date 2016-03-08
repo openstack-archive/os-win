@@ -52,7 +52,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         super(NetworkUtilsTestCase, self).setUp()
         self.netutils = networkutils.NetworkUtils()
-        self.netutils._conn = mock.MagicMock()
+        self.netutils._conn_attr = mock.MagicMock()
         self.netutils._jobutils = mock.MagicMock()
 
     def test_init_caches(self):
@@ -614,7 +614,7 @@ class TestNetworkUtilsR2(base.BaseTestCase):
     def setUp(self):
         super(TestNetworkUtilsR2, self).setUp()
         self.netutils = networkutils.NetworkUtilsR2()
-        self.netutils._conn = mock.MagicMock()
+        self.netutils._conn_attr = mock.MagicMock()
 
     @mock.patch.object(networkutils.NetworkUtilsR2,
                        '_create_default_setting_data')

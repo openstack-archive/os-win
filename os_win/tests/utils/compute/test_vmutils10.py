@@ -26,7 +26,7 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         super(VMUtils10TestCase, self).setUp()
         self._vmutils = vmutils10.VMUtils10()
-        self._vmutils._conn = mock.MagicMock()
+        self._vmutils._conn_attr = mock.MagicMock()
 
     def test_set_secure_boot_CA_required(self):
         vs_data = mock.MagicMock()

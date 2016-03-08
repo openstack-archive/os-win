@@ -65,7 +65,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
     def _cache_metrics_defs(self):
         self._metrics_defs = {}
-        if not self._conn:
+        if not self._conn_attr:
             # NOTE(claudiub): self._conn is None on Linux, causing unit tests
             # to fail.
             return

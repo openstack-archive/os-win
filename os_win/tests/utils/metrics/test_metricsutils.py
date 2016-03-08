@@ -30,10 +30,10 @@ class MetricsUtilsTestCase(base.BaseTestCase):
     def setUp(self, mock_cache_metrics_defs):
         super(MetricsUtilsTestCase, self).setUp()
         self.utils = metricsutils.MetricsUtils()
-        self.utils._conn = mock.MagicMock()
+        self.utils._conn_attr = mock.MagicMock()
 
     def test_cache_metrics_defs_no_conn(self):
-        self.utils._conn = None
+        self.utils._conn_attr = None
         self.utils._cache_metrics_defs()
         self.assertEqual({}, self.utils._metrics_defs)
 

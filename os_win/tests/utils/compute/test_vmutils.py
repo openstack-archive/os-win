@@ -69,7 +69,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         super(VMUtilsTestCase, self).setUp()
         self._vmutils = vmutils.VMUtils()
-        self._vmutils._conn = mock.MagicMock()
+        self._vmutils._conn_attr = mock.MagicMock()
         self._vmutils._jobutils = mock.MagicMock()
         self._vmutils._pathutils = mock.MagicMock()
 

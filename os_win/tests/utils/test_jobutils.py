@@ -35,7 +35,7 @@ class JobUtilsTestCase(base.BaseTestCase):
     def setUp(self):
         super(JobUtilsTestCase, self).setUp()
         self.jobutils = jobutils.JobUtils()
-        self.jobutils._conn = mock.MagicMock()
+        self.jobutils._conn_attr = mock.MagicMock()
 
     @mock.patch.object(jobutils.JobUtils, '_wait_for_job')
     def test_check_ret_val_started(self, mock_wait_for_job):

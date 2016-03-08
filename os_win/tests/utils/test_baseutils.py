@@ -77,7 +77,14 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         super(BaseUtilsVirtTestCase, self).setUp()
         self.utils = baseutils.BaseUtilsVirt()
-        self.utils._conn = mock.MagicMock()
+        self.utils._conn_attr = mock.MagicMock()
+
+    @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_conn')
+    def test_conn(self, mock_get_wmi_conn):
+        self.utils._conn_attr = None
+
+        self.assertEqual(mock_get_wmi_conn.return_value, self.utils._conn)
+        mock_get_wmi_conn.assert_called_once_with(self.utils._wmi_namespace)
 
     def test_vs_man_svc(self):
         expected = self.utils._conn.Msvm_VirtualSystemManagementService()[0]
