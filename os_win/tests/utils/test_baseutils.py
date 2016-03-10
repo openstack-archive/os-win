@@ -84,7 +84,8 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
         self.utils._conn_attr = None
 
         self.assertEqual(mock_get_wmi_conn.return_value, self.utils._conn)
-        mock_get_wmi_conn.assert_called_once_with(self.utils._wmi_namespace)
+        mock_get_wmi_conn.assert_called_once_with(
+            self.utils._wmi_namespace % '.')
 
     def test_vs_man_svc(self):
         expected = self.utils._conn.Msvm_VirtualSystemManagementService()[0]

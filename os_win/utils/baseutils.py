@@ -50,13 +50,14 @@ class BaseUtilsVirt(BaseUtils):
 
     def __init__(self, host='.'):
         self._vs_man_svc_attr = None
-        self._wmi_namespace = self._wmi_namespace % host
+        self._host = host
         self._conn_attr = None
 
     @property
     def _conn(self):
         if not self._conn_attr:
-            self._conn_attr = self._get_wmi_conn(self._wmi_namespace)
+            self._conn_attr = self._get_wmi_conn(
+                self._wmi_namespace % self._host)
         return self._conn_attr
 
     @property
