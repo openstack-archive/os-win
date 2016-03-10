@@ -1048,17 +1048,17 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(vmutils.VMUtils, '_is_drive_physical')
     @mock.patch.object(vmutils.VMUtils,
                        '_get_mounted_disk_resource_from_path')
-    def _test_drive_to_boot_source(self, mock_get_disk_res_from_path,
-                                   mock_is_drive_physical):
+    def test_drive_to_boot_source(self, mock_get_disk_res_from_path,
+                                  mock_is_drive_physical):
         mock_is_drive_physical.return_value = True
         mock_drive = mock.MagicMock()
-        mock_drive.path_.return_value = mock.sentinel.physical_bssd
         mock_drive.Parent = mock.sentinel.bssd
+        mock_get_disk_res_from_path.return_value = mock_drive
 
         mock_rasd_path = mock_drive.path_.return_value
-        mock_logical_identity = mock.Mock(SameElement=mock.sentinel.bssd_path)
+        mock_same_element = mock.MagicMock()
         self._vmutils._conn.Msvm_LogicalIdentity.return_value = [
-            mock_logical_identity]
+            mock.Mock(SameElement=mock_same_element)]
 
         ret = self._vmutils._drive_to_boot_source(mock.sentinel.drive_path)
 
@@ -1068,7 +1068,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.drive_path)
         mock_get_disk_res_from_path.assert_called_once_with(
             mock.sentinel.drive_path, is_physical=True)
-        self.assertEqual(mock.sentinel.bssd_path, ret)
+        expected_path = mock_same_element.path_.return_value
+        self.assertEqual(expected_path, ret)
 
     @mock.patch.object(vmutils.VMUtils, '_set_boot_order_gen1')
     @mock.patch.object(vmutils.VMUtils, '_set_boot_order_gen2')

@@ -101,8 +101,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
         jobs_affecting_element = self._conn.Msvm_AffectedJobElement(
             AffectedElement=element.path_())
         for job in jobs_affecting_element:
-            element_jobs.append(
-                self._get_wmi_obj(job.AffectingElement.replace('\\', '/')))
+            element_jobs.append(job.AffectingElement)
 
         for job in element_jobs:
             if job and job.Cancellable and not self._is_job_completed(job):

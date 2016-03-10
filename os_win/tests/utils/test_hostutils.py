@@ -213,9 +213,9 @@ class HostUtilsTestCase(base.BaseTestCase):
         system_memory.path_.return_value = 'fake_wmi_obj_path'
         numa_node_memory = mock.MagicMock()
         numa_node_memory.path_.return_value = 'fake_wmi_obj_path1'
-        numa_node_assoc_paths = ['fake_wmi_obj_path']
+        numa_node_assoc = [system_memory]
         memory_info = self._hostutils._get_numa_memory_info(
-            numa_node_assoc_paths, [system_memory, numa_node_memory])
+            numa_node_assoc, [system_memory, numa_node_memory])
 
         self.assertEqual(system_memory, memory_info)
 
@@ -230,8 +230,8 @@ class HostUtilsTestCase(base.BaseTestCase):
         host_cpu.path_.return_value = 'fake_wmi_obj_path'
         vm_cpu = mock.MagicMock()
         vm_cpu.path_.return_value = 'fake_wmi_obj_path1'
-        numa_node_assoc_paths = ['fake_wmi_obj_path']
-        cpu_info = self._hostutils._get_numa_cpu_info(numa_node_assoc_paths,
+        numa_node_assoc = [host_cpu]
+        cpu_info = self._hostutils._get_numa_cpu_info(numa_node_assoc,
                                                       [host_cpu, vm_cpu])
 
         self.assertEqual([host_cpu], cpu_info)

@@ -648,10 +648,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
             SnapshotType=self._SNAPSHOT_FULL)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-        snp_setting_data_path = self._conn.Msvm_MostCurrentSnapshotInBranch(
+        snp_setting_data = self._conn.Msvm_MostCurrentSnapshotInBranch(
             Antecedent=vm.path_())[0].Dependent
 
-        return snp_setting_data_path
+        return snp_setting_data.path_()
 
     def remove_vm_snapshot(self, snapshot_path):
         vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
@@ -927,10 +927,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
             drive_path, is_physical=is_physical)
 
         rasd_path = drive.path_() if is_physical else drive.Parent
-        bssd_path = self._conn.Msvm_LogicalIdentity(
+        bssd = self._conn.Msvm_LogicalIdentity(
             SystemElement=rasd_path)[0].SameElement
 
-        return bssd_path
+        return bssd.path_()
 
     def set_boot_order(self, vm_name, device_boot_order):
         if self.get_vm_generation(vm_name) == constants.VM_GEN_1:

@@ -88,8 +88,7 @@ class JobUtilsTestCase(base.BaseTestCase):
         job = self.jobutils._wait_for_job(self._FAKE_JOB_PATH)
         self.assertEqual(mock_job, job)
 
-    @mock.patch.object(jobutils.JobUtils, '_get_wmi_obj')
-    def test_stop_jobs(self, mock_get_wmi_obj):
+    def test_stop_jobs(self):
         mock_job1 = mock.MagicMock(Cancellable=True)
         mock_job2 = mock.MagicMock(Cancellable=True)
         mock_job3 = mock.MagicMock(Cancellable=True)
@@ -97,10 +96,10 @@ class JobUtilsTestCase(base.BaseTestCase):
         mock_job2.JobState = 3
         mock_job3.JobState = constants.JOB_STATE_KILLED
 
-        mock_get_wmi_obj.side_effect = [mock_job1, mock_job2, mock_job3]
-
         mock_vm = mock.MagicMock()
-        mock_vm_jobs = [mock_job1, mock_job2, mock_job3]
+        mock_vm_jobs = [mock.Mock(AffectingElement=x) for x in [mock_job1,
+                                                                mock_job2,
+                                                                mock_job3]]
         self.jobutils._conn.Msvm_AffectedJobElement.return_value = mock_vm_jobs
 
         self.jobutils.stop_jobs(mock_vm)
