@@ -92,6 +92,11 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual({mock.sentinel.port_name: mock_port},
                          self.netutils._switch_ports)
 
+    def test_clear_port_sg_acls_cache(self):
+        self.netutils._sg_acl_sds[mock.sentinel.port_id] = [mock.sentinel.acl]
+        self.netutils.clear_port_sg_acls_cache(mock.sentinel.port_id)
+        self.assertNotIn(mock.sentinel.acl, self.netutils._sg_acl_sds)
+
     def _prepare_external_port(self, mock_vswitch, mock_ext_port):
         mock_lep = mock_ext_port.associators()[0]
         mock_lep1 = mock_lep.associators()[0]

@@ -123,6 +123,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             port.ElementName: port for port in
             self._conn.Msvm_EthernetPortAllocationSettingData()}
 
+    def clear_port_sg_acls_cache(self, switch_port_name):
+        self._sg_acl_sds.pop(switch_port_name, None)
+
     def get_vswitch_id(self, vswitch_name):
         vswitch = self._get_vswitch(vswitch_name)
         return vswitch.Name
