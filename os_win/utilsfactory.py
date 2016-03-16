@@ -26,7 +26,8 @@ from os_win.utils.storage.initiator import iscsi_cli_utils
 hyper_opts = [
     cfg.BoolOpt('force_volumeutils_v1',
                 default=False,
-                help='Force V1 volume utility class'),
+                help='DEPRECATED: Force V1 volume utility class',
+                deprecated_for_removal=True),
 ]
 
 CONF = cfg.CONF
