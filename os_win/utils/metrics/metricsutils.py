@@ -23,6 +23,7 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
 from os_win import exceptions
+from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 
 LOG = logging.getLogger(__name__)
@@ -37,7 +38,6 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
     _SYNTH_ETH_PORT_SET_DATA = 'Msvm_SyntheticEthernetPortSettingData'
     _PORT_ALLOC_SET_DATA = 'Msvm_EthernetPortAllocationSettingData'
     _PORT_ALLOC_ACL_SET_DATA = 'Msvm_EthernetSwitchPortAclSettingData'
-    _METRICS_ME = 'Msvm_MetricForME'
     _BASE_METRICS_VALUE = 'Msvm_BaseMetricValue'
 
     _CPU_METRICS = 'Aggregated Average CPU Utilization'
@@ -55,7 +55,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
     def __init__(self, host='.'):
         super(MetricsUtils, self).__init__(host)
         self._metrics_svc_obj = None
-        self._cache_metrics_defs()
+        self._metrics_defs_obj = {}
 
     @property
     def _metrics_svc(self):
@@ -63,15 +63,15 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
             self._metrics_svc_obj = self._conn.Msvm_MetricService()[0]
         return self._metrics_svc_obj
 
-    def _cache_metrics_defs(self):
-        self._metrics_defs = {}
-        if not self._conn_attr:
-            # NOTE(claudiub): self._conn is None on Linux, causing unit tests
-            # to fail.
-            return
+    @property
+    def _metrics_defs(self):
+        if not self._metrics_defs_obj:
+            self._cache_metrics_defs()
+        return self._metrics_defs_obj
 
+    def _cache_metrics_defs(self):
         for metrics_def in self._conn.CIM_BaseMetricDefinition():
-            self._metrics_defs[metrics_def.ElementName] = metrics_def
+            self._metrics_defs_obj[metrics_def.ElementName] = metrics_def
 
     def enable_vm_metrics_collection(self, vm_name):
         vm = self._get_vm(vm_name)
@@ -144,8 +144,9 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
         for port in ports:
             vnic = [v for v in vnics if port.Parent == v.path_()][0]
-            port_acls = port.associators(
-                wmi_result_class=self._PORT_ALLOC_ACL_SET_DATA)
+            port_acls = _wqlutils.get_element_associated_class(
+                self._conn, self._PORT_ALLOC_ACL_SET_DATA,
+                element_instance_id=port.InstanceID)
 
             metrics_value_instances = self._get_metrics_value_instances(
                 port_acls, self._BASE_METRICS_VALUE)
@@ -220,23 +221,31 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
                 metrics_values.append(0)
         return metrics_values
 
-    @staticmethod
-    def _get_metrics_value_instances(elements, result_class):
+    def _get_metrics_value_instances(self, elements, result_class):
         instances = []
         for el in elements:
-            associators = el.associators(wmi_result_class=result_class)
-            if associators:
-                instances.append(associators[0])
+            # NOTE(abalutoiu): Msvm_MetricForME is the association between
+            # an element and all the metric values maintained for it.
+            el_metric = [
+                x.Dependent for x in self._conn.Msvm_MetricForME(
+                    Antecedent=el.path_())]
+            el_metric = [
+                x for x in el_metric if x.path().Class == result_class]
+            if el_metric:
+                instances.append(el_metric[0])
 
         return instances
 
     def _get_metrics_values(self, element, metrics_defs):
-        element_metrics = element.associators(
-            wmi_association_class=self._METRICS_ME)
+        element_metrics = [
+            x.Dependent for x in self._conn.Msvm_MetricForME(
+                Antecedent=element.path_())]
         return self._sum_metrics_values_by_defs(element_metrics, metrics_defs)
 
     def _get_metrics(self, element, metrics_def):
-        metrics = element.associators(wmi_association_class=self._METRICS_ME)
+        metrics = [
+            x.Dependent for x in self._conn.Msvm_MetricForME(
+                Antecedent=element.path_())]
         return self._filter_metrics(metrics, metrics_def)
 
     @staticmethod
@@ -246,7 +255,9 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
     def _get_vm_resources(self, vm_name, resource_class):
         setting_data = self._get_vm_setting_data(vm_name)
-        return setting_data.associators(wmi_result_class=resource_class)
+        return _wqlutils.get_element_associated_class(
+            self._conn, resource_class,
+            element_instance_id=setting_data.InstanceID)
 
     def _get_vm(self, vm_name):
         vms = self._conn.Msvm_ComputerSystem(ElementName=vm_name)

@@ -28,6 +28,7 @@ if sys.platform == 'win32':
 
 from os_win._i18n import _
 from os_win import exceptions
+from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
 
@@ -153,28 +154,30 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         vswitch = self._get_vswitch(vswitch_name)
         ext_ports = self._conn.Msvm_ExternalEthernetPort()
         for ext_port in ext_ports:
-            lan_endpoint_list = ext_port.associators(
-                wmi_result_class=self._LAN_ENDPOINT)
-            if lan_endpoint_list:
-                lan_endpoint_list = lan_endpoint_list[0].associators(
-                    wmi_result_class=self._LAN_ENDPOINT)
-                if (lan_endpoint_list and
-                        lan_endpoint_list[0].SystemName == vswitch.Name):
-                    return ext_port
+            lan_endpoint_assoc_list = (
+                self._conn.Msvm_EthernetDeviceSAPImplementation(
+                    Antecedent=ext_port.path_()))
+            if lan_endpoint_assoc_list:
+                lan_endpoint_assoc_list = self._conn.Msvm_ActiveConnection(
+                    Dependent=lan_endpoint_assoc_list[0].Dependent.path_())
+                if lan_endpoint_assoc_list:
+                    lan_endpoint = lan_endpoint_assoc_list[0].Antecedent
+                    if lan_endpoint.SystemName == vswitch.Name:
+                        return ext_port
 
     def vswitch_port_needed(self):
         return False
 
     def get_switch_ports(self, vswitch_name):
         vswitch = self._get_vswitch(vswitch_name)
-        vswitch_ports = vswitch.associators(
-            wmi_result_class=self._ETHERNET_SWITCH_PORT)
+        vswitch_ports = self._conn.Msvm_EthernetSwitchPort(
+            SystemName=vswitch.Name)
         return set(p.Name for p in vswitch_ports)
 
     def get_port_by_id(self, port_id, vswitch_name):
         vswitch = self._get_vswitch(vswitch_name)
-        switch_ports = vswitch.associators(
-            wmi_result_class=self._ETHERNET_SWITCH_PORT)
+        switch_ports = self._conn.Msvm_EthernetSwitchPort(
+            SystemName=vswitch.Name)
         for switch_port in switch_ports:
             if (switch_port.ElementName == port_id):
                 return switch_port
@@ -265,10 +268,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             self._jobutils.modify_virt_resource(port)
 
     def _get_vm_from_res_setting_data(self, res_setting_data):
-        sd = res_setting_data.associators(
-            wmi_result_class='Msvm_VirtualSystemSettingData')
-        vm = sd[0].associators(
-            wmi_result_class='Msvm_ComputerSystem')
+        vmsettings_instance_id = res_setting_data.InstanceID.split('\\')[0]
+        sd = self._conn.Msvm_VirtualSystemSettingData(
+            InstanceID=vmsettings_instance_id)
+        vm = self._conn.Msvm_ComputerSystem(Name=sd[0].ConfigurationID)
         return vm[0]
 
     def remove_switch_port(self, switch_port_name, vnic_deleted=False):
@@ -352,8 +355,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if port_alloc.InstanceID in cache:
             return cache[port_alloc.InstanceID]
 
-        setting_data = self._get_first_item(port_alloc.associators(
-            wmi_result_class=data_class))
+        setting_data = self._get_first_item(
+            _wqlutils.get_element_associated_class(
+                self._conn, data_class,
+                element_instance_id=port_alloc.InstanceID))
         if setting_data:
             cache[port_alloc.InstanceID] = setting_data
         return setting_data
@@ -403,7 +408,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             return
 
         # Add the ACLs only if they don't already exist
-        acls = port.associators(wmi_result_class=self._PORT_ALLOC_ACL_SET_DATA)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_ALLOC_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
         for acl_type in [self._ACL_TYPE_IPV4, self._ACL_TYPE_IPV6]:
             for acl_dir in [self._ACL_DIR_IN, self._ACL_DIR_OUT]:
                 _acls = self._filter_acls(
@@ -423,15 +430,18 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             return False
 
         # all 4 meter ACLs must be existent first. (2 x direction)
-        acls = port.associators(wmi_result_class=self._PORT_ALLOC_ACL_SET_DATA)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_ALLOC_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
         acls = [a for a in acls if a.Action == self._ACL_ACTION_METER]
         if len(acls) < 2:
             return False
         return True
 
     def _is_port_vm_started(self, port):
-        vmsettings = port.associators(
-            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA)
+        vmsettings_instance_id = port.InstanceID.split('\\')[0]
+        vmsettings = self._conn.Msvm_VirtualSystemSettingData(
+            InstanceID=vmsettings_instance_id)
         # See http://msdn.microsoft.com/en-us/library/cc160706%28VS.85%29.aspx
         (ret_val, summary_info) = self._vs_man_svc.GetSummaryInformation(
             [self._VM_SUMMARY_ENABLED_STATE],
@@ -455,7 +465,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             # Port not found. It happens when the VM was already deleted.
             return
 
-        acls = port.associators(wmi_result_class=self._PORT_EXT_ACL_SET_DATA)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
         remove_acls = []
         for sg_rule in sg_rules:
             filtered_acls = self._filter_security_acls(sg_rule, acls)
@@ -474,7 +486,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             # Port not found. It happens when the VM was already deleted.
             return
 
-        acls = port.associators(wmi_result_class=self._PORT_EXT_ACL_SET_DATA)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
         filtered_acls = [a for a in acls if
                          a.Action is not self._ACL_ACTION_METER]
 
@@ -485,7 +499,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             self._sg_acl_sds[port.ElementName] = []
 
     def _bind_security_rules(self, port, sg_rules):
-        acls = self._get_port_security_acls(port)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
 
         # Add the ACL only if it don't already exist.
         add_acls = []
@@ -522,13 +538,15 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         """Returns a mutable list of Security Group Rule objects.
 
         Returns the list of Security Group Rule objects from the cache,
-        otherwise it fetches and caches from the port's associators.
+        otherwise it fetches and caches from the port's associated class.
         """
 
         if port.ElementName in self._sg_acl_sds:
             return self._sg_acl_sds[port.ElementName]
 
-        acls = port.associators(wmi_result_class=self._PORT_EXT_ACL_SET_DATA)
+        acls = _wqlutils.get_element_associated_class(
+            self._conn, self._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=port.InstanceID)
         self._sg_acl_sds[port.ElementName] = acls
 
         return acls

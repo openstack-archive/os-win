@@ -16,6 +16,7 @@ import mock
 from oslotest import base
 
 from os_win import exceptions
+from os_win.utils import _wqlutils
 from os_win.utils.network import networkutils
 
 
@@ -101,12 +102,6 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.netutils.clear_port_sg_acls_cache(mock.sentinel.port_id)
         self.assertNotIn(mock.sentinel.acl, self.netutils._sg_acl_sds)
 
-    def _prepare_external_port(self, mock_vswitch, mock_ext_port):
-        mock_lep = mock_ext_port.associators()[0]
-        mock_lep1 = mock_lep.associators()[0]
-        mock_esw = mock_lep1.associators()[0]
-        mock_esw.associators.return_value = [mock_vswitch]
-
     @mock.patch.object(networkutils.NetworkUtils, '_get_vswitch_external_port')
     def test_get_vswitch_external_network_name(self, mock_get_vswitch_port):
         mock_get_vswitch_port.return_value.ElementName = (
@@ -119,16 +114,22 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         vswitch = mock.MagicMock(Name=mock.sentinel.vswitch_name)
         self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = [vswitch]
 
+        conn = self.netutils._conn
         ext_port = mock.MagicMock()
-        lan_endpoint1 = mock.MagicMock()
-        ext_port.associators.return_value = [lan_endpoint1]
-        lan_endpoint2 = mock.MagicMock(SystemName=mock.sentinel.vswitch_name)
-        lan_endpoint1.associators.return_value = [lan_endpoint2]
-
+        lan_endpoint_assoc1 = mock.MagicMock()
+        lan_endpoint_assoc2 = mock.Mock(SystemName=mock.sentinel.vswitch_name)
         self.netutils._conn.Msvm_ExternalEthernetPort.return_value = [ext_port]
+        conn.Msvm_EthernetDeviceSAPImplementation.return_value = [
+            lan_endpoint_assoc1]
+        conn.Msvm_ActiveConnection.return_value = [
+            mock.Mock(Antecedent=lan_endpoint_assoc2)]
 
         result = self.netutils._get_vswitch_external_port(mock.sentinel.name)
         self.assertEqual(ext_port, result)
+        conn.Msvm_EthernetDeviceSAPImplementation.assert_called_once_with(
+            Antecedent=ext_port.path_.return_value)
+        conn.Msvm_ActiveConnection.assert_called_once_with(
+            Dependent=lan_endpoint_assoc1.Dependent.path_.return_value)
 
     def test_vswitch_port_needed(self):
         self.assertFalse(self.netutils.vswitch_port_needed())
@@ -232,6 +233,23 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.addCleanup(patched.stop)
         return mock_port
 
+    def test_get_vm_from_res_setting_data(self):
+        fake_res_set_instance_id = "Microsoft:GUID\\SpecificData"
+        fake_vm_set_instance_id = "Microsoft:GUID"
+        res_setting_data = mock.Mock(InstanceID=fake_res_set_instance_id)
+        conn = self.netutils._conn
+        mock_setting_data = conn.Msvm_VirtualSystemSettingData.return_value
+
+        resulted_vm = self.netutils._get_vm_from_res_setting_data(
+            res_setting_data)
+
+        conn.Msvm_VirtualSystemSettingData.assert_called_once_with(
+            InstanceID=fake_vm_set_instance_id)
+        conn.Msvm_ComputerSystem.assert_called_once_with(
+            Name=mock_setting_data[0].ConfigurationID)
+        expected_result = conn.Msvm_ComputerSystem.return_value[0]
+        self.assertEqual(expected_result, resulted_vm)
+
     @mock.patch.object(networkutils, 'wmi', create=True)
     def test_remove_switch_port(self, mock_wmi):
         mock_sw_port = self._mock_get_switch_port_alloc()
@@ -298,13 +316,15 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         self.assertFalse(mock_add_feature.called)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
-    def test_set_vswitch_port_vsid(self, mock_create_default_sd):
+    def test_set_vswitch_port_vsid(self, mock_create_default_sd,
+                                   mock_get_element_associated_class):
         mock_port_alloc = self._mock_get_switch_port_alloc()
 
         mock_vsid_settings = mock.MagicMock()
-        mock_port_alloc.associators.return_value = [mock_vsid_settings]
+        mock_get_element_associated_class.return_value = [mock_vsid_settings]
         mock_create_default_sd.return_value = mock_vsid_settings
 
         self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
@@ -316,11 +336,12 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_add_feature.assert_called_once_with(mock_vsid_settings,
                                                  mock_port_alloc)
 
-    def test_set_vswitch_port_vsid_already_set(self):
-        mock_port_alloc = self._mock_get_switch_port_alloc()
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_set_vswitch_port_vsid_already_set(self, mock_get_elem_assoc_cls):
+        self._mock_get_switch_port_alloc()
 
         mock_vsid_settings = mock.MagicMock(VirtualSubnetId=mock.sentinel.vsid)
-        mock_port_alloc.associators.return_value = (mock_vsid_settings, True)
+        mock_get_elem_assoc_cls.return_value = (mock_vsid_settings, True)
 
         self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
                                             mock.sentinel.switch_port_name)
@@ -367,15 +388,18 @@ class NetworkUtilsTestCase(base.BaseTestCase):
 
         self.assertEqual(mock.sentinel.sd_object, result)
 
-    def test_get_setting_data_from_port_alloc(self):
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_get_setting_data_from_port_alloc(self, mock_get_elem_assoc_cls):
         sd_object = mock.MagicMock()
         mock_port = mock.MagicMock(InstanceID=mock.sentinel.InstanceID)
-        mock_port.associators.return_value = [sd_object]
+        mock_get_elem_assoc_cls.return_value = [sd_object]
         cache = {}
-
         result = self.netutils._get_setting_data_from_port_alloc(
             mock_port, cache, mock.sentinel.data_class)
 
+        mock_get_elem_assoc_cls.assert_called_once_with(
+            self.netutils._conn, mock.sentinel.data_class,
+            element_instance_id=mock.sentinel.InstanceID)
         self.assertEqual(sd_object, result)
         self.assertEqual(sd_object, cache[mock.sentinel.InstanceID])
 
@@ -441,25 +465,35 @@ class NetworkUtilsTestCase(base.BaseTestCase):
     def test_is_metrics_collection_allowed_true(self, mock_is_started):
         mock_acl = mock.MagicMock()
         mock_acl.Action = self.netutils._ACL_ACTION_METER
-        self._test_is_metrics_collection_allowed(mock_is_started,
-                                                 [mock_acl, mock_acl], True)
+        self._test_is_metrics_collection_allowed(
+            mock_vm_started=mock_is_started,
+            acls=[mock_acl, mock_acl],
+            expected_result=True)
 
     @mock.patch.object(networkutils.NetworkUtils, '_is_port_vm_started')
-    def test_is_metrics_collection_allowed_false(self, mock_is_started):
-        self._test_is_metrics_collection_allowed(mock_is_started, [], False)
+    def test_test_is_metrics_collection_allowed_false(self, mock_is_started):
+        self._test_is_metrics_collection_allowed(
+            mock_vm_started=mock_is_started,
+            acls=[],
+            expected_result=False)
 
-    def _test_is_metrics_collection_allowed(self, mock_vm_started, acls,
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def _test_is_metrics_collection_allowed(self, mock_get_elem_assoc_cls,
+                                            mock_vm_started, acls,
                                             expected_result):
         mock_port = self._mock_get_switch_port_alloc()
         mock_acl = mock.MagicMock()
         mock_acl.Action = self.netutils._ACL_ACTION_METER
 
-        mock_port.associators.return_value = acls
+        mock_get_elem_assoc_cls.return_value = acls
         mock_vm_started.return_value = True
 
         result = self.netutils.is_metrics_collection_allowed(
             self._FAKE_PORT_NAME)
         self.assertEqual(expected_result, result)
+        mock_get_elem_assoc_cls.assert_called_once_with(
+            self.netutils._conn, self.netutils._PORT_ALLOC_ACL_SET_DATA,
+            element_instance_id=mock_port.InstanceID)
 
     def test_is_port_vm_started_true(self):
         self._test_is_port_vm_started(self.netutils._HYPERV_VM_STATE_ENABLED,
@@ -476,7 +510,8 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_summary.EnabledState = vm_state
         mock_vmsettings.path_.return_value = self._FAKE_RES_PATH
 
-        mock_port.associators.return_value = [mock_vmsettings]
+        self.netutils._conn.Msvm_VirtualSystemSettingData.return_value = [
+            mock_vmsettings]
         mock_svc.GetSummaryInformation.return_value = (self._FAKE_RET_VAL,
                                                        [mock_summary])
 
@@ -486,22 +521,25 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             [self.netutils._VM_SUMMARY_ENABLED_STATE],
             [self._FAKE_RES_PATH])
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(networkutils.NetworkUtils, '_bind_security_rules')
-    def test_create_security_rules(self, mock_bind):
-        (m_port, m_acl) = self._setup_security_rule_test()
+    def test_create_security_rules(self, mock_bind, mock_get_elem_assoc_cls):
+        (m_port, m_acl) = self._setup_security_rule_test(
+            mock_get_elem_assoc_cls)
         fake_rule = mock.MagicMock()
 
         self.netutils.create_security_rules(self._FAKE_PORT_NAME, fake_rule)
         mock_bind.assert_called_once_with(m_port, fake_rule)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(networkutils.NetworkUtils, '_create_security_acl')
     @mock.patch.object(networkutils.NetworkUtils, '_get_new_weights')
     @mock.patch.object(networkutils.NetworkUtils, '_filter_security_acls')
     def test_bind_security_rules(self, mock_filtered_acls, mock_get_weights,
-                                 mock_create_acl):
+                                 mock_create_acl, mock_get_elem_assoc_cls):
         m_port = mock.MagicMock()
         m_acl = mock.MagicMock()
-        m_port.associators.return_value = [m_acl]
+        mock_get_elem_assoc_cls.return_value = [m_acl]
         mock_filtered_acls.return_value = []
         mock_get_weights.return_value = [mock.sentinel.FAKE_WEIGHT]
         mock_create_acl.return_value = m_acl
@@ -513,24 +551,28 @@ class NetworkUtilsTestCase(base.BaseTestCase):
                                                 mock.sentinel.FAKE_WEIGHT)
         mock_add_features = self.netutils._jobutils.add_multiple_virt_features
         mock_add_features.assert_called_once_with([m_acl], m_port)
-        self.assertEqual([m_acl, fake_rule],
-                         self.netutils._sg_acl_sds[m_port.ElementName])
+        mock_get_elem_assoc_cls.assert_called_once_with(
+            self.netutils._conn, self.netutils._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=m_port.InstanceID)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(networkutils.NetworkUtils, '_get_new_weights')
     @mock.patch.object(networkutils.NetworkUtils, '_filter_security_acls')
     def test_bind_security_rules_existent(self, mock_filtered_acls,
-                                          mock_get_weights):
+                                          mock_get_weights,
+                                          mock_get_elem_assoc_cls):
         m_port = mock.MagicMock()
         m_acl = mock.MagicMock()
-        m_port.associators.return_value = [m_acl]
+        mock_get_elem_assoc_cls.return_value = [m_acl]
         mock_filtered_acls.return_value = [m_acl]
         fake_rule = mock.MagicMock()
 
         self.netutils._bind_security_rules(m_port, [fake_rule])
         mock_filtered_acls.assert_called_once_with(fake_rule, [m_acl])
         mock_get_weights.assert_called_once_with([fake_rule], [m_acl])
-        self.assertEqual([m_acl],
-                         self.netutils._sg_acl_sds[m_port.ElementName])
+        mock_get_elem_assoc_cls.assert_called_once_with(
+            self.netutils._conn, self.netutils._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=m_port.InstanceID)
 
     def test_get_port_security_acls_cached(self):
         mock_port = mock.MagicMock(ElementName=mock.sentinel.port_name)
@@ -541,22 +583,25 @@ class NetworkUtilsTestCase(base.BaseTestCase):
 
         self.assertEqual([mock.sentinel.fake_acl], acls)
 
-    def test_get_port_security_acls(self):
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_get_port_security_acls(self, mock_get_elem_assoc_cls):
         self.netutils._sg_acl_sds = {}
         mock_port = mock.MagicMock()
-        mock_port.associators.return_value = [mock.sentinel.fake_acl]
+        mock_get_elem_assoc_cls.return_value = [mock.sentinel.fake_acl]
 
         acls = self.netutils._get_port_security_acls(mock_port)
 
         self.assertEqual([mock.sentinel.fake_acl], acls)
         self.assertEqual({mock_port.ElementName: [mock.sentinel.fake_acl]},
                          self.netutils._sg_acl_sds)
+        mock_get_elem_assoc_cls.assert_called_once_with(
+            self.netutils._conn, self.netutils._PORT_EXT_ACL_SET_DATA,
+            element_instance_id=mock_port.InstanceID)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(networkutils.NetworkUtils, '_filter_security_acls')
-    def test_remove_security_rules(self, mock_filter):
-        mock_port, mock_acl = self._setup_security_rule_test()
-        mock_port.associators.return_value.append(mock.sentinel.fake_acl)
-        mock_acl = self._setup_security_rule_test()[1]
+    def test_remove_security_rules(self, mock_filter, mock_get_elem_assoc_cls):
+        mock_acl = self._setup_security_rule_test(mock_get_elem_assoc_cls)[1]
         fake_rule = mock.MagicMock()
         mock_filter.return_value = [mock_acl]
 
@@ -566,12 +611,9 @@ class NetworkUtilsTestCase(base.BaseTestCase):
             self.netutils._jobutils.remove_multiple_virt_features)
         mock_remove_features.assert_called_once_with([mock_acl])
 
-    def test_remove_all_security_rules(self):
-        mock_port, mock_acl = self._setup_security_rule_test()
-        self.netutils._sg_acl_sds[mock_port.ElementName] = [
-            mock.sentinel.fake_acl]
-
-        mock_acl = self._setup_security_rule_test()[1]
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_remove_all_security_rules(self, mock_get_elem_assoc_cls):
+        mock_acl = self._setup_security_rule_test(mock_get_elem_assoc_cls)[1]
         self.netutils.remove_all_security_rules(self._FAKE_PORT_NAME)
         mock_remove_features = (
             self.netutils._jobutils.remove_multiple_virt_features)
@@ -587,10 +629,10 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.netutils._create_security_acl(fake_rule, self._FAKE_WEIGHT)
         mock_acl.set.assert_called_once_with(Action=self._FAKE_ACL_ACT)
 
-    def _setup_security_rule_test(self):
+    def _setup_security_rule_test(self, mock_get_elem_assoc_cls):
         mock_port = self._mock_get_switch_port_alloc()
         mock_acl = mock.MagicMock()
-        mock_port.associators.return_value = [mock_acl]
+        mock_get_elem_assoc_cls.return_value = [mock_acl]
 
         self.netutils._filter_security_acls = mock.MagicMock(
             return_value=[mock_acl])
