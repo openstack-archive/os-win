@@ -21,6 +21,7 @@ Hyper-V Server / Windows Server 2012.
 """
 
 import sys
+import time
 import uuid
 
 if sys.platform == 'win32':
@@ -32,7 +33,7 @@ from oslo_utils import uuidutils
 import six
 from six.moves import range  # noqa
 
-from os_win._i18n import _, _LW
+from os_win._i18n import _, _LE, _LW
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -822,9 +823,23 @@ class VMUtils(baseutils.BaseUtilsVirt):
                     vm_state = event.EnabledState
                     vm_power_state = self.get_vm_power_state(vm_state)
 
-                    callback(vm_name, vm_power_state)
+                    try:
+                        callback(vm_name, vm_power_state)
+                    except Exception:
+                        err_msg = _LE("Executing VM power state change event "
+                                      "callback failed. "
+                                      "VM name: %(vm_name)s, "
+                                      "VM power state: %(vm_power_state)s.")
+                        LOG.exception(err_msg,
+                                      dict(vm_name=vm_name,
+                                           vm_power_state=vm_power_state))
                 except wmi.x_wmi_timed_out:
                     pass
+                except Exception:
+                    LOG.exception(
+                        _LE("The VM power state change event listener "
+                            "encountered an unexpected exception."))
+                    time.sleep(event_timeout / 1000)
 
         return _handle_events if get_handler else listener
 

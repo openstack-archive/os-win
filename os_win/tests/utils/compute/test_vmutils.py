@@ -937,19 +937,21 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
             self.assertEqual(watcher.return_value, listener)
 
-    def test_vm_power_state_change_event_handler(self):
+    @mock.patch('time.sleep')
+    def test_vm_power_state_change_event_handler(self, mock_sleep):
         self._mock_wmi.x_wmi_timed_out = exceptions.HyperVException
 
         enabled_state = constants.HYPERV_VM_STATE_ENABLED
         hv_enabled_state = self._vmutils._vm_power_states_map[enabled_state]
         fake_event = mock.Mock(ElementName=mock.sentinel.vm_name,
                                EnabledState=hv_enabled_state)
-        fake_callback = mock.Mock()
+        fake_callback = mock.Mock(side_effect=Exception)
 
         fake_listener = (
             self._vmutils._conn.Msvm_ComputerSystem.watch_for.return_value)
         fake_listener.side_effect = (self._mock_wmi.x_wmi_timed_out,
-                                     fake_event, KeyboardInterrupt)
+                                     fake_event, Exception,
+                                     KeyboardInterrupt)
 
         handler = self._vmutils.get_vm_power_state_change_listener(
             get_handler=True)
@@ -960,7 +962,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_callback.assert_called_once_with(mock.sentinel.vm_name,
                                               enabled_state)
         fake_listener.assert_has_calls(
-            [mock.call(self._vmutils._DEFAULT_EVENT_TIMEOUT_MS)] * 3)
+            [mock.call(self._vmutils._DEFAULT_EVENT_TIMEOUT_MS)] * 4)
+        mock_sleep.assert_called_once_with(
+            self._vmutils._DEFAULT_EVENT_TIMEOUT_MS / 1000)
 
     def _test_get_vm_generation(self, vm_gen):
         mock_settings = self._lookup_vm()
