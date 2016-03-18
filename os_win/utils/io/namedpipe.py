@@ -46,6 +46,7 @@ class NamedPipeHandler(object):
         self._stopped = threading.Event()
         self._workers = []
         self._pipe_handle = None
+        self._lock = threading.Lock()
 
         self._ioutils = ioutils.IOUtils()
 
@@ -87,9 +88,19 @@ class NamedPipeHandler(object):
             if worker_running:
                 worker.join()
 
+        # If any worker has been spawned already, we rely on it to have
+        # cleaned up the handles before ending its execution.
+        # Note that we expect the caller to synchronize the start/stop calls.
+        if not self._workers:
+            self._cleanup_handles()
+
+        self._workers = []
+
+    def _cleanup_handles(self):
         self._close_pipe()
         if self._log_file_handle:
             self._log_file_handle.close()
+            self._log_file_handle = None
 
     def _setup_io_structures(self):
         self._r_buffer = self._ioutils.get_buffer(
@@ -156,6 +167,9 @@ class NamedPipeHandler(object):
                      overlapped_structure, completion_routine)
         except Exception:
             self._stopped.set()
+        finally:
+            with self._lock:
+                self._cleanup_handles()
 
     def _read_callback(self, num_bytes):
         data = self._ioutils.get_buffer_data(self._r_buffer,

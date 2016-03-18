@@ -90,24 +90,45 @@ class NamedPipeTestCase(base.BaseTestCase):
 
         mock_stop_handler.assert_called_once_with()
 
-    @mock.patch.object(namedpipe.NamedPipeHandler, '_close_pipe')
-    def test_stop_pipe_handler(self, mock_close_pipe):
+    @mock.patch.object(namedpipe.NamedPipeHandler, '_cleanup_handles')
+    def _test_stop_pipe_handler(self, mock_cleanup_handles,
+                                workers_started=True):
         self._mock_setup_pipe_handler()
+        if not workers_started:
+            handler_workers = []
+            self._handler._workers = handler_workers
+        else:
+            handler_workers = self._handler._workers
 
         self._handler.stop()
 
         self._handler._stopped.set.assert_called_once_with()
-        mock_close_pipe.assert_called_once_with()
-        self._handler._log_file_handle.close.assert_called_once_with()
+        if not workers_started:
+            mock_cleanup_handles.assert_called_once_with()
+        else:
+            self.assertFalse(mock_cleanup_handles.called)
 
-        self._ioutils.set_event.assert_has_calls(
-            [mock.call(self._handler._r_overlapped.hEvent),
-             mock.call(self._handler._w_overlapped.hEvent)])
-        self._ioutils.cancel_io.assert_called_once_with(
-            mock.sentinel.pipe_handle)
-
-        for worker in self._handler._workers:
+        for worker in handler_workers:
             worker.join.assert_called_once_with()
+
+        self.assertEqual([], self._handler._workers)
+
+    def test_stop_pipe_handler_workers_started(self):
+        self._test_stop_pipe_handler()
+
+    def test_stop_pipe_handler_workers_not_started(self):
+        self._test_stop_pipe_handler(workers_started=False)
+
+    @mock.patch.object(namedpipe.NamedPipeHandler, '_close_pipe')
+    def test_cleanup_handles(self, mock_close_pipe):
+        self._mock_setup_pipe_handler()
+        log_handle = self._handler._log_file_handle
+
+        self._handler._cleanup_handles()
+
+        mock_close_pipe.assert_called_once_with()
+        log_handle.close.assert_called_once_with()
+        self.assertIsNone(self._handler._log_file_handle)
 
     def test_setup_io_structures(self):
         self._handler._setup_io_structures()
@@ -196,7 +217,9 @@ class NamedPipeTestCase(base.BaseTestCase):
             self._handler._w_completion_routine,
             self._handler._get_data_to_write)
 
-    def _test_start_io_worker(self, buff_update_func=None, exception=None):
+    @mock.patch.object(namedpipe.NamedPipeHandler, '_cleanup_handles')
+    def _test_start_io_worker(self, mock_cleanup_handles,
+                              buff_update_func=None, exception=None):
         self._handler._stopped.isSet.side_effect = [False, True]
         self._handler._pipe_handle = mock.sentinel.pipe_handle
         self._handler.stop = mock.Mock()
@@ -218,8 +241,10 @@ class NamedPipeTestCase(base.BaseTestCase):
                                         fake_buffer, num_bytes,
                                         mock.sentinel.overlapped_structure,
                                         mock.sentinel.completion_routine)
+
         if exception:
             self._handler._stopped.set.assert_called_once_with()
+        mock_cleanup_handles.assert_called_once_with()
 
     def test_start_io_worker(self):
         self._test_start_io_worker()
