@@ -130,12 +130,6 @@ utils_map = {
             'min_version': 6.2,
             'max_version': None,
             'path': 'os_win.utils.compute.clusterutils.ClusterUtils'}},
-    'cluster_failover_monitor': {
-        'ClusterFailoverMonitor': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.compute.clusterutils.ClusterFailoverMonitor'
-        }},
 }
 
 
@@ -226,7 +220,3 @@ def get_diskutils():
 
 def get_clusterutils():
     return _get_class(class_type='clusterutils')
-
-
-def get_cluster_failover_monitor():
-    return _get_class(class_type='cluster_failover_monitor')

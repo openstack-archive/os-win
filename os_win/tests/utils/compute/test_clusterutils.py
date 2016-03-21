@@ -20,12 +20,18 @@ from os_win.tests import test_base
 from os_win.utils.compute import clusterutils
 
 
-class ClusterUtilsBaseTestCase(test_base.OsWinBaseTestCase):
+class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ClusterUtilsBase class."""
 
+    _FAKE_RES_NAME = "fake_res_name"
+    _FAKE_HOST = "fake_host"
+    _FAKE_PREV_HOST = "fake_prev_host"
+    _FAKE_VM_NAME = 'instance-00000001'
+    _FAKE_RESOURCEGROUP_NAME = 'Virtual Machine %s' % _FAKE_VM_NAME
+
     def setUp(self):
-        super(ClusterUtilsBaseTestCase, self).setUp()
-        self._clusterutils = clusterutils.ClusterUtilsBase()
+        super(ClusterUtilsTestCase, self).setUp()
+        self._clusterutils = clusterutils.ClusterUtils()
         self._clusterutils._conn_cluster = mock.MagicMock()
         self._clusterutils._cluster = mock.MagicMock()
 
@@ -48,7 +54,7 @@ class ClusterUtilsBaseTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.HyperVClusterException,
             self._clusterutils._init_hyperv_conn, "fake_host")
 
-    @mock.patch.object(clusterutils.ClusterUtilsBase,
+    @mock.patch.object(clusterutils.ClusterUtils,
                        '_get_cluster_nodes')
     def test_check_cluster_state_not_enough_nodes(self, mock_get_nodes):
         self.assertRaises(exceptions.HyperVClusterException,
@@ -87,20 +93,6 @@ class ClusterUtilsBaseTestCase(test_base.OsWinBaseTestCase):
         self.assertIn(vm_gr1, res)
         self.assertNotIn(vm_gr2, res)
         self.assertIn(vm_gr3, res)
-
-
-class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
-    """Unit tests for the Hyper-V ClusterTest class."""
-
-    _FAKE_VM_NAME = "fake_vm_name"
-    _FAKE_RES_NAME = "fake_res_name"
-    _FAKE_HOST = "fake_host"
-
-    def setUp(self):
-        super(ClusterUtilsTestCase, self).setUp()
-        self._clusterutils = clusterutils.ClusterUtils()
-        self._clusterutils._conn_cluster = mock.MagicMock()
-        self._clusterutils._cluster = mock.MagicMock()
 
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_lookup_vm_group')
@@ -304,88 +296,34 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             self._FAKE_HOST,
             [self._clusterutils._LIVE_MIGRATION_TYPE])
 
-
-class ClusterFailoverMonitorTestCase(test_base.OsWinBaseTestCase):
-    """Unit tests for the Hyper-V ClusterFailoverMonitor class."""
-
-    _FAKE_VM_NAME = 'instance-00000001'
-    _FAKE_RESOURCEGROUP_NAME = 'Virtual Machine %s' % _FAKE_VM_NAME
-    _FAKE_HOST = 'fake_host'
-
-    def setUp(self):
-        super(ClusterFailoverMonitorTestCase, self).setUp()
-        self._clusterutils = clusterutils.ClusterFailoverMonitor()
-        self._clusterutils._conn = mock.MagicMock()
-        self._clusterutils._cluster = mock.MagicMock()
-        self._clusterutils._vm_map = {}
-
-    @mock.patch.object(clusterutils.ClusterFailoverMonitor,
-                       '_list_vm_hosts')
-    def test_update_vm_map(self, mock_list_vm_hosts):
-        vm_map = [('vm1', 'vm_host1'), ('vm2', 'vm_host2')]
-        mock_list_vm_hosts.return_value = vm_map
-
-        self._clusterutils._update_vm_map()
-
-        self.assertEqual('vm_host1', self._clusterutils._vm_map['vm1'])
-        self.assertEqual('vm_host2', self._clusterutils._vm_map['vm2'])
-
-    @mock.patch.object(clusterutils.ClusterFailoverMonitor,
-                       '_get_vm_groups')
-    def test_list_vm_hosts(self, mock_get_vm_groups):
-        vm_groups = [mock.Mock(OwnerNode='owner1', Name='vm1'),
-                     mock.Mock(OwnerNode='owner2', Name='vm2')]
-        mock_get_vm_groups.return_value = vm_groups
-
-        ret = self._clusterutils._list_vm_hosts()
-        expected = [(r.Name, r.OwnerNode) for r in vm_groups]
-        self.assertItemsEqual(expected, ret)
-
-    def test_add_to_cluster_map(self):
-        self._clusterutils._this_node = self._FAKE_HOST
-        self._clusterutils.add_to_cluster_map(self._FAKE_VM_NAME)
-
-        self.assertEqual(self._FAKE_HOST,
-                         self._clusterutils._vm_map[self._FAKE_VM_NAME])
-
-    def test_get_from_cluster_map(self):
-        self._clusterutils._vm_map[self._FAKE_VM_NAME] = self._FAKE_HOST
-
-        self.assertEqual(
-            self._FAKE_HOST,
-            self._clusterutils.get_from_cluster_map(self._FAKE_VM_NAME))
-
-    def test_clear_from_cluster_map(self):
-        self._clusterutils._vm_map = {self._FAKE_VM_NAME: self._FAKE_HOST}
-
-        self._clusterutils.clear_from_cluster_map(self._FAKE_VM_NAME)
-
-        self.assertNotIn(self._FAKE_VM_NAME,
-                         self._clusterutils._vm_map.keys())
-
-    def test_monitor_no_vm(self):
+    def test_monitor_vm_failover_no_vm(self):
         self._clusterutils._watcher = mock.MagicMock()
+        fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
-                                         Name='Virtual Machine')
+                                         Name='Virtual Machine',
+                                         previous=fake_prev)
         self._clusterutils._watcher.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
-        self._clusterutils.monitor(fake_callback)
+        self._clusterutils.monitor_vm_failover(fake_callback)
 
         self._clusterutils._watcher.assert_called_once_with(
             self._clusterutils._WMI_EVENT_TIMEOUT_MS)
         fake_callback.assert_not_called()
 
-    def test_monitor(self):
+    def test_monitor_vm_failover(self):
         self._clusterutils._watcher = mock.MagicMock()
+        fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
-                                         Name=self._FAKE_RESOURCEGROUP_NAME)
+                                         Name=self._FAKE_RESOURCEGROUP_NAME,
+                                         previous=fake_prev)
         self._clusterutils._watcher.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
-        self._clusterutils.monitor(fake_callback)
+        self._clusterutils.monitor_vm_failover(fake_callback)
 
         self._clusterutils._watcher.assert_called_once_with(
             self._clusterutils._WMI_EVENT_TIMEOUT_MS)
         fake_callback.assert_called_once_with(self._FAKE_VM_NAME,
+                                              self._FAKE_PREV_HOST,
                                               self._FAKE_HOST)

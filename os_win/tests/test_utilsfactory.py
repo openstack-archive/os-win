@@ -136,8 +136,3 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=clusterutils.ClusterUtils,
             class_type='clusterutils')
-
-    def test_get_cluster_failover_monitor(self):
-        self._check_get_class(
-            expected_class=clusterutils.ClusterFailoverMonitor,
-            class_type='cluster_failover_monitor')

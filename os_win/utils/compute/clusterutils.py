@@ -32,7 +32,7 @@ from os_win.utils import baseutils
 LOG = logging.getLogger(__name__)
 
 
-class ClusterUtilsBase(baseutils.BaseUtils):
+class ClusterUtils(baseutils.BaseUtils):
 
     _MSCLUSTER_NODE = 'MSCluster_Node'
     _MSCLUSTER_RES = 'MSCluster_Resource'
@@ -43,9 +43,23 @@ class ClusterUtilsBase(baseutils.BaseUtils):
 
     _MS_CLUSTER_NAMESPACE = '//%s/root/MSCluster'
 
+    _LIVE_MIGRATION_TYPE = 4
+    _IGNORE_LOCKED = 1
+    _DESTROY_GROUP = 1
+
+    _FAILBACK_TRUE = 1
+    _FAILBACK_WINDOW_MIN = 0
+    _FAILBACK_WINDOW_MAX = 23
+
+    _WMI_EVENT_TIMEOUT_MS = 100
+    _WMI_EVENT_CHECK_INTERVAL = 2
+
     def __init__(self, host='.'):
+        self._instance_name_regex = re.compile('Virtual Machine (.*)')
+
         if sys.platform == 'win32':
             self._init_hyperv_conn(host)
+            self._watcher = self._get_failover_watcher()
 
     def _init_hyperv_conn(self, host):
         try:
@@ -60,6 +74,18 @@ class ClusterUtilsBase(baseutils.BaseUtils):
         except AttributeError:
             raise exceptions.HyperVClusterException(
                 _("Could not initialize cluster wmi connection."))
+
+    def _get_failover_watcher(self):
+        raw_query = (
+                "SELECT * FROM __InstanceModificationEvent "
+                "WITHIN %(wmi_check_interv)s WHERE TargetInstance ISA "
+                "'%(cluster_res)s' AND "
+                "TargetInstance.Type='%(cluster_res_type)s' AND "
+                "TargetInstance.OwnerNode != PreviousInstance.OwnerNode" %
+                {'wmi_check_interv': self._WMI_EVENT_CHECK_INTERVAL,
+                 'cluster_res': self._MSCLUSTER_RES,
+                 'cluster_res_type': self._VM_TYPE})
+        return self._conn_cluster.watch_for(raw_wql=raw_query)
 
     def check_cluster_state(self):
         if len(self._get_cluster_nodes()) < 1:
@@ -81,18 +107,6 @@ class ClusterUtilsBase(baseutils.BaseUtils):
         return (r for r in resources if
                 hasattr(r, 'GroupType') and
                 r.GroupType == self._VM_GROUP_TYPE)
-
-
-class ClusterUtils(ClusterUtilsBase):
-
-    _LIVE_MIGRATION_TYPE = 4
-
-    _IGNORE_LOCKED = 1
-    _DESTROY_GROUP = 1
-
-    _FAILBACK_TRUE = 1
-    _FAILBACK_WINDOW_MIN = 0
-    _FAILBACK_WINDOW_MAX = 23
 
     def _lookup_vm_group_check(self, vm_name):
         vm = self._lookup_vm_group(vm_name)
@@ -181,48 +195,7 @@ class ClusterUtils(ClusterUtilsBase):
                            'host': new_host,
                            'exception': e})
 
-
-class ClusterFailoverMonitor(ClusterUtilsBase):
-
-    _WMI_EVENT_TIMEOUT_MS = 100
-    _WMI_EVENT_CHECK_INTERVAL = 2
-
-    def __init__(self, host='.'):
-        super(ClusterFailoverMonitor, self).__init__(host)
-
-        self._listener = None
-        self._vm_map = {}
-        self._instance_name_regex = re.compile('Virtual Machine (.*)')
-
-        if sys.platform == 'win32':
-            raw_query = (
-                "SELECT * FROM __InstanceModificationEvent "
-                "WITHIN %(wmi_check_interv)s WHERE TargetInstance ISA "
-                "'%(cluster_res)s' AND "
-                "TargetInstance.Type='%(cluster_res_type)s'" %
-                {'wmi_check_interv': self._WMI_EVENT_CHECK_INTERVAL,
-                 'cluster_res': self._MSCLUSTER_RES,
-                 'cluster_res_type': self._VM_TYPE})
-            self._watcher = self._conn_cluster.watch_for(raw_wql=raw_query)
-            self._update_vm_map()
-
-    def _update_vm_map(self):
-        for vm_name, vm_host in self._list_vm_hosts():
-            self._vm_map[vm_name] = vm_host
-
-    def _list_vm_hosts(self):
-        return ((r.Name, r.OwnerNode) for r in self._get_vm_groups())
-
-    def add_to_cluster_map(self, vm_name):
-        self._vm_map[vm_name] = self._this_node
-
-    def get_from_cluster_map(self, vm_name):
-        return self._vm_map.get(vm_name)
-
-    def clear_from_cluster_map(self, vm_name):
-        self._vm_map.pop(vm_name)
-
-    def monitor(self, callback):
+    def monitor_vm_failover(self, callback):
         """Creates a monitor to check for new WMI MSCluster_Resource
         events.
 
@@ -237,6 +210,7 @@ class ClusterFailoverMonitor(ClusterUtilsBase):
         try:
             # wait for new event for _WMI_EVENT_TIMEOUT_MS miliseconds.
             wmi_object = self._watcher(self._WMI_EVENT_TIMEOUT_MS)
+            old_host = wmi_object.previous.OwnerNode
             new_host = wmi_object.OwnerNode
             # wmi_object.Name field is of the form:
             # 'Virtual Machine nova-instance-template'
@@ -248,11 +222,7 @@ class ClusterFailoverMonitor(ClusterUtilsBase):
 
             if vm_name:
                 try:
-                    callback(vm_name, new_host)
-                    # update the vm map, to remain consistent with any change.
-                    # this needs to happen after the callback, in case it
-                    # fails, so we don't have any inconsistencies.
-                    self._vm_map[vm_name] = new_host
+                    callback(vm_name, old_host, new_host)
                 except Exception:
                     LOG.exception(
                         _LE("Exception during failover callback."))
