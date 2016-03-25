@@ -129,6 +129,21 @@ class IOUtilsTestCase(base.BaseTestCase):
             **self._run_args)
         self.assertEqual(self._mock_run.return_value, handle)
 
+    def test_cancel_io(self):
+        self._ioutils.cancel_io(mock.sentinel.handle,
+                                mock.sentinel.overlapped_struct,
+                                ignore_invalid_handle=True)
+
+        expected_ignored_err_codes = [ioutils.ERROR_NOT_FOUND,
+                                      ioutils.ERROR_INVALID_HANDLE]
+
+        self._mock_run.assert_called_once_with(
+            ioutils.kernel32.CancelIoEx,
+            mock.sentinel.handle,
+            self._ctypes.byref(mock.sentinel.overlapped_struct),
+            ignored_error_codes=expected_ignored_err_codes,
+            **self._run_args)
+
     def test_close_handle(self):
         self._ioutils.close_handle(mock.sentinel.handle)
 

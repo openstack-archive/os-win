@@ -80,19 +80,23 @@ class NamedPipeHandler(object):
 
     def stop(self):
         self._stopped.set()
-        self._cancel_io()
-
-        for worker in self._workers:
-            worker_running = (worker.is_alive() and
-                              worker is not threading.current_thread())
-            if worker_running:
-                worker.join()
 
         # If any worker has been spawned already, we rely on it to have
         # cleaned up the handles before ending its execution.
         # Note that we expect the caller to synchronize the start/stop calls.
         if not self._workers:
             self._cleanup_handles()
+
+        for worker in self._workers:
+            # It may happen that another IO request was issued right after
+            # we've set the stopped event and canceled pending requests.
+            # In this case, retrying will ensure that the IO workers are
+            # stopped properly and that there are no more outstanding IO
+            # operations.
+            while (worker.is_alive() and
+                   worker is not threading.current_thread()):
+                self._cancel_io()
+                worker.join(0.5)
 
         self._workers = []
 
@@ -135,9 +139,14 @@ class NamedPipeHandler(object):
 
     def _cancel_io(self):
         if self._pipe_handle:
-            self._ioutils.set_event(self._r_overlapped.hEvent)
-            self._ioutils.set_event(self._w_overlapped.hEvent)
-            self._ioutils.cancel_io(self._pipe_handle)
+            # We ignore invalid handle errors. Even if the pipe is closed
+            # and the handle reused, by specifing the overlapped structures
+            # we ensure that we don't cancel IO operations other than the
+            # ones that we care about.
+            self._ioutils.cancel_io(self._pipe_handle, self._r_overlapped,
+                                    ignore_invalid_handle=True)
+            self._ioutils.cancel_io(self._pipe_handle, self._w_overlapped,
+                                    ignore_invalid_handle=True)
 
     def _read_from_pipe(self):
         self._start_io_worker(self._ioutils.read,

@@ -81,6 +81,7 @@ FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
 INVALID_HANDLE_VALUE = -1
 WAIT_FAILED = 0xFFFFFFFF
 WAIT_FINISHED = 0
+ERROR_INVALID_HANDLE = 6
 ERROR_PIPE_BUSY = 231
 ERROR_PIPE_NOT_CONNECTED = 233
 ERROR_NOT_FOUND = 1168
@@ -171,14 +172,24 @@ class IOUtils(object):
     def close_handle(self, handle):
         self._run_and_check_output(kernel32.CloseHandle, handle)
 
-    def cancel_io(self, handle, overlapped_structure=None):
-        """Cancels pending IO on specified handle."""
+    def cancel_io(self, handle, overlapped_structure=None,
+                  ignore_invalid_handle=False):
+        """Cancels pending IO on specified handle.
+
+        If an overlapped structure is passed, only the IO requests that
+        were issued with the specified overlapped structure are canceled.
+        """
         # Ignore errors thrown when there are no requests
         # to be canceled.
         ignored_error_codes = [ERROR_NOT_FOUND]
+        if ignore_invalid_handle:
+            ignored_error_codes.append(ERROR_INVALID_HANDLE)
+        lp_overlapped = (ctypes.byref(overlapped_structure)
+                         if overlapped_structure else None)
+
         self._run_and_check_output(kernel32.CancelIoEx,
                                    handle,
-                                   overlapped_structure,
+                                   lp_overlapped,
                                    ignored_error_codes=ignored_error_codes)
 
     def _wait_io_completion(self, event):

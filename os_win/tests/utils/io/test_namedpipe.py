@@ -52,7 +52,9 @@ class NamedPipeTestCase(base.BaseTestCase):
     def _mock_setup_pipe_handler(self):
         self._handler._log_file_handle = mock.Mock()
         self._handler._pipe_handle = mock.sentinel.pipe_handle
-        self._handler._workers = [mock.Mock(), mock.Mock()]
+        self._r_worker = mock.Mock()
+        self._w_worker = mock.Mock()
+        self._handler._workers = [self._r_worker, self._w_worker]
         self._handler._r_buffer = mock.Mock()
         self._handler._w_buffer = mock.Mock()
         self._handler._r_overlapped = mock.Mock()
@@ -91,7 +93,9 @@ class NamedPipeTestCase(base.BaseTestCase):
         mock_stop_handler.assert_called_once_with()
 
     @mock.patch.object(namedpipe.NamedPipeHandler, '_cleanup_handles')
-    def _test_stop_pipe_handler(self, mock_cleanup_handles,
+    @mock.patch.object(namedpipe.NamedPipeHandler, '_cancel_io')
+    def _test_stop_pipe_handler(self, mock_cancel_io,
+                                mock_cleanup_handles,
                                 workers_started=True):
         self._mock_setup_pipe_handler()
         if not workers_started:
@@ -99,6 +103,8 @@ class NamedPipeTestCase(base.BaseTestCase):
             self._handler._workers = handler_workers
         else:
             handler_workers = self._handler._workers
+            self._r_worker.is_alive.side_effect = (True, False)
+            self._w_worker.is_alive.return_value = False
 
         self._handler.stop()
 
@@ -108,8 +114,10 @@ class NamedPipeTestCase(base.BaseTestCase):
         else:
             self.assertFalse(mock_cleanup_handles.called)
 
-        for worker in handler_workers:
-            worker.join.assert_called_once_with()
+        if workers_started:
+            mock_cancel_io.assert_called_once_with()
+            self._r_worker.join.assert_called_once_with(0.5)
+            self.assertFalse(self._w_worker.join.called)
 
         self.assertEqual([], self._handler._workers)
 
@@ -186,11 +194,14 @@ class NamedPipeTestCase(base.BaseTestCase):
 
         self._handler._cancel_io()
 
-        self._ioutils.set_event.assert_has_calls(
-            [mock.call(self._handler._r_overlapped.hEvent),
-             mock.call(self._handler._w_overlapped.hEvent)])
-        self._ioutils.cancel_io.assert_called_once_with(
-            mock.sentinel.pipe_handle)
+        overlapped_structures = [self._handler._r_overlapped,
+                                 self._handler._w_overlapped]
+
+        self._ioutils.cancel_io.assert_has_calls(
+            [mock.call(self._handler._pipe_handle,
+                       overlapped_structure,
+                       ignore_invalid_handle=True)
+             for overlapped_structure in overlapped_structures])
 
     @mock.patch.object(namedpipe.NamedPipeHandler, '_start_io_worker')
     def test_read_from_pipe(self, mock_start_worker):
