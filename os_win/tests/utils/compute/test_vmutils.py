@@ -543,7 +543,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
             mock_diskdrive)
 
-        mock_get_wmi_obj.assert_called_once_with(self._FAKE_RES_PATH)
+        mock_get_wmi_obj.assert_called_once_with(self._FAKE_RES_PATH, True)
         self.assertEqual(mock_diskdrive.HostResource,
                          [self._FAKE_MOUNTED_DISK_PATH])
 

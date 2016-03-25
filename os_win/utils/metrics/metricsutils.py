@@ -60,7 +60,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
     @property
     def _metrics_svc(self):
         if not self._metrics_svc_obj:
-            self._metrics_svc_obj = self._conn.Msvm_MetricService()[0]
+            self._metrics_svc_obj = self._compat_conn.Msvm_MetricService()[0]
         return self._metrics_svc_obj
 
     @property

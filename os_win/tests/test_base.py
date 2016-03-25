@@ -24,6 +24,9 @@ class OsWinBaseTestCase(base.BaseTestCase):
         super(OsWinBaseTestCase, self).setUp()
 
         self._mock_wmi = mock.MagicMock()
+        mock_os = mock.MagicMock(Version='6.3.0')
+        self._mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = (
+            [mock_os])
         wmi_patcher = mock.patch.object(builtins, 'wmi', create=True,
                                         new=self._mock_wmi)
         wmi_patcher.start()

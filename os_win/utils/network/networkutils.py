@@ -397,10 +397,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
 
     def _get_setting_data(self, class_name, element_name, create=True):
         element_name = element_name.replace("'", '"')
-        q = self._conn.query("SELECT * FROM %(class_name)s WHERE "
-                             "ElementName = '%(element_name)s'" %
-                             {"class_name": class_name,
-                              "element_name": element_name})
+        q = self._compat_conn.query("SELECT * FROM %(class_name)s WHERE "
+                                    "ElementName = '%(element_name)s'" %
+                                    {"class_name": class_name,
+                                     "element_name": element_name})
         data = self._get_first_item(q)
         found = data is not None
         if not data and create:
@@ -409,11 +409,11 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         return data, found
 
     def _get_default_setting_data(self, class_name):
-        return self._conn.query("SELECT * FROM %s WHERE InstanceID "
-                                "LIKE '%%\\Default'" % class_name)[0]
+        return self._compat_conn.query("SELECT * FROM %s WHERE InstanceID "
+                                       "LIKE '%%\\Default'" % class_name)[0]
 
     def _create_default_setting_data(self, class_name):
-        return getattr(self._conn, class_name).new()
+        return getattr(self._compat_conn, class_name).new()
 
     def _get_first_item(self, obj):
         if obj:

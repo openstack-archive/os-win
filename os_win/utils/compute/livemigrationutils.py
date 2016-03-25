@@ -44,7 +44,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
 
     def _get_conn_v2(self, host='localhost'):
         try:
-            return self._get_wmi_conn(self._wmi_namespace % host)
+            return self._get_wmi_obj(self._wmi_namespace % host)
         except wmi.x_wmi as ex:
             LOG.exception(_LE('Get version 2 connection error'))
             if ex.com_error.hresult == -2147217394:
@@ -58,9 +58,11 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
             raise exceptions.HyperVException(msg)
 
     def check_live_migration_config(self):
-        migration_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]
+        migration_svc = (
+            self._compat_conn.Msvm_VirtualSystemMigrationService()[0])
         vsmssd = (
-            self._conn.Msvm_VirtualSystemMigrationServiceSettingData()[0])
+            self._compat_conn.Msvm_VirtualSystemMigrationServiceSettingData())
+        vsmssd = vsmssd[0]
         if not vsmssd.EnableVirtualSystemMigration:
             raise exceptions.HyperVException(
                 _('Live migration is not enabled on this host'))
@@ -164,7 +166,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
                                           disk_paths_remote):
         updated_resource_setting_data = []
         sasds = _wqlutils.get_element_associated_class(
-            self._conn, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
+            self._compat_conn, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
             element_uuid=planned_vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 17 and sasd.ResourceSubType ==
@@ -193,7 +195,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
     def _get_vhd_setting_data(self, vm):
         new_resource_setting_data = []
         sasds = _wqlutils.get_element_associated_class(
-            self._conn, self._STORAGE_ALLOC_SETTING_DATA_CLASS,
+            self._compat_conn, self._STORAGE_ALLOC_SETTING_DATA_CLASS,
             element_uuid=vm.Name)
         for sasd in sasds:
             if (sasd.ResourceType == 31 and sasd.ResourceSubType ==
@@ -233,7 +235,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
 
         conn_v2_remote = self._get_conn_v2(dest_host)
 
-        vm = self._get_vm(self._conn, vm_name)
+        vm = self._get_vm(self._compat_conn, vm_name)
 
         rmt_ip_addr_list = self._get_ip_address_list(conn_v2_remote,
                                                      dest_host)
@@ -257,7 +259,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
                                                                disk_paths,
                                                                dest_host)
                 planned_vm = self._create_planned_vm(conn_v2_remote,
-                                                     self._conn,
+                                                     self._compat_conn,
                                                      vm, rmt_ip_addr_list,
                                                      dest_host)
                 self._update_planned_vm_disk_resources(
@@ -266,8 +268,9 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
             planned_vm = planned_vms[0]
 
         new_resource_setting_data = self._get_vhd_setting_data(vm)
-        self._live_migrate_vm(self._conn, vm, planned_vm, rmt_ip_addr_list,
-                              new_resource_setting_data, dest_host)
+        self._live_migrate_vm(self._compat_conn, vm, planned_vm,
+                              rmt_ip_addr_list, new_resource_setting_data,
+                              dest_host)
 
     def create_planned_vm(self, vm_name, src_host, disk_path_mapping):
         # This is run on the destination host.
@@ -278,17 +281,17 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         vm = self._get_vm(conn_v2_remote, vm_name)
 
         # Make sure there are no planned VMs already.
-        self._destroy_existing_planned_vms(self._conn, vm)
+        self._destroy_existing_planned_vms(self._compat_conn, vm)
 
-        ip_addr_list = self._get_ip_address_list(self._conn,
+        ip_addr_list = self._get_ip_address_list(self._compat_conn,
                                                  dest_host)
 
         disk_paths = self._get_disk_data(vm_name, vmutils_remote,
                                          disk_path_mapping)
 
-        planned_vm = self._create_planned_vm(self._conn,
+        planned_vm = self._create_planned_vm(self._compat_conn,
                                              conn_v2_remote,
                                              vm, ip_addr_list,
                                              dest_host)
-        self._update_planned_vm_disk_resources(self._conn, planned_vm,
+        self._update_planned_vm_disk_resources(self._compat_conn, planned_vm,
                                                vm_name, disk_paths)

@@ -13,14 +13,14 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import constants
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils import jobutils
 
 
-class JobUtilsTestCase(base.BaseTestCase):
+class JobUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V JobUtils class."""
 
     _FAKE_RET_VAL = 0
@@ -151,7 +151,8 @@ class JobUtilsTestCase(base.BaseTestCase):
     @mock.patch('time.sleep')
     def _check_modify_virt_resource_max_retries(
             self, mock_sleep, side_effect, num_calls=1, expected_fail=False):
-        mock_svc = self.jobutils._vs_man_svc
+        mock_svc = mock.MagicMock()
+        self.jobutils._vs_man_svc_attr = mock_svc
         mock_svc.ModifyResourceSettings.side_effect = side_effect
         mock_res_setting_data = mock.MagicMock()
         mock_res_setting_data.GetText_.return_value = mock.sentinel.res_data
@@ -190,7 +191,8 @@ class JobUtilsTestCase(base.BaseTestCase):
 
     def _test_virt_method(self, vsms_method_name, return_count,
                           utils_method_name, with_mock_vm, *args, **kwargs):
-        mock_svc = self.jobutils._vs_man_svc
+        mock_svc = mock.MagicMock()
+        self.jobutils._vs_man_svc_attr = mock_svc
         vsms_method = getattr(mock_svc, vsms_method_name)
         mock_rsd = self._mock_vsms_method(vsms_method, return_count)
         if with_mock_vm:

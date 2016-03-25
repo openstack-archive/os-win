@@ -78,6 +78,7 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
         super(BaseUtilsVirtTestCase, self).setUp()
         self.utils = baseutils.BaseUtilsVirt()
         self.utils._conn_attr = mock.MagicMock()
+        baseutils.BaseUtilsVirt._os_version = None
 
     @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_conn')
     def test_conn(self, mock_get_wmi_conn):
@@ -88,5 +89,44 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
             self.utils._wmi_namespace % '.')
 
     def test_vs_man_svc(self):
+        mock_os = mock.MagicMock(Version='6.3.0')
+        self._mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
+            mock_os]
         expected = self.utils._conn.Msvm_VirtualSystemManagementService()[0]
         self.assertEqual(expected, self.utils._vs_man_svc)
+
+    @mock.patch.object(baseutils, 'imp')
+    @mock.patch.object(baseutils, 'wmi', create=True)
+    def test_vs_man_svc_2012(self, mock_wmi, mock_imp):
+        mock_os = mock.MagicMock(Version='6.2.0')
+        mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
+            mock_os]
+        fake_module_path = '/fake/path/to/module'
+        mock_wmi.__path__ = [fake_module_path]
+        old_conn = mock_imp.load_source.return_value.WMI.return_value
+
+        expected = old_conn.Msvm_VirtualSystemManagementService()[0]
+        self.assertEqual(expected, self.utils._vs_man_svc)
+        mock_imp.load_source.assert_called_once_with(
+            'old_wmi', '%s.py' % fake_module_path)
+
+    @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_compat_conn')
+    def test_get_wmi_obj_compatibility_6_3(self, mock_get_wmi_compat):
+        mock_os = mock.MagicMock(Version='6.3.0')
+        self._mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
+            mock_os]
+
+        result = self.utils._get_wmi_obj(mock.sentinel.moniker, True)
+        self.assertEqual(self._mock_wmi.WMI.return_value, result)
+
+    @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_compat_conn')
+    def test_get_wmi_obj_no_compatibility_6_2(self, mock_get_wmi_compat):
+        baseutils.BaseUtilsVirt._os_version = [6, 2]
+        result = self.utils._get_wmi_obj(mock.sentinel.moniker, False)
+        self.assertEqual(self._mock_wmi.WMI.return_value, result)
+
+    @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_compat_conn')
+    def test_get_wmi_obj_compatibility_6_2(self, mock_get_wmi_compat):
+        baseutils.BaseUtilsVirt._os_version = [6, 2]
+        result = self.utils._get_wmi_obj(mock.sentinel.moniker, True)
+        self.assertEqual(mock_get_wmi_compat.return_value, result)
