@@ -981,6 +981,14 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_vm_generation_gen2(self):
         self._test_get_vm_generation(constants.VM_GEN_2)
 
+    def test_get_vm_generation_no_attr(self):
+        mock_settings = self._lookup_vm()
+        mock_settings.VirtualSystemSubType.side_effect = AttributeError
+
+        ret = self._vmutils.get_vm_generation(mock.sentinel.FAKE_VM_NAME)
+
+        self.assertEqual(constants.VM_GEN_1, ret)
+
     def test_stop_vm_jobs(self):
         mock_vm = self._lookup_vm()
 
