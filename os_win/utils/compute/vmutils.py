@@ -885,9 +885,14 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def get_vm_generation(self, vm_name):
         vssd = self._lookup_vm_check(vm_name)
-        if hasattr(vssd, self._VIRTUAL_SYSTEM_SUBTYPE):
+        try:
             # expected format: 'Microsoft:Hyper-V:SubType:2'
             return int(vssd.VirtualSystemSubType.split(':')[-1])
+        except Exception:
+            # NOTE(claudiub): The Msvm_VirtualSystemSettingData object does not
+            # contain the VirtualSystemSubType field on Windows Hyper-V /
+            # Server 2012.
+            pass
         return constants.VM_GEN_1
 
     def stop_vm_jobs(self, vm_name):
