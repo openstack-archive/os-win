@@ -123,7 +123,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
     _DEFAULT_EVENT_TIMEOUT_MS = 2000
 
     def __init__(self, host='.'):
-        super(VMUtils, self).__init__()
+        super(VMUtils, self).__init__(host)
         self._jobutils = jobutils.JobUtils()
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
