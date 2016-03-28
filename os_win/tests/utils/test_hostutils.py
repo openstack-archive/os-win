@@ -13,10 +13,10 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import constants
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils import hostutils
 
 
@@ -31,7 +31,7 @@ class FakeCPUSpec(object):
     NumberOfLogicalProcessors = mock.sentinel.cpu_procs
 
 
-class HostUtilsTestCase(base.BaseTestCase):
+class HostUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V hostutils class."""
 
     _DEVICE_ID = "Microsoft:UUID\\0\\0"

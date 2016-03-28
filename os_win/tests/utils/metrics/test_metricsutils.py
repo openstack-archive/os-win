@@ -14,14 +14,14 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils import _wqlutils
 from os_win.utils.metrics import metricsutils
 
 
-class MetricsUtilsTestCase(base.BaseTestCase):
+class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V MetricsUtils class."""
 
     _FAKE_RET_VAL = 0

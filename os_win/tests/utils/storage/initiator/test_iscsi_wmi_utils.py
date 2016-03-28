@@ -13,13 +13,13 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 
-class ISCSIInitiatorWMIUtilsTestCase(base.BaseTestCase):
+class ISCSIInitiatorWMIUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ISCSIInitiatorWMIUtils class."""
 
     _FAKE_PORTAL_ADDR = '10.1.1.1'

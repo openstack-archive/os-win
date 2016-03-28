@@ -15,12 +15,12 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
+from os_win.tests import test_base
 from os_win.utils.storage.initiator import base_iscsi_utils
 
 
-class BaseISCSIInitiatorUtilsTestCase(base.BaseTestCase):
+class BaseISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V BaseISCSIInitiatorUtils class."""
 
     _FAKE_COMPUTER_NAME = "fake_computer_name"

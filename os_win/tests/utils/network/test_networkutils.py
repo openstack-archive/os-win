@@ -13,14 +13,14 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
 from os_win import exceptions
+from os_win.tests import test_base
 from os_win.utils import _wqlutils
 from os_win.utils.network import networkutils
 
 
-class NetworkUtilsTestCase(base.BaseTestCase):
+class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V NetworkUtils class."""
 
     _FAKE_VSWITCH_NAME = "fake_vswitch_name"
@@ -696,7 +696,7 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         self.assertEqual([0, 0], actual)
 
 
-class TestNetworkUtilsR2(base.BaseTestCase):
+class TestNetworkUtilsR2(test_base.OsWinBaseTestCase):
 
     def setUp(self):
         super(TestNetworkUtilsR2, self).setUp()
