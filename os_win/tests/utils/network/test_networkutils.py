@@ -284,21 +284,37 @@ class NetworkUtilsTestCase(base.BaseTestCase):
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
-    def test_set_vswitch_port_vlan_id(self, mock_create_default_sd):
+    def _check_set_vswitch_port_vlan_id(self, mock_create_default_sd,
+                                      missing_vlan=False):
         mock_port = self._mock_get_switch_port_alloc(found=True)
         old_vlan_settings = mock.MagicMock()
+        if missing_vlan:
+            side_effect = [old_vlan_settings, None]
+        else:
+            side_effect = [old_vlan_settings, old_vlan_settings]
         self.netutils._get_vlan_setting_data_from_port_alloc = mock.MagicMock(
-            return_value=old_vlan_settings)
+            side_effect=side_effect)
         mock_vlan_settings = mock.MagicMock()
         mock_create_default_sd.return_value = mock_vlan_settings
 
-        self.netutils.set_vswitch_port_vlan_id(self._FAKE_VLAN_ID,
-                                               self._FAKE_PORT_NAME)
+        if missing_vlan:
+            self.assertRaises(exceptions.HyperVException,
+                              self.netutils.set_vswitch_port_vlan_id,
+                              self._FAKE_VLAN_ID, self._FAKE_PORT_NAME)
+        else:
+            self.netutils.set_vswitch_port_vlan_id(self._FAKE_VLAN_ID,
+                                                   self._FAKE_PORT_NAME)
 
         mock_remove_feature = self.netutils._jobutils.remove_virt_feature
         mock_remove_feature.assert_called_once_with(old_vlan_settings)
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         mock_add_feature.assert_called_once_with(mock_vlan_settings, mock_port)
+
+    def test_set_vswitch_port_vlan_id(self):
+        self._check_set_vswitch_port_vlan_id()
+
+    def test_set_vswitch_port_vlan_id_missing(self):
+        self._check_set_vswitch_port_vlan_id(missing_vlan=True)
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_get_vlan_setting_data_from_port_alloc')
@@ -316,25 +332,43 @@ class NetworkUtilsTestCase(base.BaseTestCase):
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         self.assertFalse(mock_add_feature.called)
 
-    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_security_setting_data_from_port_alloc')
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
-    def test_set_vswitch_port_vsid(self, mock_create_default_sd,
-                                   mock_get_element_associated_class):
+    def _check_set_vswitch_port_vsid(self, mock_create_default_sd,
+                                   mock_get_security_sd, missing_vsid=False):
         mock_port_alloc = self._mock_get_switch_port_alloc()
 
         mock_vsid_settings = mock.MagicMock()
-        mock_get_element_associated_class.return_value = [mock_vsid_settings]
+        if missing_vsid:
+            side_effect = [mock_vsid_settings, None]
+        else:
+            side_effect = [mock_vsid_settings, mock_vsid_settings]
+
+        mock_get_security_sd.side_effect = side_effect
         mock_create_default_sd.return_value = mock_vsid_settings
 
-        self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
-                                            mock.sentinel.switch_port_name)
+        if missing_vsid:
+            self.assertRaises(exceptions.HyperVException,
+                              self.netutils.set_vswitch_port_vsid,
+                              mock.sentinel.vsid,
+                              mock.sentinel.switch_port_name)
+        else:
+            self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
+                                                mock.sentinel.switch_port_name)
 
         mock_remove_feature = self.netutils._jobutils.remove_virt_feature
         mock_remove_feature.assert_called_once_with(mock_vsid_settings)
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         mock_add_feature.assert_called_once_with(mock_vsid_settings,
                                                  mock_port_alloc)
+
+    def test_set_vswitch_port_vsid(self):
+        self._check_set_vswitch_port_vsid()
+
+    def test_set_vswitch_port_vsid_missing(self):
+        self._check_set_vswitch_port_vsid(missing_vsid=True)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_set_vswitch_port_vsid_already_set(self, mock_get_elem_assoc_cls):
