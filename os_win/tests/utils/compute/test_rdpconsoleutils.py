@@ -13,12 +13,12 @@
 #    under the License.
 
 import mock
-from oslotest import base
 
+from os_win.tests import test_base
 from os_win.utils.compute import rdpconsoleutils
 
 
-class RDPConsoleUtilsTestCase(base.BaseTestCase):
+class RDPConsoleUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_RDP_PORT = 1000
 
     def setUp(self):
