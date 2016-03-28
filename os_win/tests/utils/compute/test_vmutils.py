@@ -570,15 +570,19 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock_rasds[0].HostResource[0])
 
     def test_take_vm_snapshot(self):
-        self._lookup_vm()
+        mock_vm = self._lookup_vm()
+        mock_snap = mock.MagicMock(Antecedent=mock_vm)
+        self._vmutils._conn.Msvm_MostCurrentSnapshotInBranch.return_value = [
+            mock.MagicMock(), mock_snap]
 
         mock_svc = self._get_snapshot_service()
         mock_svc.CreateSnapshot.return_value = (self._FAKE_JOB_PATH,
                                                 mock.MagicMock(),
                                                 self._FAKE_RET_VAL)
 
-        self._vmutils.take_vm_snapshot(self._FAKE_VM_NAME)
+        snap_path = self._vmutils.take_vm_snapshot(self._FAKE_VM_NAME)
 
+        self.assertEqual(mock_snap.Dependent.path_.return_value, snap_path)
         mock_svc.CreateSnapshot.assert_called_with(
             AffectedSystem=self._FAKE_VM_PATH,
             SnapshotType=self._vmutils._SNAPSHOT_FULL)
