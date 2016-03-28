@@ -649,10 +649,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
             SnapshotType=self._SNAPSHOT_FULL)
         self._jobutils.check_ret_val(ret_val, job_path)
 
-        snp_setting_data = self._conn.Msvm_MostCurrentSnapshotInBranch(
-            Antecedent=vm.path_())[0].Dependent
+        vm_path = vm.path_().lower()
+        current_snapshots = self._conn.Msvm_MostCurrentSnapshotInBranch()
+        snp_setting_data = [s for s in current_snapshots if
+                            s.Antecedent.path_().lower() == vm_path][0]
 
-        return snp_setting_data.path_()
+        return snp_setting_data.Dependent.path_()
 
     def remove_vm_snapshot(self, snapshot_path):
         vs_snap_svc = self._conn.Msvm_VirtualSystemSnapshotService()[0]
