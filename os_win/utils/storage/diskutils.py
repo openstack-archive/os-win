@@ -13,14 +13,21 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
+import os
 import re
+import sys
 
 from oslo_log import log as logging
 
-from os_win._i18n import _
+from os_win._i18n import _, _LE
 from os_win import _utils
 from os_win import exceptions
 from os_win.utils import baseutils
+from os_win.utils import win32utils
+
+if sys.platform == 'win32':
+    kernel32 = ctypes.windll.kernel32
 
 LOG = logging.getLogger(__name__)
 
@@ -31,6 +38,7 @@ class DiskUtils(baseutils.BaseUtils):
 
     def __init__(self):
         self._conn_storage = self._get_wmi_conn(self._wmi_namespace)
+        self._win32_utils = win32utils.Win32Utils()
 
         # Physical device names look like \\.\PHYSICALDRIVE1
         self._phys_dev_name_regex = re.compile(r'\\\\.*\\[a-zA-Z]*([\d]+)')
@@ -62,3 +70,28 @@ class DiskUtils(baseutils.BaseUtils):
         # TODO(lpetrut): find a better way to do this.
         cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
         _utils.execute(*cmd)
+
+    def get_disk_capacity(self, path, ignore_errors=False):
+        norm_path = os.path.abspath(path)
+
+        total_bytes = ctypes.c_ulonglong(0)
+        free_bytes = ctypes.c_ulonglong(0)
+
+        try:
+            self._win32_utils.run_and_check_output(
+                kernel32.GetDiskFreeSpaceExW,
+                ctypes.c_wchar_p(norm_path),
+                None,
+                ctypes.pointer(total_bytes),
+                ctypes.pointer(free_bytes),
+                kernel32_lib_func=True)
+            return total_bytes.value, free_bytes.value
+        except exceptions.Win32Exception as exc:
+            LOG.error(_LE("Could not get disk %(path)s capacity info. "
+                          "Exception: %(exc)s"),
+                      dict(path=path,
+                           exc=exc))
+            if ignore_errors:
+                return 0, 0
+            else:
+                raise exc

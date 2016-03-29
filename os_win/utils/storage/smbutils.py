@@ -86,6 +86,8 @@ class SMBUtils(baseutils.BaseUtils):
                     raise exceptions.SMBException(
                         _("Could not unmount share: %s") % share_path)
 
+    # TODO(atuvenie) This method should be removed once all the callers
+    # have changed to using the get_disk_capacity method from diskutils
     def get_share_capacity_info(self, share_path, ignore_errors=False):
         norm_path = os.path.abspath(share_path)
 
