@@ -16,6 +16,7 @@ import os
 
 import mock
 from oslotest import base
+import six
 
 from os_win import constants
 from os_win import exceptions
@@ -640,6 +641,7 @@ class VHDUtilsTestCase(base.BaseTestCase):
         internal_size = self._vhdutils._get_internal_vhdx_size_by_file_size(
             mock.sentinel.vhd_path, new_vhd_sz, fake_vhd_info)
 
+        self.assertIn(type(internal_size), six.integer_types)
         self.assertEqual(expected_max_int_sz, internal_size)
 
     def test_get_vhdx_internal_size_exception(self):
