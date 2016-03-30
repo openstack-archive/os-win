@@ -435,7 +435,7 @@ class VHDUtils(object):
                 ls = self._get_vhdx_log_size(f)
                 ms = self._get_vhdx_metadata_size_and_offset(f)[0]
 
-                chunk_ratio = (1 << 23) * lss / bs
+                chunk_ratio = (1 << 23) * lss // bs
                 size = new_vhd_file_size
 
                 max_internal_size = (bs * chunk_ratio * (size - hs -
