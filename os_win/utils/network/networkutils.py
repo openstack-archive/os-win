@@ -251,7 +251,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         return query
 
     def connect_vnic_to_vswitch(self, vswitch_name, switch_port_name):
-        port, found = self._get_switch_port_allocation(switch_port_name, True)
+        port, found = self._get_switch_port_allocation(
+            switch_port_name, create=True, expected=False)
         if found and port.HostResource and port.HostResource[0]:
             # vswitch port already exists and is connected to vswitch.
             return
@@ -276,7 +277,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
 
     def remove_switch_port(self, switch_port_name, vnic_deleted=False):
         """Removes the switch port."""
-        sw_port, found = self._get_switch_port_allocation(switch_port_name)
+        sw_port, found = self._get_switch_port_allocation(switch_port_name,
+                                                          expected=False)
         if not sw_port:
             # Port not found. It happens when the VM was already deleted.
             return
@@ -293,10 +295,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         self._vsid_sds.pop(sw_port.InstanceID, None)
 
     def set_vswitch_port_vlan_id(self, vlan_id, switch_port_name):
-        port_alloc, found = self._get_switch_port_allocation(switch_port_name)
-        if not found:
-            raise exceptions.HyperVException(
-                _('Port Allocation not found: %s') % switch_port_name)
+        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
 
         vlan_settings = self._get_vlan_setting_data_from_port_alloc(port_alloc)
         if vlan_settings:
@@ -327,10 +326,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 _('Port VLAN not found: %s') % switch_port_name)
 
     def set_vswitch_port_vsid(self, vsid, switch_port_name):
-        port_alloc, found = self._get_switch_port_allocation(switch_port_name)
-        if not found:
-            raise exceptions.HyperVPortNotFoundException(
-                port_name=switch_port_name)
+        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
 
         vsid_settings = self._get_security_setting_data_from_port_alloc(
             port_alloc)
@@ -380,7 +376,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             cache[port_alloc.InstanceID] = setting_data
         return setting_data
 
-    def _get_switch_port_allocation(self, switch_port_name, create=False):
+    def _get_switch_port_allocation(self, switch_port_name, create=False,
+                                    expected=True):
         if switch_port_name in self._switch_ports:
             return self._switch_ports[switch_port_name], True
 
@@ -393,6 +390,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             # represent real objects yet.
             # if it was found, it means that it was not created.
             self._switch_ports[switch_port_name] = switch_port
+        elif expected:
+            raise exceptions.HyperVPortNotFoundException(
+                port_name=switch_port_name)
         return switch_port, found
 
     def _get_setting_data(self, class_name, element_name, create=True):
@@ -420,9 +420,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             return obj[0]
 
     def add_metrics_collection_acls(self, switch_port_name):
-        port, found = self._get_switch_port_allocation(switch_port_name, False)
-        if not found:
-            return
+        port = self._get_switch_port_allocation(switch_port_name)[0]
 
         # Add the ACLs only if they don't already exist
         acls = _wqlutils.get_element_associated_class(
@@ -439,9 +437,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                     self._jobutils.add_virt_feature(acl, port)
 
     def is_metrics_collection_allowed(self, switch_port_name):
-        port, found = self._get_switch_port_allocation(switch_port_name, False)
-        if not found:
-            return False
+        port = self._get_switch_port_allocation(switch_port_name)[0]
 
         if not self._is_port_vm_started(port):
             return False
@@ -470,17 +466,12 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         return summary_info[0].EnabledState is self._HYPERV_VM_STATE_ENABLED
 
     def create_security_rules(self, switch_port_name, sg_rules):
-        port, found = self._get_switch_port_allocation(switch_port_name, False)
-        if not found:
-            return
+        port = self._get_switch_port_allocation(switch_port_name)[0]
 
         self._bind_security_rules(port, sg_rules)
 
     def remove_security_rules(self, switch_port_name, sg_rules):
-        port, found = self._get_switch_port_allocation(switch_port_name, False)
-        if not found:
-            # Port not found. It happens when the VM was already deleted.
-            return
+        port = self._get_switch_port_allocation(switch_port_name)[0]
 
         acls = _wqlutils.get_element_associated_class(
             self._conn, self._PORT_EXT_ACL_SET_DATA,
@@ -498,10 +489,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             self._sg_acl_sds[port.ElementName] = new_acls
 
     def remove_all_security_rules(self, switch_port_name):
-        port, found = self._get_switch_port_allocation(switch_port_name, False)
-        if not found:
-            # Port not found. It happens when the VM was already deleted.
-            return
+        port = self._get_switch_port_allocation(switch_port_name)[0]
 
         acls = _wqlutils.get_element_associated_class(
             self._conn, self._PORT_EXT_ACL_SET_DATA,
