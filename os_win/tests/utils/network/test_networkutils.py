@@ -383,14 +383,6 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
 
     @mock.patch.object(networkutils.NetworkUtils,
-                       '_get_switch_port_allocation')
-    def test_set_vswitch_port_vsid_port_not_found(self, mock_get_port):
-        mock_get_port.return_value = None, False
-        self.assertRaises(exceptions.HyperVPortNotFoundException,
-                          self.netutils.set_vswitch_port_vsid,
-                          mock.sentinel.vsid, mock.sentinel.port_name)
-
-    @mock.patch.object(networkutils.NetworkUtils,
                        '_get_setting_data_from_port_alloc')
     def test_get_vlan_setting_data_from_port_alloc(self, mock_get_sd):
         mock_port = mock.MagicMock()
@@ -457,6 +449,17 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(mock.sentinel.port, port)
         self.assertTrue(found)
         self.assertIn(mock.sentinel.port_name, self.netutils._switch_ports)
+        mock_get_set_data.assert_called_once_with(
+            self.netutils._PORT_ALLOC_SET_DATA, mock.sentinel.port_name, False)
+
+    @mock.patch.object(networkutils.NetworkUtils, '_get_setting_data')
+    def test_get_switch_port_allocation_expected(self, mock_get_set_data):
+        self.netutils._switch_ports = {}
+        mock_get_set_data.return_value = (None, False)
+
+        self.assertRaises(exceptions.HyperVPortNotFoundException,
+                          self.netutils._get_switch_port_allocation,
+                          mock.sentinel.port_name, expected=True)
         mock_get_set_data.assert_called_once_with(
             self.netutils._PORT_ALLOC_SET_DATA, mock.sentinel.port_name, False)
 
