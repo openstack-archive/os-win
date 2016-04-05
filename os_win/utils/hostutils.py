@@ -84,6 +84,8 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return (int(mem_info.TotalVisibleMemorySize),
                 int(mem_info.FreePhysicalMemory))
 
+    # TODO(atuvenie) This method should be removed once all the callers have
+    # changed to use the get_disk_capacity method from diskutils.
     def get_volume_info(self, drive):
         """Returns a tuple with total size and free space
         expressed in bytes.
