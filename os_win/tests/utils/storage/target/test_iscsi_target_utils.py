@@ -21,19 +21,10 @@ from os_win.tests import test_base
 from os_win.utils.storage.target import iscsi_target_utils as tg_utils
 
 
-class FakeWMIExc(Exception):
-    def __init__(self, hresult=None):
-        excepinfo = [None] * 5 + [hresult]
-        self.com_error = mock.Mock(excepinfo=excepinfo)
-        super(FakeWMIExc, self).__init__()
-
-
 class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils, 'hostutils')
     def setUp(self, mock_hostutils):
         super(ISCSITargetUtilsTestCase, self).setUp()
-
-        self._mock_wmi.x_wmi = FakeWMIExc
 
         self._tgutils = tg_utils.ISCSITargetUtils()
         self._tgutils._pathutils = mock.Mock()
@@ -233,7 +224,8 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_file_exists_hres = -0x7ff8ffb0
         fake_hres = fake_file_exists_hres if target_exists else 1
         mock_wt_host_cls = self._tgutils._conn_wmi.WT_Host
-        mock_wt_host_cls.NewHost.side_effect = FakeWMIExc(hresult=fake_hres)
+        mock_wt_host_cls.NewHost.side_effect = test_base.FakeWMIExc(
+            hresult=fake_hres)
 
         if target_exists and not fail_if_exists:
             self._tgutils.create_iscsi_target(mock.sentinel.target_name,
@@ -260,7 +252,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_host')
     def test_delete_iscsi_target_exception(self, mock_get_wt_host):
         mock_wt_host = mock_get_wt_host.return_value
-        mock_wt_host.Delete_.side_effect = FakeWMIExc
+        mock_wt_host.Delete_.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.delete_iscsi_target,
@@ -310,7 +302,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_set_chap_credentials_exception(self, mock_set_attr,
                                             mock_get_wt_host):
         mock_wt_host = mock_get_wt_host.return_value
-        mock_wt_host.put.side_effect = FakeWMIExc
+        mock_wt_host.put.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.set_chap_credentials,
@@ -332,7 +324,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_wtidmethod.return_value = None
         mock_wt_idmeth_cls = self._tgutils._conn_wmi.WT_IDMethod
         mock_wt_idmetod = mock_wt_idmeth_cls.new.return_value
-        mock_wt_idmetod.put.side_effect = FakeWMIExc
+        mock_wt_idmetod.put.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.associate_initiator_with_iscsi_target,
@@ -358,7 +350,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_idmethod')
     def test_deassociate_initiator_exception(self, mock_get_wtidmethod):
         mock_wt_idmetod = mock_get_wtidmethod.return_value
-        mock_wt_idmetod.Delete_.side_effect = FakeWMIExc
+        mock_wt_idmetod.Delete_.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.deassociate_initiator,
@@ -369,7 +361,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_create_wt_disk_exception(self):
         mock_wt_disk_cls = self._tgutils._conn_wmi.WT_Disk
-        mock_wt_disk_cls.NewWTDisk.side_effect = FakeWMIExc
+        mock_wt_disk_cls.NewWTDisk.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.create_wt_disk,
@@ -383,7 +375,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_import_wt_disk_exception(self):
         mock_wt_disk_cls = self._tgutils._conn_wmi.WT_Disk
-        mock_wt_disk_cls.ImportWTDisk.side_effect = FakeWMIExc
+        mock_wt_disk_cls.ImportWTDisk.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.import_wt_disk,
@@ -396,7 +388,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_disk')
     def test_change_wt_disk_status_exception(self, mock_get_wt_disk):
         mock_wt_disk = mock_get_wt_disk.return_value
-        mock_wt_disk.put.side_effect = FakeWMIExc
+        mock_wt_disk.put.side_effect = test_base.FakeWMIExc
         wt_disk_enabled = True
 
         self.assertRaises(exceptions.ISCSITargetException,
@@ -410,7 +402,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_disk')
     def test_remove_wt_disk_exception(self, mock_get_wt_disk):
         mock_wt_disk = mock_get_wt_disk.return_value
-        mock_wt_disk.Delete_.side_effect = FakeWMIExc
+        mock_wt_disk.Delete_.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.remove_wt_disk,
@@ -422,7 +414,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_disk')
     def test_extend_wt_disk_exception(self, mock_get_wt_disk):
         mock_wt_disk = mock_get_wt_disk.return_value
-        mock_wt_disk.Extend.side_effect = FakeWMIExc
+        mock_wt_disk.Extend.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.extend_wt_disk,
@@ -439,7 +431,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
                                           mock_get_wt_host):
         mock_wt_disk = mock_get_wt_disk.return_value
         mock_wt_host = mock_get_wt_host.return_value
-        mock_wt_host.AddWTDisk.side_effect = FakeWMIExc
+        mock_wt_host.AddWTDisk.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.add_disk_to_target,
@@ -454,7 +446,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_create_snapshot_exception(self, mock_get_wt_disk):
         mock_wt_disk = mock_get_wt_disk.return_value
         mock_wt_snap = mock.Mock()
-        mock_wt_snap.put.side_effect = FakeWMIExc
+        mock_wt_snap.put.side_effect = test_base.FakeWMIExc
         mock_wt_snap_cls = self._tgutils._conn_wmi.WT_Snapshot
         mock_wt_snap_cls.return_value = [mock_wt_snap]
         mock_wt_snap_cls.Create.return_value = [mock.sentinel.snap_id]
@@ -472,7 +464,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_snapshot')
     def test_delete_snapshot_exception(self, mock_get_wt_snap):
         mock_wt_snap = mock_get_wt_snap.return_value
-        mock_wt_snap.Delete_.side_effect = FakeWMIExc
+        mock_wt_snap.Delete_.side_effect = test_base.FakeWMIExc
 
         self.assertRaises(exceptions.ISCSITargetException,
                           self._tgutils.delete_snapshot,
@@ -486,7 +478,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_wt_disk_cls = self._tgutils._conn_wmi.WT_Disk
         mock_wt_disk = mock.Mock()
         mock_wt_disk_cls.return_value = [mock_wt_disk]
-        mock_wt_disk.Delete_.side_effect = FakeWMIExc
+        mock_wt_disk.Delete_.side_effect = test_base.FakeWMIExc
         mock_wt_snap = mock_get_wt_snap.return_value
         mock_wt_snap.Export.return_value = [mock.sentinel.wt_disk_id]
 

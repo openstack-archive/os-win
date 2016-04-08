@@ -140,3 +140,7 @@ class HyperVRemoteFXException(HyperVException):
 
 class HyperVClusterException(HyperVException):
     pass
+
+
+class JobTerminateFailed(HyperVException):
+    msg_fmt = _("Could not terminate the requested job(s).")

@@ -18,6 +18,7 @@
 Base Utility class for operations on Hyper-V.
 """
 
+import sys
 import time
 
 from oslo_log import log as logging
@@ -27,8 +28,12 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
+from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
+
+if sys.platform == 'win32':
+    import wmi
 
 
 class JobUtils(baseutils.BaseUtilsVirt):
@@ -36,6 +41,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     _CONCRETE_JOB_CLASS = "Msvm_ConcreteJob"
 
     _KILL_JOB_STATE_CHANGE_REQUEST = 5
+    _WBEM_E_NOT_FOUND = 0x80041002
 
     _completed_job_states = [constants.JOB_STATE_COMPLETED,
                              constants.JOB_STATE_TERMINATED,
@@ -59,10 +65,6 @@ class JobUtils(baseutils.BaseUtilsVirt):
         while job.JobState == constants.WMI_JOB_STATE_RUNNING:
             time.sleep(0.1)
             job = self._get_wmi_obj(job_wmi_path)
-
-        if job.JobState == constants.JOB_STATE_KILLED:
-            LOG.debug("WMI job killed with status %s.", job.JobState)
-            return job
 
         if job.JobState != constants.WMI_JOB_STATE_COMPLETED:
             job_state = job.JobState
@@ -96,18 +98,45 @@ class JobUtils(baseutils.BaseUtilsVirt):
                   {'desc': desc, 'elap': elap})
         return job
 
-    def stop_jobs(self, element):
-        element_jobs = []
-        jobs_affecting_element = self._conn.Msvm_AffectedJobElement(
+    def _get_pending_jobs_affecting_element(self, element):
+        # Msvm_AffectedJobElement is in fact an association between
+        # the affected element and the affecting job.
+        mappings = self._conn.Msvm_AffectedJobElement(
             AffectedElement=element.path_())
-        for job in jobs_affecting_element:
-            element_jobs.append(job.AffectingElement)
+        pending_jobs = [
+            mapping.AffectingElement
+            for mapping in mappings
+            if (mapping.AffectingElement and not
+                self._is_job_completed(mapping.AffectingElement))]
+        return pending_jobs
 
-        for job in element_jobs:
-            if job and job.Cancellable and not self._is_job_completed(job):
-                job.RequestStateChange(self._KILL_JOB_STATE_CHANGE_REQUEST)
+    def stop_jobs(self, element):
+        pending_jobs = self._get_pending_jobs_affecting_element(element)
+        for job in pending_jobs:
+            try:
+                if not job.Cancellable:
+                    LOG.debug("Got request to terminate "
+                              "non-cancelable job.")
+                    continue
 
-        return element_jobs
+                job.RequestStateChange(
+                    self._KILL_JOB_STATE_CHANGE_REQUEST)
+            except wmi.x_wmi as ex:
+                hresult = win32utils.Win32Utils.get_com_error_hresult(
+                    ex.com_error)
+                # The job may had been completed right before we've
+                # attempted to kill it.
+                if not hresult == self._WBEM_E_NOT_FOUND:
+                    LOG.debug("Failed to stop job. Exception: %s", ex)
+
+        pending_jobs = self._get_pending_jobs_affecting_element(element)
+        if pending_jobs:
+            LOG.debug("Attempted to terminate jobs "
+                      "affecting element %(element)s but "
+                      "%(pending_count)s jobs are still pending.",
+                      dict(element=element,
+                           pending_count=len(pending_jobs)))
+            raise exceptions.JobTerminateFailed()
 
     def _is_job_completed(self, job):
         return job.JobState in self._completed_job_states
