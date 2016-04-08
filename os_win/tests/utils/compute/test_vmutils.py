@@ -523,7 +523,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         expected_serial = mock_phys_disk.ElementName
         expected_mapping = {
             expected_serial: {
-                'resource_path': mock_phys_disk.Path_.return_value,
+                'resource_path': mock_phys_disk.path_.return_value,
                 'mounted_disk_path': mock_phys_disk.HostResource[0]
             }
         }
