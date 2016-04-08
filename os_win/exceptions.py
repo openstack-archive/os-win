@@ -152,3 +152,7 @@ class DNSZoneNotFound(NotFound, DNSException):
 
 class DNSZoneAlreadyExists(DNSException):
     msg_fmt = _("DNS Zone already exists: %(zone_name)s")
+
+
+class JobTerminateFailed(HyperVException):
+    msg_fmt = _("Could not terminate the requested job(s).")

@@ -105,11 +105,13 @@ class Win32Utils(object):
         return hresult & 0xFFFF
 
     def get_com_err_code(self, com_error):
-        hres = None
-        try:
-            hres = com_error.excepinfo[5]
-        except Exception:
-            LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
-
+        hres = self.get_com_error_hresult(com_error)
         if hres is not None:
             return self.hresult_to_err_code(hres)
+
+    @staticmethod
+    def get_com_error_hresult(com_error):
+        try:
+            return ctypes.c_uint(com_error.excepinfo[5]).value
+        except Exception:
+            LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
