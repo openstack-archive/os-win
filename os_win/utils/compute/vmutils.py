@@ -492,7 +492,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
         physical_disks = self.get_vm_disks(vm_name)[1]
         for diskdrive in physical_disks:
             mapping[diskdrive.ElementName] = dict(
-                resource_path=diskdrive.Path_(),
+                resource_path=diskdrive.path_(),
                 mounted_disk_path=diskdrive.HostResource[0])
         return mapping
 
