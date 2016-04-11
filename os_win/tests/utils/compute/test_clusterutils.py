@@ -296,33 +296,39 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             self._FAKE_HOST,
             [self._clusterutils._LIVE_MIGRATION_TYPE])
 
-    def test_monitor_vm_failover_no_vm(self):
+    @mock.patch.object(clusterutils, 'tpool')
+    @mock.patch.object(clusterutils, 'patcher')
+    def test_monitor_vm_failover_no_vm(self, mock_patcher, mock_tpool):
         self._clusterutils._watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
                                          Name='Virtual Machine',
                                          previous=fake_prev)
-        self._clusterutils._watcher.return_value = fake_wmi_object
+        mock_tpool.execute.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
         self._clusterutils.monitor_vm_failover(fake_callback)
 
-        self._clusterutils._watcher.assert_called_once_with(
+        mock_tpool.execute.assert_called_once_with(
+            self._clusterutils._watcher,
             self._clusterutils._WMI_EVENT_TIMEOUT_MS)
         fake_callback.assert_not_called()
 
-    def test_monitor_vm_failover(self):
+    @mock.patch.object(clusterutils, 'tpool')
+    @mock.patch.object(clusterutils, 'patcher')
+    def test_monitor_vm_failover(self, mock_patcher, mock_tpool):
         self._clusterutils._watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
                                          Name=self._FAKE_RESOURCEGROUP_NAME,
                                          previous=fake_prev)
-        self._clusterutils._watcher.return_value = fake_wmi_object
+        mock_tpool.execute.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
         self._clusterutils.monitor_vm_failover(fake_callback)
 
-        self._clusterutils._watcher.assert_called_once_with(
+        mock_tpool.execute.assert_called_once_with(
+            self._clusterutils._watcher,
             self._clusterutils._WMI_EVENT_TIMEOUT_MS)
         fake_callback.assert_called_once_with(self._FAKE_VM_NAME,
                                               self._FAKE_PREV_HOST,

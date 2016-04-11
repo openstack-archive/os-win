@@ -18,9 +18,12 @@ Utility class for network related operations.
 Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
+import functools
 import re
 
 from eventlet import greenthread
+from eventlet import patcher
+from eventlet import tpool
 import sys
 
 if sys.platform == 'win32':
@@ -215,11 +218,18 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             query)
 
         def _poll_events(callback):
+            if patcher.is_monkey_patched('thread'):
+                listen = functools.partial(tpool.execute, listener,
+                                           self._VNIC_LISTENER_TIMEOUT_MS)
+            else:
+                listen = functools.partial(listener,
+                                           self._VNIC_LISTENER_TIMEOUT_MS)
+
             while True:
                 # Retrieve one by one all the events that occurred in
                 # the checked interval.
                 try:
-                    event = listener(self._VNIC_LISTENER_TIMEOUT_MS)
+                    event = listen()
                     callback(event.ElementName)
                 except wmi.x_wmi_timed_out:
                     # no new event published.

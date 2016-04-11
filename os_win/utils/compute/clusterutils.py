@@ -23,7 +23,10 @@ import sys
 if sys.platform == 'win32':
     import wmi
 
+from eventlet import patcher
+from eventlet import tpool
 from oslo_log import log as logging
+
 from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -209,7 +212,12 @@ class ClusterUtils(baseutils.BaseUtils):
         new_host = None
         try:
             # wait for new event for _WMI_EVENT_TIMEOUT_MS miliseconds.
-            wmi_object = self._watcher(self._WMI_EVENT_TIMEOUT_MS)
+            if patcher.is_monkey_patched('thread'):
+                wmi_object = tpool.execute(self._watcher,
+                                           self._WMI_EVENT_TIMEOUT_MS)
+            else:
+                wmi_object = self._watcher(self._WMI_EVENT_TIMEOUT_MS)
+
             old_host = wmi_object.previous.OwnerNode
             new_host = wmi_object.OwnerNode
             # wmi_object.Name field is of the form:

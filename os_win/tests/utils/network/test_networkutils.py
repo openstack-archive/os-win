@@ -143,14 +143,17 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.switch_port_name)
         self.assertEqual(mock.sentinel.mac_address, actual_mac_address)
 
+    @mock.patch.object(networkutils, 'patcher')
+    @mock.patch.object(networkutils.tpool, 'execute')
     @mock.patch.object(networkutils, 'wmi', create=True)
     @mock.patch.object(networkutils.NetworkUtils, '_get_event_wql_query')
-    def test_get_vnic_event_listener(self, mock_get_event_query, mock_wmi):
+    def test_get_vnic_event_listener(self, mock_get_event_query, mock_wmi,
+                                     mock_execute, mock_patcher):
         mock_wmi.x_wmi_timed_out = ValueError
         event = mock.MagicMock()
         port_class = self.netutils._conn.Msvm_SyntheticEthernetPortSettingData
         wmi_event_listener = port_class.watch_for.return_value
-        wmi_event_listener.side_effect = [mock_wmi.x_wmi_timed_out, event]
+        mock_execute.side_effect = [mock_wmi.x_wmi_timed_out, event]
 
         # callback will raise an exception in order to stop iteration in the
         # listener.
@@ -166,8 +169,9 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             timeframe=2)
         port_class.watch_for.assert_called_once_with(
             mock_get_event_query.return_value)
-        wmi_event_listener.assert_has_calls(
-            [mock.call(self.netutils._VNIC_LISTENER_TIMEOUT_MS)] * 2)
+        mock_execute.assert_has_calls(
+            [mock.call(wmi_event_listener,
+                       self.netutils._VNIC_LISTENER_TIMEOUT_MS)] * 2)
         callback.assert_called_once_with(event.ElementName)
 
     def test_get_event_wql_query(self):
