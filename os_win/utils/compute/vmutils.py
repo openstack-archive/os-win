@@ -27,6 +27,7 @@ import uuid
 if sys.platform == 'win32':
     import wmi
 
+from eventlet import tpool
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import uuidutils
@@ -819,7 +820,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 try:
                     # Retrieve one by one all the events that occurred in
                     # the checked interval.
-                    event = listener(event_timeout)
+                    #
+                    # We use eventlet.tpool for retrieving the events in
+                    # order to avoid issues caused by greenthread/thread
+                    # communication. Note that PyMI must use the unpatched
+                    # threading module.
+                    event = tpool.execute(listener, event_timeout)
 
                     vm_name = event.ElementName
                     vm_state = event.EnabledState

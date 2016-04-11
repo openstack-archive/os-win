@@ -21,6 +21,7 @@ Hyper-V Server / Windows Server 2012.
 import re
 
 from eventlet import greenthread
+from eventlet import tpool
 import sys
 
 if sys.platform == 'win32':
@@ -219,7 +220,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 # Retrieve one by one all the events that occurred in
                 # the checked interval.
                 try:
-                    event = listener(self._VNIC_LISTENER_TIMEOUT_MS)
+                    event = tpool.execute(listener,
+                                          self._VNIC_LISTENER_TIMEOUT_MS)
                     callback(event.ElementName)
                 except wmi.x_wmi_timed_out:
                     # no new event published.

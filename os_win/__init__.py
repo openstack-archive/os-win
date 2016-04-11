@@ -14,8 +14,16 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import sys
+
+from eventlet import patcher
 import pbr.version
 
 
 __version__ = pbr.version.VersionInfo(
     'os_win').version_string()
+
+if sys.platform == 'win32':
+    import wmi
+    # We need to make sure that WMI uses the unpatched threading module.
+    wmi.threading = patcher.original('threading')
