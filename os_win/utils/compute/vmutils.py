@@ -135,9 +135,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
         for vs in self._conn.Msvm_VirtualSystemSettingData(
                 ['ElementName', 'Notes'],
                 VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED):
-            if vs.Notes is not None:
+            vs_notes = vs.Notes
+            vs_name = vs.ElementName
+            if vs_notes is not None and vs_name:
                 instance_notes.append(
-                    (vs.ElementName, [v for v in vs.Notes if v]))
+                    (vs_name, [v for v in vs_notes if v]))
 
         return instance_notes
 
@@ -874,7 +876,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def _get_instance_notes(self, vm_name):
         vmsettings = self._lookup_vm_check(vm_name)
-        return [note for note in vmsettings.Notes if note]
+        vm_notes = vmsettings.Notes or []
+        return [note for note in vm_notes if note]
 
     def get_instance_uuid(self, vm_name):
         instance_notes = self._get_instance_notes(vm_name)
