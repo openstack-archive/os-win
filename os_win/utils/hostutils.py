@@ -56,8 +56,8 @@ class HostUtils(baseutils.BaseUtilsVirt):
         # is the load capacity of each processor averaged to the last
         # second, which is time wasted.
         cpus = self._conn_cimv2.query(
-            "SELECT Architecture, Name, Manufacturer, NumberOfCores, "
-            "NumberOfLogicalProcessors FROM Win32_Processor "
+            "SELECT Architecture, Name, Manufacturer, MaxClockSpeed, "
+            "NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor "
             "WHERE ProcessorType = 3")
         cpus_list = []
         for cpu in cpus:
