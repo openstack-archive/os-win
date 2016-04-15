@@ -431,7 +431,7 @@ class VHDUtils(object):
                 bes = vdisk_const.VHDX_BAT_ENTRY_SIZE
 
                 lss = vhd_info['SectorSize']
-                bs = vhd_info['BlockSize']
+                bs = self._get_vhdx_block_size(f)
                 ls = self._get_vhdx_log_size(f)
                 ms = self._get_vhdx_metadata_size_and_offset(f)[0]
 
@@ -472,6 +472,16 @@ class VHDUtils(object):
         metadata_offset = struct.unpack('<Q', vhdx_file.read(8))[0]
         metadata_size = struct.unpack('<I', vhdx_file.read(4))[0]
         return metadata_size, metadata_offset
+
+    def _get_vhdx_block_size(self, vhdx_file):
+        metadata_offset = self._get_vhdx_metadata_size_and_offset(vhdx_file)[1]
+        offset = metadata_offset + vdisk_const.VHDX_BS_METADATA_ENTRY_OFFSET
+        vhdx_file.seek(offset)
+        file_parameter_offset = struct.unpack('<I', vhdx_file.read(4))[0]
+
+        vhdx_file.seek(file_parameter_offset + metadata_offset)
+        block_size = struct.unpack('<I', vhdx_file.read(4))[0]
+        return block_size
 
     def get_best_supported_vhd_format(self):
         return constants.DISK_FORMAT_VHDX
