@@ -297,7 +297,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             [self._clusterutils._LIVE_MIGRATION_TYPE])
 
     @mock.patch.object(clusterutils, 'tpool')
-    def test_monitor_vm_failover_no_vm(self, mock_tpool):
+    @mock.patch.object(clusterutils, 'patcher')
+    def test_monitor_vm_failover_no_vm(self, mock_patcher, mock_tpool):
         self._clusterutils._watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
@@ -314,7 +315,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_callback.assert_not_called()
 
     @mock.patch.object(clusterutils, 'tpool')
-    def test_monitor_vm_failover(self, mock_tpool):
+    @mock.patch.object(clusterutils, 'patcher')
+    def test_monitor_vm_failover(self, mock_patcher, mock_tpool):
         self._clusterutils._watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,

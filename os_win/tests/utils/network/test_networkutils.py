@@ -143,11 +143,12 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.switch_port_name)
         self.assertEqual(mock.sentinel.mac_address, actual_mac_address)
 
+    @mock.patch.object(networkutils, 'patcher')
     @mock.patch.object(networkutils.tpool, 'execute')
     @mock.patch.object(networkutils, 'wmi', create=True)
     @mock.patch.object(networkutils.NetworkUtils, '_get_event_wql_query')
     def test_get_vnic_event_listener(self, mock_get_event_query, mock_wmi,
-                                     mock_execute):
+                                     mock_execute, mock_patcher):
         mock_wmi.x_wmi_timed_out = ValueError
         event = mock.MagicMock()
         port_class = self.netutils._conn.Msvm_SyntheticEthernetPortSettingData

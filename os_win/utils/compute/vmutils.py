@@ -20,6 +20,7 @@ Based on the "root/virtualization/v2" namespace available starting with
 Hyper-V Server / Windows Server 2012.
 """
 
+import functools
 import sys
 import time
 import uuid
@@ -27,6 +28,7 @@ import uuid
 if sys.platform == 'win32':
     import wmi
 
+from eventlet import patcher
 from eventlet import tpool
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -818,16 +820,22 @@ class VMUtils(baseutils.BaseUtilsVirt):
                                                             fields=[field])
 
         def _handle_events(callback):
+            if patcher.is_monkey_patched('thread'):
+                # Retrieve one by one all the events that occurred in
+                # the checked interval.
+                #
+                # We use eventlet.tpool for retrieving the events in
+                # order to avoid issues caused by greenthread/thread
+                # communication. Note that PyMI must use the unpatched
+                # threading module.
+                listen = functools.partial(tpool.execute, listener,
+                                           event_timeout)
+            else:
+                listen = functools.partial(listener, event_timeout)
+
             while True:
                 try:
-                    # Retrieve one by one all the events that occurred in
-                    # the checked interval.
-                    #
-                    # We use eventlet.tpool for retrieving the events in
-                    # order to avoid issues caused by greenthread/thread
-                    # communication. Note that PyMI must use the unpatched
-                    # threading module.
-                    event = tpool.execute(listener, event_timeout)
+                    event = listen()
 
                     vm_name = event.ElementName
                     vm_state = event.EnabledState
