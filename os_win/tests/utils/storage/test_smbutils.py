@@ -28,6 +28,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
         self._smbutils._win32_utils = mock.Mock()
         self._smbutils._smb_conn = mock.Mock()
         self._mock_run = self._smbutils._win32_utils.run_and_check_output
+        self._smb_conn = self._smbutils._smb_conn
 
     @mock.patch.object(smbutils.SMBUtils, 'unmount_smb_share')
     @mock.patch('os.path.exists')
@@ -38,8 +39,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_mappings = (
             [mock.sentinel.smb_mapping] if existing_mappings else [])
 
-        self._smbutils._smb_conn.Msft_SmbMapping.return_value = (
-            fake_mappings)
+        self._smb_conn.Msft_SmbMapping.return_value = fake_mappings
 
         ret_val = self._smbutils.check_smb_mapping(
             mock.sentinel.share_path, remove_unavailable_mapping=True)
@@ -61,7 +61,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
                                      share_available=True)
 
     def test_mount_smb_share(self):
-        fake_create = self._smbutils._smb_conn.Msft_SmbMapping.Create
+        fake_create = self._smb_conn.Msft_SmbMapping.Create
         self._smbutils.mount_smb_share(mock.sentinel.share_path,
                                        mock.sentinel.username,
                                        mock.sentinel.password)
@@ -73,8 +73,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(smbutils, 'wmi', create=True)
     def test_mount_smb_share_failed(self, mock_wmi):
         mock_wmi.x_wmi = Exception
-        self._smbutils._smb_conn.Msft_SmbMapping.Create.side_effect = (
-            mock_wmi.x_wmi)
+        self._smb_conn.Msft_SmbMapping.Create.side_effect = mock_wmi.x_wmi
 
         self.assertRaises(exceptions.SMBException,
                           self._smbutils.mount_smb_share,
@@ -84,7 +83,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_mapping = mock.Mock()
         fake_mapping_attr_err = mock.Mock()
         fake_mapping_attr_err.side_effect = AttributeError
-        smb_mapping_class = self._smbutils._smb_conn.Msft_SmbMapping
+        smb_mapping_class = self._smb_conn.Msft_SmbMapping
         smb_mapping_class.return_value = [fake_mapping, fake_mapping_attr_err]
 
         self._smbutils.unmount_smb_share(mock.sentinel.share_path,
@@ -105,7 +104,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_wmi.x_wmi = Exception
         fake_mapping = mock.Mock()
         fake_mapping.Remove.side_effect = mock_wmi.x_wmi
-        self._smbutils._smb_conn.Msft_SmbMapping.return_value = [fake_mapping]
+        self._smb_conn.Msft_SmbMapping.return_value = [fake_mapping]
 
         self.assertRaises(mock_wmi.x_wmi, self._smbutils.unmount_smb_share,
                           mock.sentinel.share_path, force=True)
@@ -162,3 +161,24 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_share_capacity_info_raised_exc(self):
         self._test_get_share_capacity_info(
             raised_exc=exceptions.Win32Exception)
+
+    def test_get_smb_share_path(self):
+        fake_share = mock.Mock(Path=mock.sentinel.share_path)
+        self._smb_conn.Msft_SmbShare.return_value = [fake_share]
+
+        share_path = self._smbutils.get_smb_share_path(
+            mock.sentinel.share_name)
+
+        self.assertEqual(mock.sentinel.share_path, share_path)
+        self._smb_conn.Msft_SmbShare.assert_called_once_with(
+            Name=mock.sentinel.share_name)
+
+    def test_get_unexisting_smb_share_path(self):
+        self._smb_conn.Msft_SmbShare.return_value = []
+
+        share_path = self._smbutils.get_smb_share_path(
+            mock.sentinel.share_name)
+
+        self.assertIsNone(share_path)
+        self._smb_conn.Msft_SmbShare.assert_called_once_with(
+            Name=mock.sentinel.share_name)
