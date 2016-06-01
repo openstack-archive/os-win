@@ -342,7 +342,8 @@ class ISCSIInitiatorUtils(object):
                              auth_type=None,
                              mpio_enabled=False,
                              ensure_lun_available=True,
-                             initiator_name=None):
+                             initiator_name=None,
+                             rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS):
         portal_addr, portal_port = _utils.parse_server_string(target_portal)
         portal_port = (int(portal_port)
                        if portal_port else iscsi_struct.DEFAULT_ISCSI_PORT)
@@ -384,7 +385,7 @@ class ISCSIInitiatorUtils(object):
                                                 is_persistent=False)
 
         if ensure_lun_available:
-            self.ensure_lun_available(target_iqn, target_lun)
+            self.ensure_lun_available(target_iqn, target_lun, rescan_attempts)
 
     def ensure_lun_available(self, target_iqn, target_lun,
                              rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS):
