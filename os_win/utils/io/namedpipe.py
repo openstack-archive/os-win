@@ -102,9 +102,18 @@ class NamedPipeHandler(object):
 
     def _cleanup_handles(self):
         self._close_pipe()
+
         if self._log_file_handle:
             self._log_file_handle.close()
             self._log_file_handle = None
+
+        if self._r_overlapped.hEvent:
+            self._ioutils.close_handle(self._r_overlapped.hEvent)
+            self._r_overlapped.hEvent = None
+
+        if self._w_overlapped.hEvent:
+            self._ioutils.close_handle(self._w_overlapped.hEvent)
+            self._w_overlapped.hEvent = None
 
     def _setup_io_structures(self):
         self._r_buffer = self._ioutils.get_buffer(
