@@ -120,3 +120,15 @@ class UtilsTestCase(base.BaseTestCase):
     def test_retry_decorator_unexpected_exc(self):
         self._test_retry_decorator_no_retry(
             expected_exceptions=(IOError, AttributeError))
+
+    @mock.patch('socket.getaddrinfo')
+    def test_get_ips(self, mock_getaddrinfo):
+        ips = ['1.2.3.4', '5.6.7.8']
+        mock_getaddrinfo.return_value = [
+            (None, None, None, None, (ip, 0)) for ip in ips]
+
+        resulted_ips = _utils.get_ips(mock.sentinel.addr)
+        self.assertEqual(ips, resulted_ips)
+
+        mock_getaddrinfo.assert_called_once_with(
+            mock.sentinel.addr, None, 0, 0, 0)
