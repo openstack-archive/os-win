@@ -16,6 +16,7 @@
 
 import netaddr
 import six
+import socket
 import time
 import types
 
@@ -128,3 +129,10 @@ def retry_decorator(max_retry_count=5, inc_sleep_time=1,
                             time.sleep(sleep_time)
         return inner
     return wrapper
+
+
+def get_ips(addr):
+    addr_info = socket.getaddrinfo(addr, None, 0, 0, 0)
+    # Returns IPv4 and IPv6 addresses, ordered by protocol family
+    addr_info.sort()
+    return [a[4][0] for a in addr_info]

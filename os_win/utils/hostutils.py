@@ -19,6 +19,7 @@ import socket
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -107,10 +108,8 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return HostUtils._windows_version
 
     def get_local_ips(self):
-        addr_info = socket.getaddrinfo(socket.gethostname(), None, 0, 0, 0)
-        # Returns IPv4 and IPv6 addresses, ordered by protocol family
-        addr_info.sort()
-        return [a[4][0] for a in addr_info]
+        hostname = socket.gethostname()
+        return _utils.get_ips(hostname)
 
     def get_host_tick_count64(self):
         return ctypes.windll.kernel32.GetTickCount64()

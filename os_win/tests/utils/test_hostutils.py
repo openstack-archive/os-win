@@ -112,6 +112,15 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(self._FAKE_VERSION_GOOD,
                          self._hostutils.get_windows_version())
 
+    @mock.patch('socket.gethostname')
+    @mock.patch('os_win._utils.get_ips')
+    def test_get_local_ips(self, mock_get_ips, mock_gethostname):
+        local_ips = self._hostutils.get_local_ips()
+
+        self.assertEqual(mock_get_ips.return_value, local_ips)
+        mock_gethostname.assert_called_once_with()
+        mock_get_ips.assert_called_once_with(mock_gethostname.return_value)
+
     def _test_host_power_action(self, action):
         fake_win32 = mock.MagicMock()
         fake_win32.Win32Shutdown = mock.MagicMock()
