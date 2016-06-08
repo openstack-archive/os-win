@@ -132,3 +132,12 @@ REMOTEFX_MAX_RES_2560x1600 = "2560x1600"
 REMOTEFX_MAX_RES_3840x2160 = "3840x2160"
 
 IPV4_DEFAULT = '0.0.0.0'
+
+# The unattended file used when creating the .pdk file may contain substitution
+# strings. The substitution string along with their corresponding values will
+# be passed as metadata and added to a fsk file.
+# FSK_COMPUTERNAME represents the substitution string for ComputerName and will
+# set the hostname during vm provisioning.
+FSK_COMPUTERNAME = 'ComputerName'
+
+VTPM_SUPPORTED_OS = ['windows']

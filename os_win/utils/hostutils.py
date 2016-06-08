@@ -45,8 +45,8 @@ class HostUtils(baseutils.BaseUtilsVirt):
 
     _wmi_cimv2_namespace = '//./root/cimv2'
 
-    def __init__(self):
-        super(HostUtils, self).__init__()
+    def __init__(self, host='.'):
+        super(HostUtils, self).__init__(host)
         self._conn_cimv2 = self._get_wmi_conn(self._wmi_cimv2_namespace,
                                               privileges=["Shutdown"])
 
@@ -237,3 +237,6 @@ class HostUtils(baseutils.BaseUtilsVirt):
             raise exceptions.HyperVRemoteFXException(
                 _("To enable RemoteFX on Hyper-V it is required that the host "
                   "GPUs support SLAT."))
+
+    def is_host_guarded(self):
+        return False

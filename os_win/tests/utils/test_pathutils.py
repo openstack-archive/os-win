@@ -188,3 +188,27 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._pathutils.copy,
                           mock.sentinel.src,
                           mock.sentinel.dest)
+
+    @mock.patch('os.close')
+    @mock.patch('tempfile.mkstemp')
+    def test_create_temporary_file(self, mock_mkstemp, mock_close):
+        fd = mock.sentinel.file_descriptor
+        path = mock.sentinel.absolute_pathname
+        mock_mkstemp.return_value = (fd, path)
+
+        output = self._pathutils.create_temporary_file(
+            suffix=mock.sentinel.suffix)
+
+        self.assertEqual(path, output)
+        mock_close.assert_called_once_with(fd)
+        mock_mkstemp.assert_called_once_with(suffix=mock.sentinel.suffix)
+
+    @mock.patch('oslo_utils.fileutils.delete_if_exists')
+    def test_temporary_file(self, mock_delete):
+        self._pathutils.create_temporary_file = mock.MagicMock()
+        self._pathutils.create_temporary_file.return_value = (
+            mock.sentinel.temporary_file)
+        with self._pathutils.temporary_file() as tmp_file:
+            self.assertEqual(mock.sentinel.temporary_file, tmp_file)
+            self.assertFalse(mock_delete.called)
+        mock_delete.assert_called_once_with(mock.sentinel.temporary_file)
