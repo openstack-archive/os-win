@@ -145,7 +145,7 @@ class ISCSIInitiatorUtils(object):
         parse_output=False)
     def get_iscsi_initiators(self, buff=None, buff_size=None,
                              element_count=None):
-        """Get the list of iSCSI targets seen by the initiator service."""
+        """Get the list of available iSCSI initiator HBAs."""
         self._run_and_check_output(
             iscsidsc.ReportIScsiInitiatorListW,
             ctypes.byref(element_count),
