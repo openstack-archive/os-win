@@ -134,6 +134,11 @@ utils_map = {
             'min_version': 6.2,
             'max_version': None,
             'path': 'os_win.utils.compute.clusterutils.ClusterUtils'}},
+    'dnsutils': {
+        'DNSUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.dns.dnsutils.DNSUtils'}}
 }
 
 
@@ -224,3 +229,7 @@ def get_diskutils():
 
 def get_clusterutils():
     return _get_class(class_type='clusterutils')
+
+
+def get_dnsutils():
+    return _get_class(class_type='dnsutils')
