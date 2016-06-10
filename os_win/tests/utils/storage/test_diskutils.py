@@ -100,6 +100,7 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
         self._diskutils.rescan_disks()
 
         mock_execute.assert_called_once_with(*cmd)
+        self._diskutils._conn_storage.Msft_Disk.assert_called_once_with()
 
     @mock.patch.object(diskutils, 'ctypes')
     @mock.patch.object(diskutils, 'kernel32', create=True)

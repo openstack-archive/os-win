@@ -71,6 +71,8 @@ class DiskUtils(baseutils.BaseUtils):
         cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
         _utils.execute(*cmd)
 
+        self._conn_storage.Msft_Disk()
+
     def get_disk_capacity(self, path, ignore_errors=False):
         norm_path = os.path.abspath(path)
 
