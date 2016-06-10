@@ -13,7 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from os_win._i18n import _LW
+from os_win._i18n import _, _LW
+from os_win import exceptions
 from os_win.utils import hostutils
 from oslo_log import log as logging
 
@@ -26,7 +27,21 @@ class HostUtils10(hostutils.HostUtils):
 
     def __init__(self, host='.'):
         super(HostUtils10, self).__init__(host)
-        self._conn_hgs = self._get_wmi_conn(self._HGS_NAMESPACE % host)
+        self._conn_hgs_attr = None
+
+    @property
+    def _conn_hgs(self):
+        if not self._conn_hgs_attr:
+            try:
+                namespace = self._HGS_NAMESPACE % self._host
+                self._conn_hgs_attr = self._get_wmi_conn(namespace)
+            except Exception:
+                raise exceptions.OSWinException(
+                    _("Namespace %(namespace)s is not supported on this "
+                      "Windows version.") %
+                    {'namespace': namespace})
+
+        return self._conn_hgs_attr
 
     def is_host_guarded(self):
         """Checks the host is guarded so it can run Shielded VMs"""
