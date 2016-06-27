@@ -21,7 +21,6 @@ Hyper-V Server / Windows Server 2012.
 import functools
 import re
 
-from eventlet import greenthread
 from eventlet import patcher
 from eventlet import tpool
 import sys
@@ -537,9 +536,6 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             # append sg_rule the acls list, to make sure that the same rule
             # is not processed twice.
             processed_sg_rules.append(sg_rule)
-
-            # yielding to other threads that must run (like state reporting)
-            greenthread.sleep()
 
         if add_acls:
             self._jobutils.add_multiple_virt_features(add_acls, port)
