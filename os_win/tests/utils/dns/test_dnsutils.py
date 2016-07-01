@@ -109,6 +109,26 @@ class DNSUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertFalse(zone_already_exists)
 
+    @mock.patch.object(dnsutils.DNSUtils, '_get_zone')
+    def test_get_zone_properties(self, mock_get_zone):
+        mock_get_zone.return_value = mock.Mock(
+            ZoneType=mock.sentinel.zone_type,
+            DsIntegrated=mock.sentinel.ds_integrated,
+            DataFile=mock.sentinel.data_file_name,
+            MasterServers=[mock.sentinel.ip_addrs])
+
+        zone_properties = self._dnsutils.get_zone_properties(
+            mock.sentinel.zone_name)
+        expected_zone_props = {
+            'zone_type': mock.sentinel.zone_type,
+            'ds_integrated': mock.sentinel.ds_integrated,
+            'master_servers': [mock.sentinel.ip_addrs],
+            'data_file_name': mock.sentinel.data_file_name
+        }
+        self.assertDictEqual(expected_zone_props, zone_properties)
+        mock_get_zone.assert_called_once_with(mock.sentinel.zone_name,
+                                              ignore_missing=False)
+
     @mock.patch.object(dnsutils.DNSUtils, 'zone_exists')
     def test_zone_create(self, mock_zone_exists):
         mock_zone_exists.return_value = False
@@ -135,10 +155,6 @@ class DNSUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(dnsutils.DNSUtils, 'zone_exists')
     def test_zone_create_existing_zone(self, mock_zone_exists):
-        mock_zone_exists.return_value = True
-        zone_manager = self._dnsutils._dns_manager.MicrosoftDNS_Zone
-        zone_manager.CreateZone.return_value = (mock.sentinel.zone_path,)
-
         self.assertRaises(exceptions.DNSZoneAlreadyExists,
                           self._dnsutils.zone_create,
                           zone_name=mock.sentinel.zone_name,
