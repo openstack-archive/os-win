@@ -102,6 +102,7 @@ VM_GEN_2 = 2
 JOB_STATE_COMPLETED = 7
 JOB_STATE_TERMINATED = 8
 JOB_STATE_KILLED = 9
+JOB_STATE_EXCEPTION = 10
 JOB_STATE_COMPLETED_WITH_WARNINGS = 32768
 
 # Special vlan_id value in ovs_vlan_allocations table indicating flat network

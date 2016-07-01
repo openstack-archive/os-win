@@ -40,6 +40,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     _CONCRETE_JOB_CLASS = "Msvm_ConcreteJob"
 
+    _DEFAULT_JOB_TERMINATE_TIMEOUT = 15  # seconds
     _KILL_JOB_STATE_CHANGE_REQUEST = 5
     _WBEM_E_NOT_FOUND = 0x80041002
 
@@ -98,7 +99,8 @@ class JobUtils(baseutils.BaseUtilsVirt):
                   {'desc': desc, 'elap': elap})
         return job
 
-    def _get_pending_jobs_affecting_element(self, element):
+    def _get_pending_jobs_affecting_element(self, element,
+                                            ignore_error_state=True):
         # Msvm_AffectedJobElement is in fact an association between
         # the affected element and the affecting job.
         mappings = self._conn.Msvm_AffectedJobElement(
@@ -107,17 +109,21 @@ class JobUtils(baseutils.BaseUtilsVirt):
             mapping.AffectingElement
             for mapping in mappings
             if (mapping.AffectingElement and not
-                self._is_job_completed(mapping.AffectingElement))]
+                self._is_job_completed(mapping.AffectingElement,
+                                       ignore_error_state))]
         return pending_jobs
 
-    def stop_jobs(self, element):
-        pending_jobs = self._get_pending_jobs_affecting_element(element)
+    def _stop_jobs(self, element):
+        pending_jobs = self._get_pending_jobs_affecting_element(
+            element, ignore_error_state=False)
         for job in pending_jobs:
             try:
                 if not job.Cancellable:
                     LOG.debug("Got request to terminate "
                               "non-cancelable job.")
                     continue
+                elif job.JobState == constants.JOB_STATE_EXCEPTION:
+                    LOG.debug("Attempting to terminate exception state job.")
 
                 job.RequestStateChange(
                     self._KILL_JOB_STATE_CHANGE_REQUEST)
@@ -138,8 +144,18 @@ class JobUtils(baseutils.BaseUtilsVirt):
                            pending_count=len(pending_jobs)))
             raise exceptions.JobTerminateFailed()
 
-    def _is_job_completed(self, job):
-        return job.JobState in self._completed_job_states
+    def _is_job_completed(self, job, ignore_error_state=True):
+        return (job.JobState in self._completed_job_states or
+                (job.JobState == constants.JOB_STATE_EXCEPTION
+                 and ignore_error_state))
+
+    def stop_jobs(self, element, timeout=_DEFAULT_JOB_TERMINATE_TIMEOUT):
+        @_utils.retry_decorator(exceptions=exceptions.JobTerminateFailed,
+                                timeout=timeout, max_retry_count=None)
+        def _stop_jobs_with_timeout():
+            self._stop_jobs(element)
+
+        _stop_jobs_with_timeout()
 
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_virt_resource(self, virt_resource, parent):
