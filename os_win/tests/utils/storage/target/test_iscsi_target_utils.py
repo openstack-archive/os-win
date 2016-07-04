@@ -207,18 +207,6 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_wt_idmethod_not_found(self):
         self._test_get_wt_idmethod(idmeth_found=False)
 
-    def test_set_wmi_obj_attr(self):
-        wmi_obj = mock.Mock()
-        wmi_property_method = wmi_obj.wmi_property
-        wmi_property = wmi_property_method.return_value
-
-        self._tgutils._wmi_obj_set_attr(wmi_obj,
-                                      mock.sentinel.key,
-                                      mock.sentinel.value)
-
-        wmi_property_method.assert_called_once_with(mock.sentinel.key)
-        wmi_property.set.assert_called_once_with(mock.sentinel.value)
-
     def _test_create_iscsi_target_exception(self, target_exists=False,
                                             fail_if_exists=False):
         fake_file_exists_hres = -0x7ff8ffb0
@@ -298,9 +286,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_wt_host.assert_called_once_with(mock.sentinel.target_name)
 
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_host')
-    @mock.patch.object(tg_utils.ISCSITargetUtils, '_wmi_obj_set_attr')
-    def test_set_chap_credentials_exception(self, mock_set_attr,
-                                            mock_get_wt_host):
+    def test_set_chap_credentials_exception(self, mock_get_wt_host):
         mock_wt_host = mock_get_wt_host.return_value
         mock_wt_host.put.side_effect = test_base.FakeWMIExc
 
@@ -310,14 +296,13 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
                           mock.sentinel.chap_username,
                           mock.sentinel.chap_password)
 
-        expected_fields = dict(EnableCHAP=True,
-                               CHAPUserName=mock.sentinel.chap_username,
-                               CHAPSecret=mock.sentinel.chap_password)
-        expected_setattr_calls = [mock.call(mock_wt_host, key, val)
-                                  for key, val in expected_fields.items()]
-        mock_set_attr.assert_has_calls(expected_setattr_calls,
-                                       any_order=True)
         mock_get_wt_host.assert_called_once_with(mock.sentinel.target_name)
+        self.assertTrue(mock_wt_host.EnableCHAP),
+        self.assertEqual(mock.sentinel.chap_username,
+                         mock_wt_host.CHAPUserName)
+        self.assertEqual(mock.sentinel.chap_password,
+                         mock_wt_host.CHAPSecret)
+        mock_wt_host.put.assert_called_once_with()
 
     @mock.patch.object(tg_utils.ISCSITargetUtils, '_get_wt_idmethod')
     def test_associate_initiator_exception(self, mock_get_wtidmethod):
