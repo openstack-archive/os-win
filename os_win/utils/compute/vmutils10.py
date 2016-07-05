@@ -178,3 +178,12 @@ class VMUtils10(vmutils.VMUtils):
         (job_path, ret_val) = provisioning_service.ProvisionMachine(
             fsk_filepath, vm.ConfigurationID, pdk_filepath)
         self._jobutils.check_ret_val(ret_val, job_path)
+
+    def is_secure_vm(self, instance_name):
+        inst_id = self.get_vm_id(instance_name)
+        security_profile = _wqlutils.get_element_associated_class(
+            self._conn, self._SECURITY_SETTING_DATA,
+            element_uuid=inst_id)
+        if security_profile:
+            return security_profile[0].EncryptStateAndVmMigrationTraffic
+        return False

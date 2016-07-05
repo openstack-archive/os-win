@@ -202,3 +202,27 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.job_path_ProvisionMachine)
 
         mock_lookup_vm_check.assert_called_with(mock.sentinel.vm_name)
+
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    @mock.patch.object(vmutils10.VMUtils10, 'get_vm_id')
+    def _test_secure_vm(self, mock_get_vm_id,
+                          mock_get_element_associated_class,
+                          is_encrypted_vm=True):
+        inst_id = mock_get_vm_id.return_value
+        security_profile = mock.MagicMock()
+        mock_get_element_associated_class.return_value = [security_profile]
+        security_profile.EncryptStateAndVmMigrationTraffic = is_encrypted_vm
+
+        response = self._vmutils.is_secure_vm(mock.sentinel.instance_name)
+        self.assertEqual(is_encrypted_vm, response)
+
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._conn,
+            self._vmutils._SECURITY_SETTING_DATA,
+            element_uuid=inst_id)
+
+    def test_is_secure_shielded_vm(self):
+        self._test_secure_vm()
+
+    def test_not_secure_vm(self):
+        self._test_secure_vm(is_encrypted_vm=False)
