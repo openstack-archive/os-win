@@ -1068,3 +1068,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def _vm_has_s3_controller(self, vm_name):
         return True
+
+    def is_secure_vm(self, instance_name):
+        return False
