@@ -114,12 +114,6 @@ class ISCSITargetUtils(object):
         if wt_idmethod:
             return wt_idmethod[0]
 
-    @staticmethod
-    def _wmi_obj_set_attr(wmi_obj, key, value):
-        # Due to a bug in the python WMI module, some wmi object attributes
-        # cannot be modified. This method is used as a workaround.
-        wmi_obj.wmi_property(key).set(value)
-
     def create_iscsi_target(self, target_name, fail_if_exists=False):
         """Creates ISCSI target."""
         try:
@@ -174,9 +168,9 @@ class ISCSITargetUtils(object):
     def set_chap_credentials(self, target_name, chap_username, chap_password):
         try:
             wt_host = self._get_wt_host(target_name)
-            self._wmi_obj_set_attr(wt_host, 'EnableCHAP', True)
-            self._wmi_obj_set_attr(wt_host, 'CHAPUserName', chap_username)
-            self._wmi_obj_set_attr(wt_host, 'CHAPSecret', chap_password)
+            wt_host.EnableCHAP = True
+            wt_host.CHAPUserName = chap_username
+            wt_host.CHAPSecret = chap_password
             wt_host.put()
         except wmi.x_wmi as wmi_exc:
             err_msg = _('Failed to set CHAP credentials on target %s.')
