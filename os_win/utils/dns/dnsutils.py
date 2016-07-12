@@ -61,6 +61,17 @@ class DNSUtils(baseutils.BaseUtils):
     def zone_exists(self, zone_name):
         return self._get_zone(zone_name) is not None
 
+    def get_zone_properties(self, zone_name):
+        zone = self._get_zone(zone_name, ignore_missing=False)
+
+        zone_properties = {}
+        zone_properties['zone_type'] = zone.ZoneType
+        zone_properties['ds_integrated'] = zone.DsIntegrated
+        zone_properties['data_file_name'] = zone.DataFile
+        zone_properties['master_servers'] = zone.MasterServers or []
+
+        return zone_properties
+
     def zone_create(self, zone_name, zone_type, ds_integrated,
                     data_file_name=None, ip_addrs=None,
                     admin_email_name=None):
