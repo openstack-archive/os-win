@@ -24,6 +24,7 @@ from os_win import exceptions
 from os_win.tests import test_base
 from os_win.utils.compute import clusterutils
 from os_win.utils.compute import livemigrationutils
+from os_win.utils.compute import migrationutils
 from os_win.utils.compute import rdpconsoleutils
 from os_win.utils.compute import vmutils
 from os_win.utils.dns import dnsutils
@@ -146,3 +147,8 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=dnsutils.DNSUtils,
             class_type='dnsutils')
+
+    def test_get_migrationutils(self):
+        self._check_get_class(
+            expected_class=migrationutils.MigrationUtils,
+            class_type='migrationutils')

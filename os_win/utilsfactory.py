@@ -83,6 +83,11 @@ utils_map = {
             'min_version': 6.2,
             'max_version': None,
             'path': 'os_win.utils.metrics.metricsutils.MetricsUtils'}},
+    'migrationutils': {
+        'MigrationUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.compute.migrationutils.MigrationUtils'}},
     'networkutils': {
         'NetworkUtils': {
             'min_version': 6.2,
@@ -232,3 +237,7 @@ def get_clusterutils():
 
 def get_dnsutils():
     return _get_class(class_type='dnsutils')
+
+
+def get_migrationutils():
+    return _get_class(class_type='migrationutils')
