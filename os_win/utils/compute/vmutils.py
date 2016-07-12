@@ -79,6 +79,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     _VIRTUAL_SYSTEM_SUBTYPE = 'VirtualSystemSubType'
     _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
+    _VIRTUAL_SYSTEM_TYPE_PLANNED = 'Microsoft:Hyper-V:System:Planned'
     _VIRTUAL_SYSTEM_SUBTYPE_GEN2 = 'Microsoft:Hyper-V:SubType:2'
 
     _SNAPSHOT_FULL = 2
@@ -190,18 +191,21 @@ class VMUtils(baseutils.BaseUtilsVirt):
         settings = self.get_vm_summary_info(vm_name)
         return settings['EnabledState']
 
-    def _lookup_vm_check(self, vm_name, as_vssd=True, for_update=False):
-        vm = self._lookup_vm(vm_name, as_vssd, for_update)
+    def _lookup_vm_check(self, vm_name, as_vssd=True, for_update=False,
+                         virtual_system_type=_VIRTUAL_SYSTEM_TYPE_REALIZED):
+        vm = self._lookup_vm(vm_name, as_vssd, for_update,
+                             virtual_system_type)
         if not vm:
             raise exceptions.HyperVVMNotFoundException(vm_name=vm_name)
         return vm
 
-    def _lookup_vm(self, vm_name, as_vssd=True, for_update=False):
+    def _lookup_vm(self, vm_name, as_vssd=True, for_update=False,
+                   virtual_system_type=_VIRTUAL_SYSTEM_TYPE_REALIZED):
         if as_vssd:
             conn = self._compat_conn if for_update else self._conn
             vms = conn.Msvm_VirtualSystemSettingData(
                 ElementName=vm_name,
-                VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED)
+                VirtualSystemType=virtual_system_type)
         else:
             vms = self._conn.Msvm_ComputerSystem(ElementName=vm_name)
         n = len(vms)
@@ -267,12 +271,24 @@ class VMUtils(baseutils.BaseUtilsVirt):
         self._jobutils.modify_virt_resource(procsetting)
 
     def update_vm(self, vm_name, memory_mb, memory_per_numa_node, vcpus_num,
-                  vcpus_per_numa_node, limit_cpu_features, dynamic_mem_ratio):
-        vmsetting = self._lookup_vm_check(vm_name)
+                  vcpus_per_numa_node, limit_cpu_features, dynamic_mem_ratio,
+                  configuration_root_dir=None, snapshot_dir=None,
+                  is_planned_vm=False):
+        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
+
+        vmsetting = self._lookup_vm_check(
+            vm_name, virtual_system_type=virtual_system_type)
+
+        if configuration_root_dir:
+            vmsetting.ConfigurationDataRoot = configuration_root_dir
+        if snapshot_dir:
+            vmsetting.SnapshotDataRoot = snapshot_dir
         self._set_vm_memory(vmsetting, memory_mb, memory_per_numa_node,
                             dynamic_mem_ratio)
         self._set_vm_vcpus(vmsetting, vcpus_num, vcpus_per_numa_node,
                            limit_cpu_features)
+        if configuration_root_dir or snapshot_dir:
+            self._modify_virtual_system(vmsetting)
 
     def check_admin_permissions(self):
         if not self._compat_conn.Msvm_VirtualSystemManagementService():
@@ -488,9 +504,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
             diskdrive.ElementName = serial
             self._jobutils.modify_virt_resource(diskdrive)
 
-    def get_vm_physical_disk_mapping(self, vm_name):
+    def get_vm_physical_disk_mapping(self, vm_name, is_planned_vm=False):
         mapping = {}
-        physical_disks = self.get_vm_disks(vm_name)[1]
+        physical_disks = (
+            self.get_vm_disks(vm_name, is_planned_vm=is_planned_vm)[1])
         for diskdrive in physical_disks:
             mapping[diskdrive.ElementName] = dict(
                 resource_path=diskdrive.path_(),
@@ -599,8 +616,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
         vmsettings = self._lookup_vm_check(vm_name)
         return vmsettings.ConfigurationDataRoot
 
-    def get_vm_storage_paths(self, vm_name):
-        vmsettings = self._lookup_vm_check(vm_name)
+    def get_vm_storage_paths(self, vm_name, is_planned_vm=False):
+        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
+        vmsettings = self._lookup_vm_check(
+            vm_name,
+            virtual_system_type=virtual_system_type)
         (disk_resources, volume_resources) = self._get_vm_disks(vmsettings)
 
         volume_drives = []
@@ -615,8 +635,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         return (disk_files, volume_drives)
 
-    def get_vm_disks(self, vm_name):
-        vmsettings = self._lookup_vm_check(vm_name)
+    def get_vm_disks(self, vm_name, is_planned_vm=False):
+        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
+        vmsettings = self._lookup_vm_check(
+            vm_name, virtual_system_type=virtual_system_type)
         return self._get_vm_disks(vmsettings)
 
     def _get_vm_disks(self, vmsettings):
@@ -1078,3 +1100,14 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def is_secure_vm(self, instance_name):
         return False
+
+    def update_vm_disk_path(self, disk_path, new_disk_path, is_physical=True):
+        disk_resource = self._get_mounted_disk_resource_from_path(
+            disk_path=disk_path, is_physical=is_physical)
+        disk_resource.HostResource = [new_disk_path]
+        self._jobutils.modify_virt_resource(disk_resource)
+
+    def _get_virtual_system_type(self, is_planned_vm):
+        return (
+            self._VIRTUAL_SYSTEM_TYPE_PLANNED if is_planned_vm
+            else self._VIRTUAL_SYSTEM_TYPE_REALIZED)
