@@ -80,20 +80,20 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
                                              % vm_name)
         return vms[0]
 
-    def _destroy_planned_vm(self, conn_v2, planned_vm):
+    def _destroy_planned_vm(self, planned_vm):
         LOG.debug("Destroying existing planned VM: %s",
                   planned_vm.ElementName)
-        vs_man_svc = conn_v2.Msvm_VirtualSystemManagementService()[0]
-        (job_path, ret_val) = vs_man_svc.DestroySystem(planned_vm.path_())
+        (job_path,
+         ret_val) = self._vs_man_svc.DestroySystem(planned_vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def _get_planned_vms(self, conn_v2, vm):
-        return conn_v2.Msvm_PlannedComputerSystem(Name=vm.Name)
+    def _get_planned_vms(self, conn_v2, vm_name):
+        return conn_v2.Msvm_PlannedComputerSystem(ElementName=vm_name)
 
-    def _destroy_existing_planned_vms(self, conn_v2, vm):
-        planned_vms = self._get_planned_vms(conn_v2, vm)
+    def destroy_existing_planned_vms(self, vm_name):
+        planned_vms = self._get_planned_vms(self._compat_conn, vm_name)
         for planned_vm in planned_vms:
-            self._destroy_planned_vm(conn_v2, planned_vm)
+            self._destroy_planned_vm(planned_vm)
 
     def _create_planned_vm(self, conn_v2_local, conn_v2_remote,
                            vm, ip_addr_list, dest_host):
@@ -240,7 +240,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         rmt_ip_addr_list = self._get_ip_address_list(conn_v2_remote,
                                                      dest_host)
 
-        planned_vms = self._get_planned_vms(conn_v2_remote, vm)
+        planned_vms = self._get_planned_vms(conn_v2_remote, vm_name)
         if len(planned_vms) > 1:
             err_msg = _("Multiple planned VMs were found for VM %(vm_name)s "
                         "on host %(dest_host)s")
@@ -281,7 +281,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         vm = self._get_vm(conn_v2_remote, vm_name)
 
         # Make sure there are no planned VMs already.
-        self._destroy_existing_planned_vms(self._compat_conn, vm)
+        self.destroy_existing_planned_vms(vm_name)
 
         ip_addr_list = self._get_ip_address_list(self._compat_conn,
                                                  dest_host)

@@ -87,19 +87,14 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                           mock_conn_v2, self._FAKE_VM_NAME)
 
     def test_destroy_planned_vm(self):
-        mock_conn_v2 = mock.MagicMock()
         mock_planned_vm = mock.MagicMock()
-        mock_vs_man_svc = mock.MagicMock()
-        mock_conn_v2.Msvm_VirtualSystemManagementService.return_value = [
-            mock_vs_man_svc]
         mock_planned_vm.path_.return_value = mock.sentinel.planned_vm_path
+        mock_vs_man_svc = self.liveutils._vs_man_svc
         mock_vs_man_svc.DestroySystem.return_value = (
             mock.sentinel.job_path, mock.sentinel.ret_val)
 
-        self.liveutils._destroy_planned_vm(mock_conn_v2, mock_planned_vm)
+        self.liveutils._destroy_planned_vm(mock_planned_vm)
 
-        mock_msvms_cls = mock_conn_v2.Msvm_VirtualSystemManagementService
-        mock_msvms_cls.assert_called_once_with()
         mock_vs_man_svc.DestroySystem.assert_called_once_with(
             mock.sentinel.planned_vm_path)
         self.liveutils._jobutils.check_ret_val.assert_called_once_with(
@@ -108,14 +103,14 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_get_planned_vms(self):
         mock_conn_v2 = mock.MagicMock()
-        mock_vm = self._get_vm()
         mock_conn_v2.Msvm_PlannedComputerSystem.return_value = (
             mock.sentinel.planned_vms)
 
-        planned_vms = self.liveutils._get_planned_vms(mock_conn_v2, mock_vm)
+        planned_vms = self.liveutils._get_planned_vms(mock_conn_v2,
+                                                      mock.sentinel.vm_name)
 
         mock_conn_v2.Msvm_PlannedComputerSystem.assert_called_once_with(
-            Name=self._FAKE_VM_NAME)
+            ElementName=mock.sentinel.vm_name)
         self.assertEqual(mock.sentinel.planned_vms, planned_vms)
 
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
@@ -124,19 +119,17 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                        '_get_planned_vms')
     def test_destroy_existing_planned_vms(self, mock_get_planned_vms,
                                           mock_destroy_planned_vm):
-        mock_conn_v2 = mock.sentinel.conn_v2
         mock_planned_vms = [mock.sentinel.planned_vm,
                             mock.sentinel.another_planned_vm]
         mock_get_planned_vms.return_value = mock_planned_vms
 
-        self.liveutils._destroy_existing_planned_vms(mock_conn_v2,
-                                                     mock.sentinel.vm)
+        self.liveutils.destroy_existing_planned_vms(mock.sentinel.vm_name)
 
-        mock_get_planned_vms.assert_called_once_with(mock_conn_v2,
-                                                     mock.sentinel.vm)
+        mock_get_planned_vms.assert_called_once_with(self._conn,
+                                                     mock.sentinel.vm_name)
         mock_destroy_planned_vm.assert_has_calls(
-            [mock.call(mock_conn_v2, mock.sentinel.planned_vm),
-             mock.call(mock_conn_v2, mock.sentinel.another_planned_vm)])
+            [mock.call(mock.sentinel.planned_vm),
+             mock.call(mock.sentinel.another_planned_vm)])
 
     def test_create_planned_vm_helper(self):
         mock_vm = mock.MagicMock()
@@ -386,7 +379,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_create_planned_vm')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
-                       '_destroy_existing_planned_vms')
+                       'destroy_existing_planned_vms')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_get_disk_data')
     def test_create_planned_vm(self, mock_get_disk_data,
@@ -414,8 +407,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                                          mock.sentinel.host,
                                          mock.sentinel.disk_path_mapping)
 
-        mock_destroy_existing_planned_vm.assert_called_once_with(self._conn,
-                                                                 mock_vm)
+        mock_destroy_existing_planned_vm.assert_called_once_with(
+            mock.sentinel.vm_name)
         mock_get_ip_address_list.assert_called_once_with(self._conn, dest_host)
         mock_get_disk_data.assert_called_once_with(
             mock.sentinel.vm_name,
