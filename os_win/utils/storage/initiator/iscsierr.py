@@ -252,8 +252,8 @@ err_msg_dict = {
     ISDSC_INVALID_CHAP_SECRET: _('CHAP secret given does not conform '
                                  'to the standard. Please see system '
                                  'event log for more information.'),
-    ISDSC_INVALID_TARGET_CHAP_SECRET: _(
-      'Target CHAP secret given is invalid. Maximum size of CHAP secret'
+    ISDSC_INVALID_TARGET_CHAP_SECRET:
+    _('Target CHAP secret given is invalid. Maximum size of CHAP secret'
       'is 16 bytes. Minimum size is 12 bytes if IPSec is not used.'),
     ISDSC_INVALID_INITIATOR_CHAP_SECRET: _('Initiator CHAP secret given is '
                                            'invalid. Maximum size of CHAP '
@@ -264,7 +264,7 @@ err_msg_dict = {
     ISDSC_INVALID_LOGON_AUTH_TYPE: _('Logon Authentication type '
                                      'given is invalid.'),
     ISDSC_INVALID_TARGET_MAPPING: _('Target Mapping information '
-                                     'given is invalid.'),
+                                    'given is invalid.'),
     ISDSC_INVALID_TARGET_ID: _('Target Id given in '
                                'Target Mapping is invalid.'),
     ISDSC_INVALID_ISCSI_NAME: _('The iSCSI name specified contains '

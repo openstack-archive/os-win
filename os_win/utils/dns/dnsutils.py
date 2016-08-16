@@ -54,7 +54,9 @@ class DNSUtils(baseutils.BaseUtils):
 
     def zone_list(self):
         """Returns the current list of DNS Zones.
+
         """
+
         zones = self._dns_manager.MicrosoftDNS_Zone()
         return [x.Name for x in zones]
 
@@ -117,6 +119,7 @@ class DNSUtils(baseutils.BaseUtils):
     def zone_modify(self, zone_name, allow_update=None, disable_wins=None,
                     notify=None, reverse=None, secure_secondaries=None):
         """Modifies properties of an existing zone. If any parameter is None,
+
         then that parameter will be skipped and will not be taken into
         consideration.
 
@@ -140,6 +143,7 @@ class DNSUtils(baseutils.BaseUtils):
                 are specified in SecondaryServers value)
             3 = Zone tranfers not allowed
         """
+
         zone = self._get_zone(zone_name, ignore_missing=False)
 
         if allow_update is not None:

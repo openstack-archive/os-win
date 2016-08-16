@@ -97,9 +97,9 @@ class ISCSIInitiatorCLIUtilsTestCase(base.BaseTestCase):
                               fake_portal, username, password)
         else:
             self._initiator.login_storage_target(self._FAKE_LUN,
-                                                self._FAKE_TARGET,
-                                                fake_portal,
-                                                username, password)
+                                                 self._FAKE_TARGET,
+                                                 fake_portal,
+                                                 username, password)
 
             if target_connected:
                 call_list = self._initiator.execute.call_args_list

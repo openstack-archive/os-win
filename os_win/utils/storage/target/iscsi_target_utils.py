@@ -15,9 +15,6 @@
 
 import sys
 
-if sys.platform == 'win32':
-    import wmi
-
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LI
@@ -26,6 +23,9 @@ from os_win import exceptions
 from os_win.utils import hostutils
 from os_win.utils import pathutils
 from os_win.utils import win32utils
+
+if sys.platform == 'win32':
+    import wmi
 
 LOG = logging.getLogger(__name__)
 

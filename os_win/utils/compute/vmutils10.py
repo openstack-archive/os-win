@@ -78,10 +78,12 @@ class VMUtils10(vmutils.VMUtils):
 
     def vm_gen_supports_remotefx(self, vm_gen):
         """RemoteFX is supported on both generation 1 and 2 virtual
+
         machines for Windows 10 / Windows Server 2016.
 
         :returns: True
         """
+
         return True
 
     def _validate_remotefx_params(self, monitor_count, max_resolution,
@@ -121,6 +123,7 @@ class VMUtils10(vmutils.VMUtils):
 
     def populate_fsk(self, fsk_filepath, fsk_pairs):
         """Writes in the fsk file all the substitution strings and their
+
         values which will populate the unattended file used when
         creating the pdk.
         """

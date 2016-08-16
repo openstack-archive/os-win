@@ -146,8 +146,8 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     def _is_job_completed(self, job, ignore_error_state=True):
         return (job.JobState in self._completed_job_states or
-                (job.JobState == constants.JOB_STATE_EXCEPTION
-                 and ignore_error_state))
+                (job.JobState == constants.JOB_STATE_EXCEPTION and
+                 ignore_error_state))
 
     def stop_jobs(self, element, timeout=_DEFAULT_JOB_TERMINATE_TIMEOUT):
         @_utils.retry_decorator(exceptions=exceptions.JobTerminateFailed,

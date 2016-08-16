@@ -41,10 +41,12 @@ def execute(*cmd, **kwargs):
 
 def parse_server_string(server_str):
     """Parses the given server_string and returns a tuple of host and port.
+
     If it's not a combination of host part and port, the port element
     is an empty string. If the input is invalid expression, return a tuple of
     two empty strings.
     """
+
     try:
         # First of all, exclude pure IPv6 address (w/o port).
         if netaddr.valid_ipv6(server_str):
@@ -124,8 +126,8 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                 except exceptions as exc:
                     with excutils.save_and_reraise_exception() as ctxt:
                         err_code = getattr(exc, 'error_code', None)
-                        expected_err_code = (err_code in error_codes
-                                             or not error_codes)
+                        expected_err_code = (err_code in error_codes or not
+                                             error_codes)
 
                         time_elapsed = time.time() - time_start
                         time_left = (timeout - time_elapsed
@@ -135,10 +137,10 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                                       else 'undefined')
 
                         should_retry = (
-                            expected_err_code
-                            and tries_left
-                            and (time_left == 'undefined'
-                                 or time_left > 0))
+                            expected_err_code and
+                            tries_left and
+                            (time_left == 'undefined' or
+                             time_left > 0))
                         ctxt.reraise = not should_retry
 
                         if should_retry:

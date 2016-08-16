@@ -45,9 +45,9 @@ class ISCSIInitiatorCLIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
     def execute(self, *args, **kwargs):
         stdout_value, stderr_value = _utils.execute(*args, **kwargs)
         if stdout_value.find('The operation completed successfully') == -1:
-            raise exceptions.HyperVException(
-              _('An error has occurred when calling the iscsi initiator: %s')
-              % stdout_value)
+            raise exceptions.HyperVException
+            (_('An error has occurred when calling the iscsi initiator: %s')
+             % stdout_value)
         return stdout_value
 
     def _login_target_portal(self, target_portal):

@@ -103,9 +103,9 @@ class ISCSIInitiatorWMIUtilsTestCase(test_base.OsWinBaseTestCase):
                               self._FAKE_LUN, self._FAKE_TARGET, fake_portal)
         else:
             self._initiator.login_storage_target(self._FAKE_LUN,
-                                                  self._FAKE_TARGET,
-                                                  fake_portal,
-                                                  username, password)
+                                                 self._FAKE_TARGET,
+                                                 fake_portal,
+                                                 username, password)
 
             if target_connected:
                 fake_target_object.Update.assert_called_with()

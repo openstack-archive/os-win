@@ -16,9 +16,6 @@
 import platform
 import sys
 
-if sys.platform == 'win32':
-    import wmi
-
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
@@ -28,6 +25,9 @@ from os_win.utils import baseutils
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
+
+if sys.platform == 'win32':
+    import wmi
 
 LOG = logging.getLogger(__name__)
 

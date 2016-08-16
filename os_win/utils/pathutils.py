@@ -21,10 +21,6 @@ import sys
 import tempfile
 import time
 
-if sys.platform == 'win32':
-    from ctypes import wintypes
-    kernel32 = ctypes.windll.kernel32
-
 from oslo_log import log as logging
 from oslo_utils import fileutils
 import six
@@ -32,6 +28,10 @@ import six
 from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import win32utils
+
+if sys.platform == 'win32':
+    from ctypes import wintypes
+    kernel32 = ctypes.windll.kernel32
 
 LOG = logging.getLogger(__name__)
 
@@ -90,6 +90,7 @@ class PathUtils(object):
 
     def move_folder_files(self, src_dir, dest_dir):
         """Moves the files of the given src_dir to dest_dir.
+
         It will ignore any nested folders.
 
         :param src_dir: Given folder from which to move files.
@@ -142,6 +143,7 @@ class PathUtils(object):
 
         NOTE: Juctions only work on same filesystem.
         """
+
         create_symlink = kernel32.CreateSymbolicLinkW
         create_symlink.argtypes = (
             ctypes.c_wchar_p,
@@ -164,6 +166,7 @@ class PathUtils(object):
     @contextlib.contextmanager
     def temporary_file(self, suffix=None, *args, **kwargs):
         """Creates a random, temporary, closed file, returning the file's
+
         path. It's different from tempfile.NamedTemporaryFile which returns
         an open file descriptor.
         """

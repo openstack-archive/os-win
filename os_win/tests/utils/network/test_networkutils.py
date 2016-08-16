@@ -289,7 +289,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
     def _check_set_vswitch_port_vlan_id(self, mock_create_default_sd,
-                                      missing_vlan=False):
+                                        missing_vlan=False):
         mock_port = self._mock_get_switch_port_alloc(found=True)
         old_vlan_settings = mock.MagicMock()
         if missing_vlan:
@@ -341,7 +341,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
     def _check_set_vswitch_port_vsid(self, mock_create_default_sd,
-                                   mock_get_security_sd, missing_vsid=False):
+                                     mock_get_security_sd, missing_vsid=False):
         mock_port_alloc = self._mock_get_switch_port_alloc()
 
         mock_vsid_settings = mock.MagicMock()
@@ -493,7 +493,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
 
         with mock.patch.multiple(
             self.netutils,
-            _create_default_setting_data=mock.Mock(return_value=mock_acl)):
+            _create_default_setting_data=mock.Mock(
+                return_value=mock_acl)):
 
             self.netutils.add_metrics_collection_acls(self._FAKE_PORT_NAME)
 

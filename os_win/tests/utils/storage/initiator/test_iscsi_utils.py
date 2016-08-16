@@ -258,8 +258,8 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(['fake', 'buff'], str_list)
 
-        self._ctypes.cast.assert_called_once_with(fake_buff,
-            self._ctypes.POINTER.return_value)
+        self._ctypes.cast.assert_called_once_with(
+            fake_buff, self._ctypes.POINTER.return_value)
         self._ctypes.POINTER.assert_called_once_with(self._ctypes.c_wchar)
 
     def test_get_iscsi_initiator(self):
@@ -350,7 +350,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_sessions')
     def test_get_iscsi_target_sessions(self, mock_get_iscsi_sessions,
-                                        target_sessions_found=True):
+                                       target_sessions_found=True):
         fake_session = mock.Mock(TargetNodeName=mock.sentinel.target_name,
                                  ConnectionCount=1)
         fake_disconn_session = mock.Mock(

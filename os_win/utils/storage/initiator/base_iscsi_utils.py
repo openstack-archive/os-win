@@ -24,13 +24,13 @@ import abc
 import re
 import sys
 
-if sys.platform == 'win32':
-    from six.moves import winreg
-
 from oslo_log import log as logging
 
 from os_win._i18n import _LI
 from os_win.utils import baseutils
+
+if sys.platform == 'win32':
+    from six.moves import winreg
 
 LOG = logging.getLogger(__name__)
 

@@ -25,14 +25,14 @@ from eventlet import patcher
 from eventlet import tpool
 import sys
 
-if sys.platform == 'win32':
-    import wmi
-
 from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
+
+if sys.platform == 'win32':
+    import wmi
 
 
 class NetworkUtils(baseutils.BaseUtilsVirt):

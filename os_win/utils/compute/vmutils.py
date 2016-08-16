@@ -25,9 +25,6 @@ import sys
 import time
 import uuid
 
-if sys.platform == 'win32':
-    import wmi
-
 from eventlet import patcher
 from eventlet import tpool
 from oslo_config import cfg
@@ -44,6 +41,9 @@ from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
 from os_win.utils import pathutils
+
+if sys.platform == 'win32':
+    import wmi
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -148,6 +148,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def list_instances(self):
         """Return the names of all the instances known to Hyper-V."""
+
         return [v.ElementName for v in
                 self._conn.Msvm_VirtualSystemSettingData(
                     ['ElementName'],
@@ -182,7 +183,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
         # considering that in all the non mappable states the instance
         # is running.
         enabled_state = self._enabled_states_map.get(si.EnabledState,
-            constants.HYPERV_VM_STATE_ENABLED)
+                                                     constants.
+                                                     HYPERV_VM_STATE_ENABLED)
 
         summary_info_dict = {'NumberOfProcessors': si.NumberOfProcessors,
                              'EnabledState': enabled_state,
@@ -370,8 +372,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
             self._conn, self._RESOURCE_ALLOC_SETTING_DATA_CLASS,
             element_instance_id=vmsettings.InstanceID)
         ide_ctrls = [r for r in rasds
-                     if r.ResourceSubType == self._IDE_CTRL_RES_SUB_TYPE
-                     and r.Address == str(ctrller_addr)]
+                     if r.ResourceSubType == self._IDE_CTRL_RES_SUB_TYPE and
+                     r.Address == str(ctrller_addr)]
 
         return ide_ctrls[0].path_() if ide_ctrls else None
 
@@ -523,7 +525,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 if (disk_resource.HostResource and
                         disk_resource.HostResource[0] != mounted_disk_path):
                     LOG.debug('Updating disk host resource "%(old)s" to '
-                                '"%(new)s"' %
+                              '"%(new)s"' %
                               {'old': disk_resource.HostResource[0],
                                'new': mounted_disk_path})
                     disk_resource.HostResource = [mounted_disk_path]
@@ -585,6 +587,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def set_vm_state(self, vm_name, req_state):
         """Set the desired state of the VM."""
+
         vm = self._lookup_vm_check(vm_name, as_vssd=False)
         (job_path,
          ret_val) = vm.RequestStateChange(self._vm_power_states_map[req_state])
@@ -800,10 +803,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def get_active_instances(self):
         """Return the names of all the active instances known to Hyper-V."""
+
         vm_names = self.list_instances()
         vms = [self._lookup_vm(vm_name, as_vssd=False) for vm_name in vm_names]
         active_vm_names = [v.ElementName for v in vms
-            if v.EnabledState == constants.HYPERV_VM_STATE_ENABLED]
+                           if v.EnabledState ==
+                           constants.HYPERV_VM_STATE_ENABLED]
 
         return active_vm_names
 
@@ -873,15 +878,16 @@ class VMUtils(baseutils.BaseUtilsVirt):
                                     object transitioned into one of those
                                     states.
         """
+
         query = ("SELECT %(field)s, TargetInstance "
                  "FROM __InstanceModificationEvent "
                  "WITHIN %(timeframe)s "
                  "WHERE TargetInstance ISA '%(class)s' "
                  "AND TargetInstance.%(field)s != "
                  "PreviousInstance.%(field)s" %
-                    {'class': cls,
-                     'field': field,
-                     'timeframe': timeframe})
+                 {'class': cls,
+                  'field': field,
+                  'timeframe': timeframe})
         if filtered_states:
             checks = ["TargetInstance.%s = '%s'" % (field, state)
                       for state in filtered_states]
@@ -928,6 +934,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                                  Authority for Secure Boot. Only Linux
                                  guests require this CA.
         """
+
         vs_data = self._lookup_vm_check(vm_name)
         self._set_secure_boot(vs_data, msft_ca_required)
         self._modify_virtual_system(vs_data)
@@ -985,7 +992,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def _set_boot_order_gen2(self, vm_name, device_boot_order):
         new_boot_order = [(self._drive_to_boot_source(device))
-                           for device in device_boot_order if device]
+                          for device in device_boot_order if device]
 
         vssd = self._lookup_vm_check(vm_name)
         old_boot_order = vssd.BootSourceOrder
@@ -1003,10 +1010,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def vm_gen_supports_remotefx(self, vm_gen):
         """RemoteFX is supported only for generation 1 virtual machines
+
         on Windows 8 / Windows Server 2012 and 2012R2.
 
         :returns: True if the given vm_gen is 1, False otherwise
         """
+
         return vm_gen == constants.VM_GEN_1
 
     def _validate_remotefx_params(self, monitor_count, max_resolution,
@@ -1021,10 +1030,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 _("Unsuported RemoteFX monitor count: %(count)s for "
                   "this resolution %(res)s. Hyper-V supports a maximum "
                   "of %(max_monitors)s monitors for this resolution.")
-                  % {'count': monitor_count,
-                     'res': max_resolution,
-                     'max_monitors': self._remotefx_max_monitors_map[
-                        max_resolution]})
+                % {'count': monitor_count,
+                   'res': max_resolution,
+                   'max_monitors':
+                   self._remotefx_max_monitors_map[max_resolution]})
 
     def _add_3d_display_controller(self, vm, monitor_count,
                                    max_resolution, vram_bytes=None):

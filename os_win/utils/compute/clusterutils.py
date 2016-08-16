@@ -20,9 +20,6 @@ Utility class for VM related operations on Hyper-V Clusters.
 import re
 import sys
 
-if sys.platform == 'win32':
-    import wmi
-
 from eventlet import patcher
 from eventlet import tpool
 from oslo_log import log as logging
@@ -31,6 +28,8 @@ from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils import baseutils
 
+if sys.platform == 'win32':
+    import wmi
 
 LOG = logging.getLogger(__name__)
 
@@ -79,15 +78,14 @@ class ClusterUtils(baseutils.BaseUtils):
                 _("Could not initialize cluster wmi connection."))
 
     def _get_failover_watcher(self):
-        raw_query = (
-                "SELECT * FROM __InstanceModificationEvent "
-                "WITHIN %(wmi_check_interv)s WHERE TargetInstance ISA "
-                "'%(cluster_res)s' AND "
-                "TargetInstance.Type='%(cluster_res_type)s' AND "
-                "TargetInstance.OwnerNode != PreviousInstance.OwnerNode" %
-                {'wmi_check_interv': self._WMI_EVENT_CHECK_INTERVAL,
-                 'cluster_res': self._MSCLUSTER_RES,
-                 'cluster_res_type': self._VM_TYPE})
+        raw_query = ("SELECT * FROM __InstanceModificationEvent "
+                     "WITHIN %(wmi_check_interv)s WHERE TargetInstance ISA "
+                     "'%(cluster_res)s' AND "
+                     "TargetInstance.Type='%(cluster_res_type)s' AND "
+                     "TargetInstance.OwnerNode != PreviousInstance.OwnerNode" %
+                     {'wmi_check_interv': self._WMI_EVENT_CHECK_INTERVAL,
+                      'cluster_res': self._MSCLUSTER_RES,
+                      'cluster_res_type': self._VM_TYPE})
         return self._conn_cluster.watch_for(raw_wql=raw_query)
 
     def check_cluster_state(self):
@@ -194,12 +192,13 @@ class ClusterUtils(baseutils.BaseUtils):
         except Exception as e:
             LOG.error(_LE('Exception during cluster live migration of '
                           '%(vm_name)s to %(host)s: %(exception)s'),
-                          {'vm_name': vm_name,
-                           'host': new_host,
-                           'exception': e})
+                      {'vm_name': vm_name,
+                       'host': new_host,
+                       'exception': e})
 
     def monitor_vm_failover(self, callback):
         """Creates a monitor to check for new WMI MSCluster_Resource
+
         events.
 
         This method will poll the last _WMI_EVENT_CHECK_INTERVAL + 1
@@ -208,6 +207,7 @@ class ClusterUtils(baseutils.BaseUtils):
 
         Any event object caught will then be processed.
         """
+
         vm_name = None
         new_host = None
         try:

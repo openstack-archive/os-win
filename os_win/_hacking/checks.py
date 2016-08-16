@@ -34,24 +34,28 @@ UNDERSCORE_IMPORT_FILES = []
 
 cfg_re = re.compile(r".*\scfg\.")
 asse_trueinst_re = re.compile(
-                     r"(.)*assertTrue\(isinstance\((\w|\.|\'|\"|\[|\])+, "
-                     "(\w|\.|\'|\"|\[|\])+\)\)")
+    r"(.)*assertTrue\(isinstance\((\w|\.|\'|\"|\[|\])+, "
+    "(\w|\.|\'|\"|\[|\])+\)\)")
 asse_equal_type_re = re.compile(
-                       r"(.)*assertEqual\(type\((\w|\.|\'|\"|\[|\])+\), "
-                       "(\w|\.|\'|\"|\[|\])+\)")
-asse_equal_in_end_with_true_or_false_re = re.compile(r"assertEqual\("
-                    r"(\w|[][.'\"])+ in (\w|[][.'\", ])+, (True|False)\)")
-asse_equal_in_start_with_true_or_false_re = re.compile(r"assertEqual\("
-                    r"(True|False), (\w|[][.'\"])+ in (\w|[][.'\", ])+\)")
+    r"(.)*assertEqual\(type\((\w|\.|\'|\"|\[|\])+\), "
+    "(\w|\.|\'|\"|\[|\])+\)")
+asse_equal_in_end_with_true_or_false_re = re.compile(
+    r"assertEqual\("
+    r"(\w|[][.'\"])+ in (\w|[][.'\", ])+, (True|False)\)")
+asse_equal_in_start_with_true_or_false_re = re.compile(
+    r"assertEqual\("
+    r"(True|False), (\w|[][.'\"])+ in (\w|[][.'\", ])+\)")
 asse_equal_end_with_none_re = re.compile(
-                           r"assertEqual\(.*?,\s+None\)$")
+    r"assertEqual\(.*?,\s+None\)$")
 asse_equal_start_with_none_re = re.compile(
-                           r"assertEqual\(None,")
-asse_true_false_with_in_or_not_in = re.compile(r"assert(True|False)\("
-                    r"(\w|[][.'\"])+( not)? in (\w|[][.'\",])+(, .*)?\)")
-asse_true_false_with_in_or_not_in_spaces = re.compile(r"assert(True|False)"
-                    r"\((\w|[][.'\"])+( not)? in [\[|'|\"](\w|[][.'\", ])+"
-                    r"[\[|'|\"](, .*)?\)")
+    r"assertEqual\(None,")
+asse_true_false_with_in_or_not_in = re.compile(
+    r"assert(True|False)\("
+    r"(\w|[][.'\"])+( not)? in (\w|[][.'\",])+(, .*)?\)")
+asse_true_false_with_in_or_not_in_spaces = re.compile(
+    r"assert(True|False)"
+    r"\((\w|[][.'\"])+( not)? in [\[|'|\"](\w|[][.'\", ])+"
+    r"[\[|'|\"](, .*)?\)")
 asse_raises_regexp = re.compile(r"assertRaisesRegexp\(")
 conf_attribute_set_re = re.compile(r"CONF\.[a-z0-9_.]+\s*=\s*\w")
 log_translation = re.compile(
@@ -192,8 +196,10 @@ def no_translate_debug_logs(logical_line, filename):
 
 def no_import_translation_in_tests(logical_line, filename):
     """Check for 'from os_win._i18n import _'
+
     N337
     """
+
     if 'os_win/tests/' in filename:
         res = import_translation_for_log_or_exception.match(logical_line)
         if res:
@@ -209,6 +215,7 @@ def no_setting_conf_directly_in_tests(logical_line, filename):
 
     N320
     """
+
     if 'os_win/tests/' in filename:
         res = conf_attribute_set_re.match(logical_line)
         if res:
@@ -259,7 +266,7 @@ def check_explicit_underscore_import(logical_line, filename):
           custom_underscore_check.match(logical_line)):
         UNDERSCORE_IMPORT_FILES.append(filename)
     elif (translated_log.match(logical_line) or
-         string_translation.match(logical_line)):
+          string_translation.match(logical_line)):
         yield(0, "N323: Found use of _() without explicit import of _ !")
 
 
@@ -339,11 +346,13 @@ class CheckForTransAdd(BaseASTChecker):
 
 def assert_true_or_false_with_in(logical_line):
     """Check for assertTrue/False(A in B), assertTrue/False(A not in B),
+
     assertTrue/False(A in B, message) or assertTrue/False(A not in B, message)
     sentences.
 
     N334
     """
+
     res = (asse_true_false_with_in_or_not_in.search(logical_line) or
            asse_true_false_with_in_or_not_in_spaces.search(logical_line))
     if res:
@@ -357,6 +366,7 @@ def assert_raises_regexp(logical_line):
 
     N335
     """
+
     res = asse_raises_regexp.search(logical_line)
     if res:
         yield (0, "N335: assertRaisesRegex must be used instead "
@@ -373,10 +383,12 @@ def dict_constructor_with_list_copy(logical_line):
 
 def assert_equal_in(logical_line):
     """Check for assertEqual(A in B, True), assertEqual(True, A in B),
+
     assertEqual(A in B, False) or assertEqual(False, A in B) sentences
 
     N338
     """
+
     res = (asse_equal_in_start_with_true_or_false_re.search(logical_line) or
            asse_equal_in_end_with_true_or_false_re.search(logical_line))
     if res:

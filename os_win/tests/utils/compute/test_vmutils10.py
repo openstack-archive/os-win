@@ -206,8 +206,8 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     @mock.patch.object(vmutils10.VMUtils10, 'get_vm_id')
     def _test_secure_vm(self, mock_get_vm_id,
-                          mock_get_element_associated_class,
-                          is_encrypted_vm=True):
+                        mock_get_element_associated_class,
+                        is_encrypted_vm=True):
         inst_id = mock_get_vm_id.return_value
         security_profile = mock.MagicMock()
         mock_get_element_associated_class.return_value = [security_profile]

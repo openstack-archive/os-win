@@ -160,8 +160,9 @@ def _get_class(class_type):
             return importutils.import_object(utils_class['path'])
 
     raise exceptions.HyperVException(_('Could not find any %(class)s class for'
-        'this Windows version: %(win_version)s')
-        % {'class': class_type, 'win_version': windows_version})
+                                       'this Windows version: %(win_version)s')
+                                     % {'class': class_type,
+                                        'win_version': windows_version})
 
 
 def get_vmutils(host='.'):

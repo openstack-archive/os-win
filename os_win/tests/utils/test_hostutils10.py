@@ -50,7 +50,8 @@ class HostUtils10TestCase(test_base.OsWinBaseTestCase):
     def _test_is_host_guarded(self, return_code=0, is_host_guarded=True):
         hgs_config = self._hostutils._conn_hgs.MSFT_HgsClientConfiguration
         hgs_config.Get.return_value = (return_code,
-            mock.MagicMock(IsHostGuarded=is_host_guarded))
+                                       mock.MagicMock
+                                       (IsHostGuarded=is_host_guarded))
         expected_result = is_host_guarded and not return_code
 
         result = self._hostutils.is_host_guarded()

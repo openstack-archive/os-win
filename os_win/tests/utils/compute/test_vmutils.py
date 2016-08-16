@@ -191,7 +191,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_shutdown.InitiateShutdown.assert_called_once_with(
             Force=False, Reason=mock.ANY)
         self._vmutils._conn.Msvm_ShutdownComponent.assert_called_once_with(
-                SystemName=mock_vm.Name)
+            SystemName=mock_vm.Name)
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, None)
 
@@ -202,7 +202,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils.soft_shutdown_vm(self._FAKE_VM_NAME)
 
         self._vmutils._conn.Msvm_ShutdownComponent.assert_called_once_with(
-                SystemName=mock_vm.Name)
+            SystemName=mock_vm.Name)
         self.assertFalse(self._vmutils._jobutils.check_ret_val.called)
 
     @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
@@ -361,7 +361,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         type(fake_drive).AddressOnParent = mock.PropertyMock(
             side_effect=list(range(constants.SCSI_CONTROLLER_SLOTS_NUMBER)))
 
-        with mock.patch.object(self._vmutils,
+        with mock.patch.object(
+                self._vmutils,
                 'get_attached_disks') as fake_get_attached_disks:
             fake_get_attached_disks.return_value = (
                 [fake_drive] * constants.SCSI_CONTROLLER_SLOTS_NUMBER)
@@ -786,7 +787,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_ret_val = 'fake return value'
 
         mock_vs_man_svc.ModifySystemSettings.return_value = (fake_job_path,
-                                                            fake_ret_val)
+                                                             fake_ret_val)
 
         self._vmutils._modify_virtual_system(vmsetting=mock_vmsetting)
 
@@ -911,11 +912,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             "WHERE TargetInstance ISA '%(class)s' "
             "AND TargetInstance.%(field)s != "
             "PreviousInstance.%(field)s "
-            "AND (%(checks)s)" %
-                {'class': cls,
-                 'field': field,
-                 'timeframe': timeframe,
-                 'checks': expected_checks})
+            "AND (%(checks)s)"
+            % {'class': cls,
+               'field': field,
+               'timeframe': timeframe,
+               'checks': expected_checks})
 
         query = self._vmutils._get_event_wql_query(
             cls=cls, field=field, timeframe=timeframe,

@@ -21,9 +21,6 @@ and storage repositories on Windows Server 2012 and above
 import sys
 import time
 
-if sys.platform == 'win32':
-    import wmi
-
 from oslo_config import cfg
 from oslo_log import log as logging
 from six.moves import range  # noqa
@@ -32,6 +29,9 @@ from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import base_iscsi_utils
+
+if sys.platform == 'win32':
+    import wmi
 
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF

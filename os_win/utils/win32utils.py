@@ -17,12 +17,12 @@
 import ctypes
 import sys
 
-if sys.platform == 'win32':
-    kernel32 = ctypes.windll.kernel32
-
 from oslo_log import log as logging
 
 from os_win import exceptions
+
+if sys.platform == 'win32':
+    kernel32 = ctypes.windll.kernel32
 
 LOG = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class Win32Utils(object):
         ret_val = func(*args, **kwargs)
 
         func_failed = (error_on_nonzero_ret_val and ret_val) or (
-                       ret_val in error_ret_vals)
+            ret_val in error_ret_vals)
 
         if func_failed:
             error_code = (ret_val

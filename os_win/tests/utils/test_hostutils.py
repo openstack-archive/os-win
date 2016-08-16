@@ -266,13 +266,13 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
         return_gpus = self._hostutils.get_remotefx_gpu_info()
         self.assertEqual(mock.sentinel.Fake_gpu_name, return_gpus[0]['name'])
         self.assertEqual(mock.sentinel.Fake_gpu_driver_version,
-            return_gpus[0]['driver_version'])
+                         return_gpus[0]['driver_version'])
         self.assertEqual(mock.sentinel.Fake_gpu_total_memory,
-            return_gpus[0]['total_video_ram'])
+                         return_gpus[0]['total_video_ram'])
         self.assertEqual(mock.sentinel.Fake_gpu_available_memory,
-            return_gpus[0]['available_video_ram'])
+                         return_gpus[0]['available_video_ram'])
         self.assertEqual(mock.sentinel.Fake_gpu_directx,
-            return_gpus[0]['directx_version'])
+                         return_gpus[0]['directx_version'])
 
     def _set_verify_host_remotefx_capability_mocks(self, isGpuCapable=True,
                                                    isSlatCapable=True):

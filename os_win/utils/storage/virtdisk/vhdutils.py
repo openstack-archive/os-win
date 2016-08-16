@@ -28,14 +28,6 @@ import os
 import struct
 import sys
 
-if sys.platform == 'win32':
-    from ctypes import wintypes
-    kernel32 = ctypes.windll.kernel32
-    virtdisk = ctypes.windll.virtdisk
-
-    from os_win.utils.storage.virtdisk import (
-        virtdisk_structures as vdisk_struct)  # noqa
-
 from oslo_log import log as logging
 
 from os_win._i18n import _
@@ -44,6 +36,14 @@ from os_win import exceptions
 from os_win.utils.storage.virtdisk import (
     virtdisk_constants as vdisk_const)
 from os_win.utils import win32utils
+
+if sys.platform == 'win32':
+    from ctypes import wintypes
+    kernel32 = ctypes.windll.kernel32
+    virtdisk = ctypes.windll.virtdisk
+
+    from os_win.utils.storage.virtdisk import (
+        virtdisk_structures as vdisk_struct)  # noqa
 
 LOG = logging.getLogger(__name__)
 
@@ -379,6 +379,7 @@ class VHDUtils(object):
                                             new_vhd_file_size,
                                             vhd_info):
         """Fixed VHD size = Data Block size + 512 bytes
+
            | Dynamic_VHD_size = Dynamic Disk Header
            |                  + Copy of hard disk footer
            |                  + Hard Disk Footer
@@ -395,6 +396,7 @@ class VHDUtils(object):
            | Default block size is 2M
            | BAT entry size is 4byte
         """
+
         vhd_type = vhd_info['ProviderSubtype']
         if vhd_type == constants.VHD_TYPE_FIXED:
             vhd_header_size = vdisk_const.VHD_HEADER_SIZE_FIX
@@ -414,6 +416,7 @@ class VHDUtils(object):
                                              new_vhd_file_size,
                                              vhd_info):
         """VHDX Size:
+
         Header (1MB) + Log + Metadata Region + BAT + Payload Blocks
 
         The chunk size is the maximum number of bytes described by a SB
@@ -425,6 +428,7 @@ class VHDUtils(object):
         :param new_vhd_file_size: Size of the new VHD file.
         :return: Internal VHD size according to new VHD file size.
         """
+
         try:
             with open(vhd_path, 'rb') as f:
                 hs = vdisk_const.VHDX_HEADER_SECTION_SIZE
@@ -439,15 +443,16 @@ class VHDUtils(object):
                 size = new_vhd_file_size
 
                 max_internal_size = (bs * chunk_ratio * (size - hs -
-                    ls - ms - bes - bes // chunk_ratio) // (bs *
-                    chunk_ratio + bes * chunk_ratio + bes))
+                                     ls - ms - bes - bes // chunk_ratio) //
+                                     (bs *
+                                     chunk_ratio + bes * chunk_ratio + bes))
 
                 return max_internal_size - (max_internal_size % bs)
         except IOError as ex:
             raise exceptions.VHDException(
                 _("Unable to obtain internal size from VHDX: "
                   "%(vhd_path)s. Exception: %(ex)s") %
-                  {"vhd_path": vhd_path, "ex": ex})
+                {"vhd_path": vhd_path, "ex": ex})
 
     def _get_vhdx_current_header_offset(self, vhdx_file):
         sequence_numbers = []

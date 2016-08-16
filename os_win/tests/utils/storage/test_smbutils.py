@@ -89,7 +89,7 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
         smb_mapping_class.return_value = [fake_mapping, fake_mapping_attr_err]
 
         self._smbutils.unmount_smb_share(mock.sentinel.share_path,
-                                          force)
+                                         force)
 
         smb_mapping_class.assert_called_once_with(
             RemotePath=mock.sentinel.share_path)

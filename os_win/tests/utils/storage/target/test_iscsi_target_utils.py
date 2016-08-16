@@ -192,7 +192,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
                                            if idmeth_found else [])
 
         wt_idmeth = self._tgutils._get_wt_idmethod(mock.sentinel.initiator,
-                                                 mock.sentinel.target_name)
+                                                   mock.sentinel.target_name)
 
         expected_wt_idmeth = mock_wt_idmeth if idmeth_found else None
         self.assertEqual(expected_wt_idmeth, wt_idmeth)
@@ -217,7 +217,7 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
 
         if target_exists and not fail_if_exists:
             self._tgutils.create_iscsi_target(mock.sentinel.target_name,
-                                            fail_if_exists=fail_if_exists)
+                                              fail_if_exists=fail_if_exists)
         else:
             self.assertRaises(exceptions.ISCSITargetException,
                               self._tgutils.create_iscsi_target,

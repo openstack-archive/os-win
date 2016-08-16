@@ -689,7 +689,7 @@ class VHDUtilsTestCase(base.BaseTestCase):
         fake_md_sz = bytearray(b'\x01\x00\x00\x00')
 
         mock_handle = self._get_mock_file_handle(fake_md_offset,
-                                                      fake_md_sz)
+                                                 fake_md_sz)
 
         md_sz, md_offset = self._vhdutils._get_vhdx_metadata_size_and_offset(
             mock_handle)

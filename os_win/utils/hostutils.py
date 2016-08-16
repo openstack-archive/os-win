@@ -77,8 +77,10 @@ class HostUtils(baseutils.BaseUtilsVirt):
 
     def get_memory_info(self):
         """Returns a tuple with total visible memory and free physical memory
+
         expressed in kB.
         """
+
         mem_info = self._conn_cimv2.query("SELECT TotalVisibleMemorySize, "
                                           "FreePhysicalMemory "
                                           "FROM win32_operatingsystem")[0]
@@ -89,8 +91,10 @@ class HostUtils(baseutils.BaseUtilsVirt):
     # changed to use the get_disk_capacity method from diskutils.
     def get_volume_info(self, drive):
         """Returns a tuple with total size and free space
+
         expressed in bytes.
         """
+
         logical_disk = self._conn_cimv2.query("SELECT Size, FreeSpace "
                                               "FROM win32_logicaldisk "
                                               "WHERE DeviceID='%s'"
@@ -128,11 +132,13 @@ class HostUtils(baseutils.BaseUtilsVirt):
 
     def get_supported_vm_types(self):
         """Get the supported Hyper-V VM generations.
+
         Hyper-V Generation 2 VMs are supported in Windows 8.1,
         Windows Server / Hyper-V Server 2012 R2 or newer.
 
         :returns: array of supported VM generations (ex. ['hyperv-gen1'])
         """
+
         if self.check_min_windows_version(6, 3):
             return [constants.IMAGE_PROP_VM_GEN_1,
                     constants.IMAGE_PROP_VM_GEN_2]
