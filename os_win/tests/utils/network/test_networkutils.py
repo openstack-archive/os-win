@@ -145,15 +145,13 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(networkutils, 'patcher')
     @mock.patch.object(networkutils.tpool, 'execute')
-    @mock.patch.object(networkutils, 'wmi', create=True)
     @mock.patch.object(networkutils.NetworkUtils, '_get_event_wql_query')
-    def test_get_vnic_event_listener(self, mock_get_event_query, mock_wmi,
+    def test_get_vnic_event_listener(self, mock_get_event_query,
                                      mock_execute, mock_patcher):
-        mock_wmi.x_wmi_timed_out = ValueError
         event = mock.MagicMock()
         port_class = self.netutils._conn.Msvm_SyntheticEthernetPortSettingData
         wmi_event_listener = port_class.watch_for.return_value
-        mock_execute.side_effect = [mock_wmi.x_wmi_timed_out, event]
+        mock_execute.side_effect = [exceptions.x_wmi_timed_out, event]
 
         # callback will raise an exception in order to stop iteration in the
         # listener.
@@ -254,14 +252,12 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         expected_result = conn.Msvm_ComputerSystem.return_value[0]
         self.assertEqual(expected_result, resulted_vm)
 
-    @mock.patch.object(networkutils, 'wmi', create=True)
-    def test_remove_switch_port(self, mock_wmi):
+    def test_remove_switch_port(self):
         mock_sw_port = self._mock_get_switch_port_alloc()
         self.netutils._switch_ports[self._FAKE_PORT_NAME] = mock_sw_port
         self.netutils._vlan_sds[mock_sw_port.InstanceID] = mock.MagicMock()
-        mock_wmi.x_wmi = Exception
         self.netutils._jobutils.remove_virt_resource.side_effect = (
-            mock_wmi.x_wmi)
+            exceptions.x_wmi)
 
         self.netutils.remove_switch_port(self._FAKE_PORT_NAME, False)
 

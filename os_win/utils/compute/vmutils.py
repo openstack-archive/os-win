@@ -21,7 +21,6 @@ Hyper-V Server / Windows Server 2012.
 """
 
 import functools
-import sys
 import time
 import uuid
 
@@ -41,9 +40,6 @@ from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
 from os_win.utils import pathutils
-
-if sys.platform == 'win32':
-    import wmi
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -856,7 +852,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                         LOG.exception(err_msg,
                                       dict(vm_name=vm_name,
                                            vm_power_state=vm_power_state))
-                except wmi.x_wmi_timed_out:
+                except exceptions.x_wmi_timed_out:
                     pass
                 except Exception:
                     LOG.exception(

@@ -28,9 +28,6 @@ from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils import baseutils
 
-if sys.platform == 'win32':
-    import wmi
-
 LOG = logging.getLogger(__name__)
 
 
@@ -234,5 +231,5 @@ class ClusterUtils(baseutils.BaseUtils):
                 except Exception:
                     LOG.exception(
                         _LE("Exception during failover callback."))
-        except wmi.x_wmi_timed_out:
+        except exceptions.x_wmi_timed_out:
             pass

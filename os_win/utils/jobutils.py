@@ -18,7 +18,6 @@
 Base Utility class for operations on Hyper-V.
 """
 
-import sys
 import time
 
 from oslo_log import log as logging
@@ -31,9 +30,6 @@ from os_win.utils import baseutils
 from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
-
-if sys.platform == 'win32':
-    import wmi
 
 
 class JobUtils(baseutils.BaseUtilsVirt):
@@ -127,7 +123,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
                 job.RequestStateChange(
                     self._KILL_JOB_STATE_CHANGE_REQUEST)
-            except wmi.x_wmi as ex:
+            except exceptions.x_wmi as ex:
                 hresult = win32utils.Win32Utils.get_com_error_hresult(
                     ex.com_error)
                 # The job may had been completed right before we've

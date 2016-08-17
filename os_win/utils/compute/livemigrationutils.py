@@ -14,7 +14,6 @@
 #    under the License.
 
 import platform
-import sys
 
 from oslo_log import log as logging
 
@@ -25,9 +24,6 @@ from os_win.utils import baseutils
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
-
-if sys.platform == 'win32':
-    import wmi
 
 LOG = logging.getLogger(__name__)
 
@@ -45,7 +41,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
     def _get_conn_v2(self, host='localhost'):
         try:
             return self._get_wmi_obj(self._wmi_namespace % host)
-        except wmi.x_wmi as ex:
+        except exceptions.x_wmi as ex:
             LOG.exception(_LE('Get version 2 connection error'))
             if ex.com_error.hresult == -2147217394:
                 msg = (_('Live migration is not supported on target host "%s"')

@@ -28,7 +28,6 @@ from os_win.utils import win32utils
 
 if sys.platform == 'win32':
     kernel32 = ctypes.windll.kernel32
-    import wmi
 
 LOG = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class SMBUtils(baseutils.BaseUtils):
             self._smb_conn.Msft_SmbMapping.Create(RemotePath=share_path,
                                                   UserName=username,
                                                   Password=password)
-        except wmi.x_wmi as exc:
+        except exceptions.x_wmi as exc:
             err_msg = (_(
                 'Unable to mount SMBFS share: %(share_path)s '
                 'WMI exception: %(wmi_exc)s') % {'share_path': share_path,
@@ -81,7 +80,7 @@ class SMBUtils(baseutils.BaseUtils):
                 mapping.Remove(Force=force)
             except AttributeError:
                 pass
-            except wmi.x_wmi:
+            except exceptions.x_wmi:
                 # If this fails, a 'Generic Failure' exception is raised.
                 # This happens even if we unforcefully unmount an in-use
                 # share, for which reason we'll simply ignore it in this

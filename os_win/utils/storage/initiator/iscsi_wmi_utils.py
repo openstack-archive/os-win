@@ -18,7 +18,6 @@
 Helper methods for operations related to the management of volumes
 and storage repositories on Windows Server 2012 and above
 """
-import sys
 import time
 
 from oslo_config import cfg
@@ -29,9 +28,6 @@ from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import base_iscsi_utils
-
-if sys.platform == 'win32':
-    import wmi
 
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
@@ -99,7 +95,7 @@ class ISCSIInitiatorWMIUtils(base_iscsi_utils.BaseISCSIInitiatorUtils):
                 target.Connect(NodeAddress=target_iqn,
                                IsPersistent=True, **auth)
                 time.sleep(CONF.hyperv.volume_attach_retry_interval)
-            except wmi.x_wmi as exc:
+            except exceptions.x_wmi as exc:
                 LOG.debug("Attempt %(attempt)d to connect to target  "
                           "%(target_iqn)s failed. Retrying. "
                           "WMI exception: %(exc)s " %

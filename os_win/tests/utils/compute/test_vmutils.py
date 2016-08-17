@@ -947,8 +947,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(vmutils, 'patcher')
     def test_vm_power_state_change_event_handler(self, mock_patcher,
                                                  mock_tpool, mock_sleep):
-        self._mock_wmi.x_wmi_timed_out = exceptions.HyperVException
-
         enabled_state = constants.HYPERV_VM_STATE_ENABLED
         hv_enabled_state = self._vmutils._vm_power_states_map[enabled_state]
         fake_event = mock.Mock(ElementName=mock.sentinel.vm_name,
@@ -957,7 +955,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         fake_listener = (
             self._vmutils._conn.Msvm_ComputerSystem.watch_for.return_value)
-        mock_tpool.execute.side_effect = (self._mock_wmi.x_wmi_timed_out,
+        mock_tpool.execute.side_effect = (exceptions.x_wmi_timed_out,
                                           fake_event, Exception,
                                           KeyboardInterrupt)
 

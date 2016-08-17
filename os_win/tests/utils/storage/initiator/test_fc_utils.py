@@ -29,8 +29,7 @@ class FCUtilsTestCase(base.BaseTestCase):
     _FAKE_ADAPTER_NAME = 'fake_adapter_name'
     _FAKE_ADAPTER_WWN = list(range(8))
 
-    @mock.patch.object(fc_utils, 'wmi', create=True)
-    def setUp(self, mock_wmi):
+    def setUp(self):
         super(FCUtilsTestCase, self).setUp()
         self._setup_lib_mocks()
 

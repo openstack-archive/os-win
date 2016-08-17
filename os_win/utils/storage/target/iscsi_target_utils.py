@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import sys
-
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LI
@@ -24,9 +22,6 @@ from os_win.utils import baseutils
 from os_win.utils import hostutils
 from os_win.utils import pathutils
 from os_win.utils import win32utils
-
-if sys.platform == 'win32':
-    import wmi
 
 LOG = logging.getLogger(__name__)
 
@@ -119,7 +114,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
         """Creates ISCSI target."""
         try:
             self._conn_wmi.WT_Host.NewHost(HostName=target_name)
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_code = self._win32utils.get_com_err_code(wmi_exc.com_error)
             target_exists = err_code == self._ERR_FILE_EXISTS
 
@@ -141,7 +136,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
                 return
             wt_host.RemoveAllWTDisks()
             wt_host.Delete_()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _("Failed to delete ISCSI target %s")
             raise exceptions.ISCSITargetWMIException(err_msg % target_name,
                                                      wmi_exc=wmi_exc)
@@ -173,7 +168,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_host.CHAPUserName = chap_username
             wt_host.CHAPSecret = chap_password
             wt_host.put()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Failed to set CHAP credentials on target %s.')
             raise exceptions.ISCSITargetWMIException(err_msg % target_name,
                                                      wmi_exc=wmi_exc)
@@ -191,7 +186,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_idmethod.Method = id_method
             wt_idmethod.Value = initiator
             wt_idmethod.put()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Could not associate initiator %(initiator)s to '
                         'iSCSI target: %(target_name)s.')
             raise exceptions.ISCSITargetWMIException(
@@ -204,7 +199,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_idmethod = self._get_wt_idmethod(initiator, target_name)
             if wt_idmethod:
                 wt_idmethod.Delete_()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Could not deassociate initiator %(initiator)s from '
                         'iSCSI target: %(target_name)s.')
             raise exceptions.ISCSITargetWMIException(
@@ -217,7 +212,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             self._conn_wmi.WT_Disk.NewWTDisk(DevicePath=vhd_path,
                                              Description=wtd_name,
                                              SizeInMB=size_mb)
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Failed to create WT Disk. '
                         'VHD path: %(vhd_path)s '
                         'WT disk name: %(wtd_name)s')
@@ -231,7 +226,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
         try:
             self._conn_wmi.WT_Disk.ImportWTDisk(DevicePath=vhd_path,
                                                 Description=wtd_name)
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _("Failed to import WT disk: %s.")
             raise exceptions.ISCSITargetWMIException(err_msg % vhd_path,
                                                      wmi_exc=wmi_exc)
@@ -241,7 +236,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_disk = self._get_wt_disk(wtd_name)
             wt_disk.Enabled = enabled
             wt_disk.put()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Could not change disk status. WT Disk name: %s')
             raise exceptions.ISCSITargetWMIException(err_msg % wtd_name,
                                                      wmi_exc=wmi_exc)
@@ -251,7 +246,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_disk = self._get_wt_disk(wtd_name, fail_if_not_found=False)
             if wt_disk:
                 wt_disk.Delete_()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _("Failed to remove WT disk: %s.")
             raise exceptions.ISCSITargetWMIException(err_msg % wtd_name,
                                                      wmi_exc=wmi_exc)
@@ -260,7 +255,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
         try:
             wt_disk = self._get_wt_disk(wtd_name)
             wt_disk.Extend(additional_mb)
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Could not extend WT Disk %(wtd_name)s '
                         'with additional %(additional_mb)s MB.')
             raise exceptions.ISCSITargetWMIException(
@@ -274,7 +269,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_disk = self._get_wt_disk(wtd_name)
             wt_host = self._get_wt_host(target_name)
             wt_host.AddWTDisk(wt_disk.WTD)
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Could not add WTD Disk %(wtd_name)s to '
                         'iSCSI target %(target_name)s.')
             raise exceptions.ISCSITargetWMIException(
@@ -291,7 +286,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             wt_snap = self._conn_wmi.WT_Snapshot(Id=snap_id)[0]
             wt_snap.Description = snapshot_name
             wt_snap.put()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Failed to create snapshot. '
                         'WT Disk name: %(wtd_name)s '
                         'Snapshot name: %(snapshot_name)s')
@@ -315,7 +310,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
             self._pathutils.copy(src_path, dest_path)
 
             wt_disk.Delete_()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Failed to export snapshot %(snapshot_name)s '
                         'to %(dest_path)s.')
             raise exceptions.ISCSITargetWMIException(
@@ -330,7 +325,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
                                                 fail_if_not_found=False)
             if wt_snapshot:
                 wt_snapshot.Delete_()
-        except wmi.x_wmi as wmi_exc:
+        except exceptions.x_wmi as wmi_exc:
             err_msg = _('Failed delete snapshot %s.')
             raise exceptions.ISCSITargetWMIException(err_msg % snapshot_name,
                                                      wmi_exc=wmi_exc)

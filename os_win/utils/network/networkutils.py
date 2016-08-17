@@ -23,16 +23,12 @@ import re
 
 from eventlet import patcher
 from eventlet import tpool
-import sys
 
 from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
-
-if sys.platform == 'win32':
-    import wmi
 
 
 class NetworkUtils(baseutils.BaseUtilsVirt):
@@ -230,7 +226,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 try:
                     event = listen()
                     callback(event.ElementName)
-                except wmi.x_wmi_timed_out:
+                except exceptions.x_wmi_timed_out:
                     # no new event published.
                     pass
 
@@ -295,7 +291,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if not vnic_deleted:
             try:
                 self._jobutils.remove_virt_resource(sw_port)
-            except wmi.x_wmi:
+            except exceptions.x_wmi:
                 # port may have already been destroyed by Hyper-V
                 pass
 

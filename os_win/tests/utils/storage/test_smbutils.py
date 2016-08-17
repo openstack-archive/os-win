@@ -72,10 +72,8 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
             UserName=mock.sentinel.username,
             Password=mock.sentinel.password)
 
-    @mock.patch.object(smbutils, 'wmi', create=True)
-    def test_mount_smb_share_failed(self, mock_wmi):
-        mock_wmi.x_wmi = Exception
-        self._smb_conn.Msft_SmbMapping.Create.side_effect = mock_wmi.x_wmi
+    def test_mount_smb_share_failed(self):
+        self._smb_conn.Msft_SmbMapping.Create.side_effect = exceptions.x_wmi
 
         self.assertRaises(exceptions.SMBException,
                           self._smbutils.mount_smb_share,
@@ -101,14 +99,13 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_force_unmount_smb_share(self):
         self._test_unmount_smb_share(force=True)
 
-    @mock.patch.object(smbutils, 'wmi', create=True)
-    def test_unmount_smb_share_wmi_exception(self, mock_wmi):
-        mock_wmi.x_wmi = Exception
+    def test_unmount_smb_share_wmi_exception(self):
         fake_mapping = mock.Mock()
-        fake_mapping.Remove.side_effect = mock_wmi.x_wmi
+        fake_mapping.Remove.side_effect = exceptions.x_wmi
         self._smb_conn.Msft_SmbMapping.return_value = [fake_mapping]
 
-        self.assertRaises(mock_wmi.x_wmi, self._smbutils.unmount_smb_share,
+        self.assertRaises(exceptions.SMBException,
+                          self._smbutils.unmount_smb_share,
                           mock.sentinel.share_path, force=True)
 
     @mock.patch.object(smbutils, 'ctypes')
