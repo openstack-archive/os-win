@@ -20,6 +20,7 @@ from oslo_log import log as logging
 from os_win._i18n import _, _LI
 from os_win import constants
 from os_win import exceptions
+from os_win.utils import baseutils
 from os_win.utils import hostutils
 from os_win.utils import pathutils
 from os_win.utils import win32utils
@@ -30,7 +31,7 @@ if sys.platform == 'win32':
 LOG = logging.getLogger(__name__)
 
 
-class ISCSITargetUtils(object):
+class ISCSITargetUtils(baseutils.BaseUtils):
     ID_METHOD_DNS_NAME = 1
     ID_METHOD_IPV4_ADDR = 2
     ID_METHOD_MAC_ADDR = 3
@@ -40,7 +41,7 @@ class ISCSITargetUtils(object):
     _ERR_FILE_EXISTS = 80
 
     def __init__(self):
-        self._conn_wmi = wmi.WMI(moniker='//./root/wmi')
+        self._conn_wmi = self._get_wmi_conn('//./root/wmi')
         self._ensure_wt_provider_available()
 
         self._pathutils = pathutils.PathUtils()
