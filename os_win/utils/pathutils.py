@@ -19,7 +19,6 @@ import os
 import shutil
 import sys
 import tempfile
-import time
 
 from oslo_log import log as logging
 from oslo_utils import fileutils
@@ -104,17 +103,7 @@ class PathUtils(object):
                 self.rename(src, os.path.join(dest_dir, fname))
 
     def rmtree(self, path):
-        # This will be removed once support for Windows Server 2008R2 is
-        # stopped
-        for i in range(5):
-            try:
-                shutil.rmtree(path)
-                return
-            except WindowsError as e:
-                if e.winerror == ERROR_DIR_IS_NOT_EMPTY:
-                    time.sleep(1)
-                else:
-                    raise e
+        shutil.rmtree(path)
 
     def check_create_dir(self, path):
         if not self.exists(path):
