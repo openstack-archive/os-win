@@ -23,10 +23,13 @@ from os_win.utils.storage.target import iscsi_target_utils as tg_utils
 
 class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(tg_utils, 'hostutils')
-    def setUp(self, mock_hostutils):
+    @mock.patch.object(tg_utils.ISCSITargetUtils,
+                       '_ensure_wt_provider_available')
+    def setUp(self, mock_ensure_wt_provider_available, mock_hostutils):
         super(ISCSITargetUtilsTestCase, self).setUp()
 
         self._tgutils = tg_utils.ISCSITargetUtils()
+        self._tgutils._conn_wmi = mock.Mock()
         self._tgutils._pathutils = mock.Mock()
 
     def test_ensure_wt_provider_unavailable(self):
