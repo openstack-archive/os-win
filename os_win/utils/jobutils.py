@@ -46,6 +46,26 @@ class JobUtils(baseutils.BaseUtilsVirt):
                              constants.JOB_STATE_COMPLETED_WITH_WARNINGS]
 
     def check_ret_val(self, ret_val, job_path, success_values=[0]):
+        """Checks that the job represented by the given arguments succeeded.
+
+        Some Hyper-V operations are not atomic, and will return a reference
+        to a job. In this case, this method will wait for the job's
+        completion.
+
+        :param ret_val: integer, representing the return value of the job.
+            if the value is WMI_JOB_STATUS_STARTED or WMI_JOB_STATE_RUNNING,
+            a job_path cannot be None.
+        :param job_path: string representing the WMI object path of a
+            Hyper-V job.
+        :param success_values: list of return values that can be considered
+            successful. WMI_JOB_STATUS_STARTED and WMI_JOB_STATE_RUNNING
+            values are ignored.
+        :raises exceptions.HyperVException: if the given ret_val is
+            WMI_JOB_STATUS_STARTED or WMI_JOB_STATE_RUNNING and the state of
+            job represented by the given job_path is not
+            WMI_JOB_STATE_COMPLETED, or if the given ret_val is not in the
+            list of given success_values.
+        """
         if ret_val in [constants.WMI_JOB_STATUS_STARTED,
                        constants.WMI_JOB_STATE_RUNNING]:
             return self._wait_for_job(job_path)
@@ -146,6 +166,16 @@ class JobUtils(baseutils.BaseUtilsVirt):
                  ignore_error_state))
 
     def stop_jobs(self, element, timeout=_DEFAULT_JOB_TERMINATE_TIMEOUT):
+        """Stops the Hyper-V jobs associated with the given resource.
+
+        :param element: string representing the path of the Hyper-V resource
+            whose jobs will be stopped.
+        :param timeout: the maximum amount of time allowed to stop all the
+            given resource's jobs.
+        :raises exceptions.JobTerminateFailed: if there are still pending jobs
+            associated with the given resource and the given timeout amount of
+            time has passed.
+        """
         @_utils.retry_decorator(exceptions=exceptions.JobTerminateFailed,
                                 timeout=timeout, max_retry_count=None)
         def _stop_jobs_with_timeout():

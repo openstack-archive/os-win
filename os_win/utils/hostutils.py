@@ -52,6 +52,7 @@ class HostUtils(baseutils.BaseUtilsVirt):
                                               privileges=["Shutdown"])
 
     def get_cpus_info(self):
+        """Returns dictionary containing information about the host's CPUs."""
         # NOTE(abalutoiu): Specifying exactly the fields that we need
         # improves the speed of the query. The LoadPercentage field
         # is the load capacity of each processor averaged to the last
@@ -73,12 +74,13 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return cpus_list
 
     def is_cpu_feature_present(self, feature_key):
+        """Checks if the host's CPUs have the given feature."""
         return ctypes.windll.kernel32.IsProcessorFeaturePresent(feature_key)
 
     def get_memory_info(self):
-        """Returns a tuple with total visible memory and free physical memory
+        """Returns a tuple with total visible memory and free physical memory.
 
-        expressed in kB.
+        The returned values are expressed in KB.
         """
 
         mem_info = self._conn_cimv2.query("SELECT TotalVisibleMemorySize, "
@@ -90,9 +92,12 @@ class HostUtils(baseutils.BaseUtilsVirt):
     # TODO(atuvenie) This method should be removed once all the callers have
     # changed to use the get_disk_capacity method from diskutils.
     def get_volume_info(self, drive):
-        """Returns a tuple with total size and free space
+        """Returns a tuple with total size and free space of the given drive.
 
-        expressed in bytes.
+        Returned values are expressed in bytes.
+
+        :param drive: the drive letter of the logical disk whose information
+            is required.
         """
 
         logical_disk = self._conn_cimv2.query("SELECT Size, FreeSpace "
@@ -102,20 +107,28 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return (int(logical_disk.Size), int(logical_disk.FreeSpace))
 
     def check_min_windows_version(self, major, minor, build=0):
+        """Compares the host's kernel version with the given version.
+
+        :returns: True if the host's kernel version is higher or equal to
+            the given version.
+        """
         version_str = self.get_windows_version()
         return list(map(int, version_str.split('.'))) >= [major, minor, build]
 
     def get_windows_version(self):
+        """Returns a string representing the host's kernel version."""
         if not HostUtils._windows_version:
             Win32_OperatingSystem = self._conn_cimv2.Win32_OperatingSystem()[0]
             HostUtils._windows_version = Win32_OperatingSystem.Version
         return HostUtils._windows_version
 
     def get_local_ips(self):
+        """Returns the list of locally assigned IPs."""
         hostname = socket.gethostname()
         return _utils.get_ips(hostname)
 
     def get_host_tick_count64(self):
+        """Returns host uptime in miliseconds."""
         return ctypes.windll.kernel32.GetTickCount64()
 
     def host_power_action(self, action):
@@ -149,9 +162,15 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return self._DEFAULT_VM_GENERATION
 
     def check_server_feature(self, feature_id):
+        """Checks if the given feature exists on the host."""
         return len(self._conn_cimv2.Win32_ServerFeature(ID=feature_id)) > 0
 
     def get_numa_nodes(self):
+        """Returns the host's list of NUMA nodes.
+
+        :returns: list of dictionaries containing information about each
+            host NUMA node. Each host has at least one NUMA node.
+        """
         numa_nodes = self._conn.Msvm_NumaNode()
         nodes_info = []
         system_memory = self._conn.Msvm_Memory(['NumberOfBlocks'])
@@ -221,6 +240,11 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return cpu_info
 
     def get_remotefx_gpu_info(self):
+        """Returns information about the GPUs used for RemoteFX.
+
+        :returns: list with dictionaries containing information about each
+            GPU used for RemoteFX.
+        """
         gpus = []
         all_gpus = self._conn.Msvm_Physical3dGraphicsProcessor(
             EnabledForVirtualization=True)
@@ -233,6 +257,11 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return gpus
 
     def verify_host_remotefx_capability(self):
+        """Validates that the host supports RemoteFX.
+
+        :raises exceptions.HyperVRemoteFXException: if the host has no GPU
+            that supports DirectX 11, or SLAT.
+        """
         synth_3d_video_pool = self._conn.Msvm_Synth3dVideoPool()[0]
         if not synth_3d_video_pool.IsGpuCapable:
             raise exceptions.HyperVRemoteFXException(
@@ -244,4 +273,9 @@ class HostUtils(baseutils.BaseUtilsVirt):
                   "GPUs support SLAT."))
 
     def is_host_guarded(self):
+        """Checks if the host is guarded.
+
+        :returns: False, only Windows / Hyper-V Server 2016 or newer can be
+            guarded.
+        """
         return False
