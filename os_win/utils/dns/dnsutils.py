@@ -183,6 +183,8 @@ class DNSUtils(baseutils.BaseUtils):
 
         zone_soatype = self._dns_manager.MicrosoftDNS_SOAType(
             ContainerName=zone_name)
+        if not zone_soatype:
+            return None
         # Serial number of the SOA record
         SOA = zone_soatype[0].SerialNumber
         return int(SOA)
