@@ -69,7 +69,7 @@ class DiskUtils(baseutils.BaseUtils):
     def rescan_disks(self):
         # TODO(lpetrut): find a better way to do this.
         cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
-        _utils.execute(*cmd)
+        _utils.execute(*cmd, attempts=5)
 
         self._conn_storage.Msft_Disk()
 
