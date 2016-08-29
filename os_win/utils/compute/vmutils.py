@@ -26,7 +26,6 @@ import uuid
 
 from eventlet import patcher
 from eventlet import tpool
-from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import uuidutils
 import six
@@ -41,7 +40,6 @@ from os_win.utils import baseutils
 from os_win.utils import jobutils
 from os_win.utils import pathutils
 
-CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
