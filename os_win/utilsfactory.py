@@ -14,7 +14,6 @@
 #    under the License.
 
 from oslo_config import cfg
-from oslo_log import log as logging
 from oslo_utils import importutils
 
 from os_win._i18n import _, _LW  # noqa
@@ -32,8 +31,6 @@ hyper_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(hyper_opts, 'hyperv')
-
-LOG = logging.getLogger(__name__)
 
 utils = hostutils.HostUtils()
 
