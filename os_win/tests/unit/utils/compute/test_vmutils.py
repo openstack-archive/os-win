@@ -1305,3 +1305,15 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         actual_result = self._vmutils._get_virtual_system_type(
             is_planned_vm=is_planned_vm)
         self.assertEqual(exp_result, actual_result)
+
+    def test_add_pci_device(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.add_pci_device,
+                          mock.sentinel.vm_name, mock.sentinel.vendor_id,
+                          mock.sentinel.product_id)
+
+    def test_remove_pci_device(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.remove_pci_device,
+                          mock.sentinel.vm_name, mock.sentinel.vendor_id,
+                          mock.sentinel.product_id)

@@ -296,3 +296,6 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_supports_nested_virtualization(self):
         self.assertFalse(self._hostutils.supports_nested_virtualization())
+
+    def test_get_pci_passthrough_devices(self):
+        self.assertEqual([], self._hostutils.get_pci_passthrough_devices())

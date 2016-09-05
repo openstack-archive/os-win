@@ -53,6 +53,11 @@ class NotFound(OSWinException):
     msg_fmt = _("Resource could not be found: %(resource)s")
 
 
+class PciDeviceNotFound(NotFound):
+    msg_fmt = _("No assignable PCI device with vendor id: %(vendor_id)s and "
+                "product id: %(product_id)s was found.")
+
+
 class HyperVException(OSWinException):
     pass
 

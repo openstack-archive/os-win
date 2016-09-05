@@ -13,6 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import re
+
+from oslo_log import log as logging
+
 from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
@@ -20,12 +24,15 @@ from os_win.utils import _wqlutils
 from os_win.utils.compute import vmutils
 from oslo_utils import units
 
+LOG = logging.getLogger(__name__)
+
 
 class VMUtils10(vmutils.VMUtils):
 
     _UEFI_CERTIFICATE_AUTH = 'MicrosoftUEFICertificateAuthority'
     _SERIAL_PORT_SETTING_DATA_CLASS = "Msvm_SerialPortSettingData"
     _SECURITY_SETTING_DATA = 'Msvm_SecuritySettingData'
+    _PCI_EXPRESS_SETTING_DATA = 'Msvm_PciExpressSettingData'
     _MSPS_NAMESPACE = '//%s/root/msps'
 
     _remote_fx_res_map = {
@@ -205,3 +212,73 @@ class VMUtils10(vmutils.VMUtils):
         if security_profile:
             return security_profile[0].EncryptStateAndVmMigrationTraffic
         return False
+
+    def add_pci_device(self, vm_name, vendor_id, product_id):
+        """Adds the given PCI device to the given VM.
+
+        :param vm_name: the name of the VM to which the PCI device will be
+            attached to.
+        :param vendor_id: the PCI device's vendor ID.
+        :param product_id: the PCI device's product ID.
+        :raises exceptions.PciDeviceNotFound: if there is no PCI device
+            identifiable by the given vendor_id and product_id, or it was
+            already assigned.
+        """
+        vmsettings = self._lookup_vm_check(vm_name)
+        pci_setting_data = self._get_new_setting_data(
+            self._PCI_EXPRESS_SETTING_DATA)
+        pci_device = self._get_assignable_pci_device(vendor_id, product_id)
+        pci_setting_data.HostResource = [pci_device.path_()]
+
+        self._jobutils.add_virt_resource(pci_setting_data, vmsettings)
+
+    def _get_assignable_pci_device(self, vendor_id, product_id):
+        pci_devices = self._conn.Msvm_PciExpress()
+
+        pattern = re.compile(
+            "^(.*)VEN_%(vendor_id)s&DEV_%(product_id)s&(.*)$" % {
+                'vendor_id': vendor_id, 'product_id': product_id})
+        for dev in pci_devices:
+            if pattern.match(dev.DeviceID):
+                # NOTE(claudiub): if the given PCI device is already assigned,
+                # the pci_devices list will contain PCI device with the same
+                # LocationPath.
+                pci_devices_found = [d for d in pci_devices if
+                                     d.LocationPath == dev.LocationPath]
+
+                LOG.debug('PCI devices found: %s',
+                          [d.DeviceID for d in pci_devices_found])
+
+                # device is not in use by other VM
+                if len(pci_devices_found) == 1:
+                    return pci_devices_found[0]
+
+        raise exceptions.PciDeviceNotFound(vendor_id=vendor_id,
+                                           product_id=product_id)
+
+    def remove_pci_device(self, vm_name, vendor_id, product_id):
+        """Removes the given PCI device from the given VM.
+
+        :param vm_name: the name of the VM from which the PCI device will be
+            attached from.
+        :param vendor_id: the PCI device's vendor ID.
+        :param product_id: the PCI device's product ID.
+        """
+        vmsettings = self._lookup_vm_check(vm_name)
+
+        pattern = re.compile(
+            "^(.*)VEN_%(vendor_id)s&DEV_%(product_id)s&(.*)$" % {
+                'vendor_id': vendor_id, 'product_id': product_id})
+
+        pci_sds = _wqlutils.get_element_associated_class(
+            self._conn, self._PCI_EXPRESS_SETTING_DATA,
+            vmsettings.InstanceID)
+        pci_sds = [sd for sd in pci_sds if pattern.match(sd.HostResource[0])]
+
+        if pci_sds:
+            self._jobutils.remove_virt_resource(pci_sds[0])
+        else:
+            LOG.debug("PCI device with vendor ID %(vendor_id)s and "
+                      "%(product_id)s is not attached to %(vm_name)s",
+                      {'vendor_id': vendor_id, 'product_id': product_id,
+                       'vm_name': vm_name})
