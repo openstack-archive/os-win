@@ -598,6 +598,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def _get_disk_resource_disk_path(self, disk_resource):
         return disk_resource.HostResource
 
+    def get_vm_config_root_dir(self, vm_name):
+        vmsettings = self._lookup_vm_check(vm_name)
+        return vmsettings.ConfigurationDataRoot
+
     def get_vm_storage_paths(self, vm_name):
         vmsettings = self._lookup_vm_check(vm_name)
         (disk_resources, volume_resources) = self._get_vm_disks(vmsettings)
