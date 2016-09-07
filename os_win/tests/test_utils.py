@@ -159,6 +159,32 @@ class UtilsTestCase(base.BaseTestCase):
         self._test_retry_decorator_no_retry(
             expected_exceptions=(IOError, AttributeError))
 
+    @mock.patch('time.sleep')
+    def test_retry_decorator_explicitly_avoid_retry(self, mock_sleep):
+        # Tests the case when there is a function aware of the retry
+        # decorator and explicitly requests that no retry should be
+        # performed.
+
+        def func_side_effect(fake_arg, retry_context):
+            self.assertEqual(mock.sentinel.arg, fake_arg)
+            self.assertEqual(retry_context, dict(prevent_retry=False))
+
+            retry_context['prevent_retry'] = True
+            raise exceptions.Win32Exception(message='fake_exc',
+                                            error_code=1)
+
+        fake_func, mock_side_effect = (
+            self._get_fake_func_with_retry_decorator(
+                exceptions=exceptions.Win32Exception,
+                side_effect=func_side_effect,
+                pass_retry_context=True))
+
+        self.assertRaises(exceptions.Win32Exception,
+                          fake_func, mock.sentinel.arg)
+
+        self.assertEqual(1, mock_side_effect.call_count)
+        self.assertFalse(mock_sleep.called)
+
     @mock.patch('socket.getaddrinfo')
     def test_get_ips(self, mock_getaddrinfo):
         ips = ['1.2.3.4', '5.6.7.8']
