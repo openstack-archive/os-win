@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import collections
 import ctypes
 import os
 import re
@@ -66,12 +67,17 @@ class DiskUtils(baseutils.BaseUtils):
         err_msg = _("Could not find device number for device: %s")
         raise exceptions.DiskNotFound(err_msg % device_name)
 
+    @_utils.retry_decorator(exceptions=(exceptions.x_wmi,
+                                        exceptions.OSWinException))
     def rescan_disks(self):
-        # TODO(lpetrut): find a better way to do this.
-        cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
-        _utils.execute(*cmd, attempts=5)
+        ret = self._conn_storage.Msft_StorageSetting.UpdateHostStorageCache()
 
-        self._conn_storage.Msft_Disk()
+        if isinstance(ret, collections.Iterable):
+            ret = ret[0]
+
+        if ret:
+            err_msg = _("Rescanning disks failed. Error code: %s.")
+            raise exceptions.OSWinException(err_msg % ret)
 
     def get_disk_capacity(self, path, ignore_errors=False):
         norm_path = os.path.abspath(path)

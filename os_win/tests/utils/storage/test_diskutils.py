@@ -13,14 +13,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ddt
 import mock
 
-from os_win import _utils
 from os_win import exceptions
 from os_win.tests import test_base
 from os_win.utils.storage import diskutils
 
 
+@ddt.ddt
 class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         super(DiskUtilsTestCase, self).setUp()
@@ -93,14 +94,29 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._diskutils.get_device_number_from_device_name,
                           fake_physical_device_name)
 
-    @mock.patch.object(_utils, 'execute')
-    def test_rescan_disks(self, mock_execute):
-        cmd = ("cmd", "/c", "echo", "rescan", "|", "diskpart.exe")
+    def _get_mocked_wmi_rescan(self, return_value):
+        conn = self._diskutils._conn_storage
+        rescan_method = conn.Msft_StorageSetting.UpdateHostStorageCache
+        rescan_method.return_value = return_value
+        return rescan_method
+
+    @ddt.data(0, [0], (0,))
+    @mock.patch('time.sleep')
+    def test_rescan_disks(self, return_value, mock_sleep):
+        mock_rescan = self._get_mocked_wmi_rescan(return_value)
 
         self._diskutils.rescan_disks()
 
-        mock_execute.assert_called_once_with(*cmd, attempts=5)
-        self._diskutils._conn_storage.Msft_Disk.assert_called_once_with()
+        mock_rescan.assert_called_once_with()
+
+    @mock.patch('time.sleep')
+    def test_rescan_disks_error(self, mock_sleep):
+        mock_rescan = self._get_mocked_wmi_rescan(return_value=1)
+        expected_retry_count = 5
+
+        self.assertRaises(exceptions.OSWinException,
+                          self._diskutils.rescan_disks)
+        mock_rescan.assert_has_calls([mock.call()] * expected_retry_count)
 
     @mock.patch.object(diskutils, 'ctypes')
     @mock.patch.object(diskutils, 'kernel32', create=True)
