@@ -133,7 +133,7 @@ utils_map = {
 }
 
 
-def _get_class(class_type):
+def _get_class(class_type, *args, **kwargs):
     if class_type not in utils_map:
         raise exceptions.HyperVException(_('Class type %s does '
                                            'not exist') % class_type)
@@ -148,7 +148,8 @@ def _get_class(class_type):
         if (utils_class['min_version'] <= windows_version and
                 (utils_class['max_version'] is None or
                  windows_version < utils_class['max_version'])):
-            return importutils.import_object(utils_class['path'])
+            return importutils.import_object(utils_class['path'],
+                                             *args, **kwargs)
 
     raise exceptions.HyperVException(_('Could not find any %(class)s class for'
         'this Windows version: %(win_version)s')
@@ -156,7 +157,7 @@ def _get_class(class_type):
 
 
 def get_vmutils(host='.'):
-    return _get_class(class_type='vmutils')
+    return _get_class(class_type='vmutils', host=host)
 
 
 def get_vhdutils():

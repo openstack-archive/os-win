@@ -54,16 +54,20 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(utilsfactory.utils, 'get_windows_version')
     def _check_get_class(self, mock_get_windows_version, expected_class,
-                         class_type, windows_version='6.2'):
+                         class_type, windows_version='6.2', **kwargs):
         mock_get_windows_version.return_value = windows_version
 
         method = getattr(utilsfactory, 'get_%s' % class_type)
-        instance = method()
+        instance = method(**kwargs)
         self.assertEqual(expected_class, type(instance))
 
+        return instance
+
     def test_get_vmutils(self):
-        self._check_get_class(expected_class=vmutils.VMUtils,
-                              class_type='vmutils')
+        instance = self._check_get_class(expected_class=vmutils.VMUtils,
+                                         class_type='vmutils',
+                                         host=mock.sentinel.host)
+        self.assertEqual(mock.sentinel.host, instance._host)
 
     def test_get_vhdutils(self):
         self._check_get_class(expected_class=vhdutils.VHDUtils,
