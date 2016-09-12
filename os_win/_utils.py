@@ -20,6 +20,8 @@ import socket
 import time
 import types
 
+import eventlet
+from eventlet import tpool
 from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 from oslo_log import log as logging
@@ -187,3 +189,24 @@ def get_ips(addr):
     # Returns IPv4 and IPv6 addresses, ordered by protocol family
     addr_info.sort()
     return [a[4][0] for a in addr_info]
+
+
+def avoid_blocking_call(f, *args, **kwargs):
+    """Ensures that the invoked method will not block other greenthreads.
+
+    Performs the call in a different thread using tpool.execute when called
+    from a greenthread.
+    """
+    # Note that eventlet.getcurrent will always return a greenlet object.
+    # In case of a greenthread, the parent greenlet will always be the hub
+    # loop greenlet.
+    if eventlet.getcurrent().parent:
+        return tpool.execute(f, *args, **kwargs)
+    else:
+        return f(*args, **kwargs)
+
+
+def avoid_blocking_call_decorator(f):
+    def wrapper(*args, **kwargs):
+        return avoid_blocking_call(f, *args, **kwargs)
+    return wrapper
