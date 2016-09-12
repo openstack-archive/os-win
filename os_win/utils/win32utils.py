@@ -19,6 +19,7 @@ import sys
 
 from oslo_log import log as logging
 
+from os_win import _utils
 from os_win import exceptions
 
 if sys.platform == 'win32':
@@ -62,7 +63,13 @@ class Win32Utils(object):
         # message table.
         error_msg_src = kwargs.pop('error_msg_src', {})
 
-        ret_val = func(*args, **kwargs)
+        eventlet_nonblocking_mode = kwargs.pop(
+            'eventlet_nonblocking_mode', True)
+
+        if eventlet_nonblocking_mode:
+            ret_val = _utils.avoid_blocking_call(func, *args, **kwargs)
+        else:
+            ret_val = func(*args, **kwargs)
 
         func_failed = (error_on_nonzero_ret_val and ret_val) or (
             ret_val in error_ret_vals)

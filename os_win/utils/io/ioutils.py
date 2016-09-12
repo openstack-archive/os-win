@@ -145,8 +145,10 @@ class IOUtils(object):
         self._win32_utils = win32utils.Win32Utils()
 
     def _run_and_check_output(self, *args, **kwargs):
+        eventlet_blocking_mode = kwargs.get('eventlet_nonblocking_mode', False)
         kwargs.update(kernel32_lib_func=True,
-                      failure_exc=exceptions.Win32IOException)
+                      failure_exc=exceptions.Win32IOException,
+                      eventlet_nonblocking_mode=eventlet_blocking_mode)
         return self._win32_utils.run_and_check_output(*args, **kwargs)
 
     def wait_named_pipe(self, pipe_name, timeout=WAIT_PIPE_DEFAULT_TIMEOUT):
