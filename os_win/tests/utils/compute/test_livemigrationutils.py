@@ -104,35 +104,24 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.ret_val,
             mock.sentinel.job_path)
 
-    def test_get_planned_vms(self):
-        mock_conn_v2 = mock.MagicMock()
-        mock_conn_v2.Msvm_PlannedComputerSystem.return_value = (
-            mock.sentinel.planned_vms)
-
-        planned_vms = self.liveutils._get_planned_vms(mock_conn_v2,
-                                                      mock.sentinel.vm_name)
-
-        mock_conn_v2.Msvm_PlannedComputerSystem.assert_called_once_with(
-            ElementName=mock.sentinel.vm_name)
-        self.assertEqual(mock.sentinel.planned_vms, planned_vms)
-
+    @ddt.data({'planned_vm': None}, {'planned_vm': mock.sentinel.planned_vm})
+    @ddt.unpack
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_destroy_planned_vm')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
-                       '_get_planned_vms')
-    def test_destroy_existing_planned_vms(self, mock_get_planned_vms,
-                                          mock_destroy_planned_vm):
-        mock_planned_vms = [mock.sentinel.planned_vm,
-                            mock.sentinel.another_planned_vm]
-        mock_get_planned_vms.return_value = mock_planned_vms
+                       '_get_planned_vm')
+    def test_destroy_existing_planned_vm(self, mock_get_planned_vm,
+                                         mock_destroy_planned_vm, planned_vm):
+        mock_get_planned_vm.return_value = planned_vm
 
-        self.liveutils.destroy_existing_planned_vms(mock.sentinel.vm_name)
+        self.liveutils.destroy_existing_planned_vm(mock.sentinel.vm_name)
 
-        mock_get_planned_vms.assert_called_once_with(self._conn,
-                                                     mock.sentinel.vm_name)
-        mock_destroy_planned_vm.assert_has_calls(
-            [mock.call(mock.sentinel.planned_vm),
-             mock.call(mock.sentinel.another_planned_vm)])
+        mock_get_planned_vm.assert_called_once_with(
+            mock.sentinel.vm_name, self._conn)
+        if planned_vm:
+            mock_destroy_planned_vm.assert_called_once_with(planned_vm)
+        else:
+            self.assertFalse(mock_destroy_planned_vm.called)
 
     def test_create_planned_vm_helper(self):
         mock_vm = mock.MagicMock()
@@ -303,19 +292,12 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             MigrationSettingData=mock_vsmsd.GetText_.return_value,
             NewResourceSettingData=mock.sentinel.FAKE_RASD_PATH)
 
-    def test_live_migrate_multiple_planned_vms(self):
-        mock_vm = self._get_vm()
-        self._conn.Msvm_PlannedComputerSystem.return_value = [
-            mock_vm, mock_vm]
-
-        self.assertRaises(exceptions.OSWinException,
-                          self.liveutils.live_migrate_vm,
-                          mock.sentinel.vm_name,
-                          mock.sentinel.host)
-
     @ddt.data(True, False)
+    @mock.patch.object(livemigrationutils.LiveMigrationUtils,
+                       '_get_planned_vm')
     @mock.patch.object(livemigrationutils, 'vmutils')
-    def test_live_migrate_no_planned_vm(self, migrate_disks, mock_vm_utils):
+    def test_live_migrate_no_planned_vm(self, migrate_disks, mock_vm_utils,
+                                        mock_get_planned_vm):
         mock_vm_utils_remote = mock_vm_utils.VMUtils.return_value
         mock_vm = self._get_vm()
 
@@ -333,7 +315,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                 _get_vhd_setting_data=mock.DEFAULT,
                 _live_migrate_vm=mock.DEFAULT):
 
-            self._conn.Msvm_PlannedComputerSystem.return_value = []
+            mock_get_planned_vm.return_value = None
             disk_paths = {
                 mock.sentinel.FAKE_IDE_PATH: mock.sentinel.FAKE_SASD_RESOURCE}
             self.liveutils._get_physical_disk_paths.return_value = disk_paths
@@ -345,7 +327,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             self.liveutils.live_migrate_vm(mock.sentinel.vm_name,
                                            mock.sentinel.FAKE_HOST,
                                            migrate_disks=migrate_disks)
-
+            mock_get_planned_vm.assert_called_once_with(
+                mock.sentinel.vm_name, self._conn)
             self.liveutils._get_remote_disk_data.assert_called_once_with(
                 mock_vm_utils_remote, disk_paths, mock.sentinel.FAKE_HOST)
             self.liveutils._create_planned_vm.assert_called_once_with(
@@ -372,7 +355,9 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                 mock.sentinel.FAKE_HOST,
                 expected_migr_type)
 
-    def test_live_migrate_single_planned_vm(self):
+    @mock.patch.object(
+        livemigrationutils.LiveMigrationUtils, '_get_planned_vm')
+    def test_live_migrate_single_planned_vm(self, mock_get_planned_vm):
         mock_vm = self._get_vm()
 
         mock_migr_svc = self._conn.Msvm_VirtualSystemMigrationService()[0]
@@ -385,7 +370,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                 _get_vhd_setting_data=mock.DEFAULT,
                 _live_migrate_vm=mock.DEFAULT):
 
-            self._conn.Msvm_PlannedComputerSystem.return_value = [mock_vm]
+            mock_get_planned_vm.return_value = mock_vm
             self.liveutils.live_migrate_vm(mock.sentinel.vm_name,
                                            mock.sentinel.FAKE_HOST)
             self.liveutils._live_migrate_vm.assert_called_once_with(
@@ -394,6 +379,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                 self.liveutils._get_vhd_setting_data.return_value,
                 mock.sentinel.FAKE_HOST,
                 self.liveutils._MIGRATION_TYPE_VIRTUAL_SYSTEM_AND_STORAGE)
+            mock_get_planned_vm.assert_called_once_with(
+                mock.sentinel.vm_name, self._conn)
 
     @mock.patch.object(vmutils, 'VMUtils')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils, '_get_vm')
@@ -404,7 +391,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_create_planned_vm')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
-                       'destroy_existing_planned_vms')
+                       'destroy_existing_planned_vm')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils,
                        '_get_disk_data')
     def test_create_planned_vm(self, mock_get_disk_data,

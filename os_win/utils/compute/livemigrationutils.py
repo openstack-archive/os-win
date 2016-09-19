@@ -20,15 +20,14 @@ from oslo_log import log as logging
 from os_win._i18n import _, _LE
 from os_win import exceptions
 from os_win.utils import _wqlutils
-from os_win.utils import baseutils
+from os_win.utils.compute import migrationutils
 from os_win.utils.compute import vmutils
-from os_win.utils import jobutils
 from os_win.utils.storage.initiator import iscsi_wmi_utils
 
 LOG = logging.getLogger(__name__)
 
 
-class LiveMigrationUtils(baseutils.BaseUtilsVirt):
+class LiveMigrationUtils(migrationutils.MigrationUtils):
     _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
     _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'CIM_ResourceAllocationSettingData'
 
@@ -38,8 +37,6 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
 
     def __init__(self):
         super(LiveMigrationUtils, self).__init__()
-        self._vmutils = vmutils.VMUtils()
-        self._jobutils = jobutils.JobUtils()
         self._iscsi_initiator = iscsi_wmi_utils.ISCSIInitiatorWMIUtils()
 
     def _get_conn_v2(self, host='localhost'):
@@ -87,12 +84,9 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
          ret_val) = self._vs_man_svc.DestroySystem(planned_vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def _get_planned_vms(self, conn_v2, vm_name):
-        return conn_v2.Msvm_PlannedComputerSystem(ElementName=vm_name)
-
-    def destroy_existing_planned_vms(self, vm_name):
-        planned_vms = self._get_planned_vms(self._compat_conn, vm_name)
-        for planned_vm in planned_vms:
+    def destroy_existing_planned_vm(self, vm_name):
+        planned_vm = self._get_planned_vm(vm_name, self._compat_conn)
+        if planned_vm:
             self._destroy_planned_vm(planned_vm)
 
     def _create_planned_vm(self, conn_v2_local, conn_v2_remote,
@@ -238,14 +232,8 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         rmt_ip_addr_list = self._get_ip_address_list(conn_v2_remote,
                                                      dest_host)
 
-        planned_vms = self._get_planned_vms(conn_v2_remote, vm_name)
-        if len(planned_vms) > 1:
-            err_msg = _("Multiple planned VMs were found for VM %(vm_name)s "
-                        "on host %(dest_host)s")
-            raise exceptions.OSWinException(
-                err_msg % dict(vm_name=vm_name,
-                               dest_host=dest_host))
-        elif not planned_vms:
+        planned_vm = self._get_planned_vm(vm_name, conn_v2_remote)
+        if not planned_vm:
             # TODO(claudiub): Remove this branch after the livemigrationutils
             # usage has been updated to create planned VM on the destination
             # host beforehand.
@@ -262,8 +250,6 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
                                                      dest_host)
                 self._update_planned_vm_disk_resources(
                     conn_v2_remote, planned_vm, vm_name, disk_paths_remote)
-        else:
-            planned_vm = planned_vms[0]
 
         if migrate_disks:
             new_resource_setting_data = self._get_vhd_setting_data(vm)
@@ -285,7 +271,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         vm = self._get_vm(conn_v2_remote, vm_name)
 
         # Make sure there are no planned VMs already.
-        self.destroy_existing_planned_vms(vm_name)
+        self.destroy_existing_planned_vm(vm_name)
 
         ip_addr_list = self._get_ip_address_list(self._compat_conn,
                                                  dest_host)

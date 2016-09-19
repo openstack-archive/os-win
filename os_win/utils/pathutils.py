@@ -60,6 +60,9 @@ class PathUtils(object):
     def rename(self, src, dest):
         os.rename(src, dest)
 
+    def copy_dir(self, src, dest):
+        shutil.copytree(src, dest)
+
     def copyfile(self, src, dest):
         self.copy(src, dest)
 
