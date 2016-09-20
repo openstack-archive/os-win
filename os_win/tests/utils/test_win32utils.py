@@ -17,6 +17,7 @@
 import mock
 from oslotest import base
 
+from os_win import _utils
 from os_win import exceptions
 from os_win.utils import win32utils
 
@@ -45,14 +46,21 @@ class Win32UtilsTestCase(base.BaseTestCase):
                             wintypes=mock.DEFAULT,
                             create=True).start()
 
+    @mock.patch.object(_utils, 'avoid_blocking_call')
     @mock.patch.object(win32utils.Win32Utils, 'get_error_message')
     @mock.patch.object(win32utils.Win32Utils, 'get_last_error')
     def _test_run_and_check_output(self, mock_get_last_err, mock_get_err_msg,
-                                   ret_val=None, expected_exc=None,
+                                   mock_avoid_blocking_call,
+                                   ret_val=0, expected_exc=None,
                                    **kwargs):
+        self._ctypes_patcher.stop()
+
         mock_func = mock.Mock()
         mock_func.return_value = ret_val
-        self._ctypes_patcher.stop()
+        mock_avoid_blocking_call.return_value = ret_val
+
+        eventlet_nonblocking_mode = kwargs.get(
+            'eventlet_nonblocking_mode', True)
 
         if expected_exc:
             self.assertRaises(expected_exc,
@@ -69,13 +77,20 @@ class Win32UtilsTestCase(base.BaseTestCase):
                 **kwargs)
             self.assertEqual(ret_val, actual_ret_val)
 
-        mock_func.assert_called_once_with(mock.sentinel.arg,
-                                          kwarg=mock.sentinel.kwarg)
+        if eventlet_nonblocking_mode:
+            mock_avoid_blocking_call.assert_called_once_with(
+                mock_func, mock.sentinel.arg, kwarg=mock.sentinel.kwarg)
+        else:
+            mock_func.assert_called_once_with(mock.sentinel.arg,
+                                              kwarg=mock.sentinel.kwarg)
 
         return mock_get_last_err, mock_get_err_msg
 
     def test_run_and_check_output(self):
-        self._test_run_and_check_output(ret_val=0)
+        self._test_run_and_check_output()
+
+    def test_run_and_check_output_nonblocking_mode_disabled(self):
+        self._test_run_and_check_output(eventlet_nonblocking_mode=False)
 
     def test_run_and_check_output_fail_on_nonzero_ret_val(self):
         ret_val = 1

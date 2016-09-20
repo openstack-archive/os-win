@@ -74,7 +74,8 @@ class IOUtilsTestCase(base.BaseTestCase):
 
         self._mock_run = self._ioutils._win32_utils.run_and_check_output
         self._run_args = dict(kernel32_lib_func=True,
-                              failure_exc=exceptions.Win32IOException)
+                              failure_exc=exceptions.Win32IOException,
+                              eventlet_nonblocking_mode=False)
 
         self.addCleanup(mock.patch.stopall)
 
