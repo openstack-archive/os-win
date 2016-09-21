@@ -16,6 +16,8 @@
 
 import collections
 import ctypes
+
+import ddt
 import mock
 
 from os_win import _utils
@@ -27,6 +29,7 @@ from os_win.utils.storage.initiator import iscsidsc_structures as iscsi_struct
 from os_win.utils.storage.initiator import iscsierr
 
 
+@ddt.ddt
 class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ISCSIInitiatorUtils class."""
 
@@ -419,51 +422,56 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(fake_device, resulted_device)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
-                       '_get_iscsi_device_from_session')
-    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
-                       '_get_iscsi_target_sessions')
-    def test_get_iscsi_device(self, mock_get_iscsi_target_sessions,
-                              mock_get_iscsi_session_devices):
-        fake_sessions = [mock.Mock(), mock.Mock()]
-
-        mock_get_iscsi_target_sessions.return_value = fake_sessions
-        mock_get_iscsi_session_devices.side_effect = [None,
-                                                      mock.sentinel.device]
-
-        resulted_device = self._initiator._get_iscsi_device(
-            mock.sentinel.target_name,
-            mock.sentinel.target_lun)
-
-        mock_get_iscsi_target_sessions.assert_called_once_with(
-            mock.sentinel.target_name)
-        mock_get_iscsi_session_devices.assert_has_calls(
-            [mock.call(session.SessionId, mock.sentinel.target_lun)
-             for session in fake_sessions])
-        self.assertEqual(mock.sentinel.device, resulted_device)
-
-    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils, '_get_iscsi_device')
-    def test_get_device_number_for_target(self, mock_get_iscsi_device):
-        mock_dev = mock_get_iscsi_device.return_value
-
+                       'get_device_number_and_path')
+    def test_get_device_number_for_target(self, mock_get_dev_num_and_path):
         dev_num = self._initiator.get_device_number_for_target(
+            mock.sentinel.target_name, mock.sentinel.lun,
+            mock.sentinel.fail_if_not_found)
+
+        mock_get_dev_num_and_path.assert_called_once_with(
+            mock.sentinel.target_name, mock.sentinel.lun,
+            mock.sentinel.fail_if_not_found)
+        self.assertEqual(mock_get_dev_num_and_path.return_value[0], dev_num)
+
+    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
+                       'ensure_lun_available')
+    def test_get_device_number_and_path(self, mock_ensure_lun_available):
+        mock_ensure_lun_available.return_value = (mock.sentinel.dev_num,
+                                                  mock.sentinel.dev_path)
+
+        dev_num, dev_path = self._initiator.get_device_number_and_path(
             mock.sentinel.target_name, mock.sentinel.lun)
 
-        mock_get_iscsi_device.assert_called_once_with(
-            mock.sentinel.target_name, mock.sentinel.lun)
-        self.assertEqual(mock_dev.StorageDeviceNumber.DeviceNumber, dev_num)
+        mock_ensure_lun_available.assert_called_once_with(
+            mock.sentinel.target_name, mock.sentinel.lun,
+            retry_attempts=10, retry_interval=0.1, rescan_disks=False)
 
-    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils, '_get_iscsi_device')
-    def get_device_number_and_path(self, mock_get_iscsi_device):
-        mock_dev = mock_get_iscsi_device.return_value
+        self.assertEqual(mock.sentinel.dev_num, dev_num)
+        self.assertEqual(mock.sentinel.dev_path, dev_path)
 
-        dev_num, dev_path = self._initiator.get_device_path(
-            mock.sentinel.target_name, mock.sentinel.lun)
+    @ddt.data(True, False)
+    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
+                       'ensure_lun_available')
+    def test_get_device_number_and_path_exc(self, fail_if_not_found,
+                                            mock_ensure_lun_available):
+        raised_exc = exceptions.ISCSILunNotAvailable
+        mock_ensure_lun_available.side_effect = raised_exc(
+            target_iqn=mock.sentinel.target_iqn,
+            target_lun=mock.sentinel.target_lun)
 
-        mock_get_iscsi_device.assert_called_once_with(
-            mock.sentinel.target_name, mock.sentinel.lun)
-
-        self.assertEqual(mock_dev.StorageDeviceNumber.DeviceNumber, dev_num)
-        self.assertEqual(mock_dev.LegacyName, dev_path)
+        if fail_if_not_found:
+            self.assertRaises(raised_exc,
+                              self._initiator.get_device_number_and_path,
+                              mock.sentinel.target_name,
+                              mock.sentinel.lun,
+                              fail_if_not_found)
+        else:
+            dev_num, dev_path = self._initiator.get_device_number_and_path(
+                mock.sentinel.target_name,
+                mock.sentinel.lun,
+                fail_if_not_found)
+            self.assertIsNone(dev_num)
+            self.assertIsNone(dev_path)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_target_sessions')
@@ -715,14 +723,19 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_login_storage_target_new_path_using_mpio(self):
         self._test_login_storage_target(mpio_enabled=True)
 
+    @ddt.data(dict(rescan_disks=True),
+              dict(retry_interval=mock.sentinel.retry_interval))
+    @ddt.unpack
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_device_from_session')
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_target_sessions')
-    def test_ensure_lun_available(self,
+    @mock.patch('time.sleep')
+    def test_ensure_lun_available(self, mock_sleep,
                                   mock_get_iscsi_target_sessions,
-                                  mock_get_iscsi_device_from_session):
-        expected_try_count = 5
+                                  mock_get_iscsi_device_from_session,
+                                  rescan_disks=False, retry_interval=0):
+        retry_count = 5
         mock_get_iscsi_target_sessions.return_value = [
             mock.Mock(SessionId=mock.sentinel.session_id)]
 
@@ -730,27 +743,46 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
             message='fake_message',
             error_code=1,
             func_name='fake_func')
-        dev_num_side_eff = [None, -1, fake_exc, mock.sentinel.dev_num]
+        dev_num_side_eff = [None, -1,
+                            mock.sentinel.dev_num,
+                            mock.sentinel.dev_num]
+        dev_path_side_eff = ([mock.sentinel.dev_path] * 2 +
+                             [None] + [mock.sentinel.dev_path])
         fake_device = mock.Mock()
         type(fake_device.StorageDeviceNumber).DeviceNumber = (
             mock.PropertyMock(side_effect=dev_num_side_eff))
+        type(fake_device).LegacyName = (
+            mock.PropertyMock(side_effect=dev_path_side_eff))
 
-        mock_get_dev_side_eff = [None] + [fake_device] * 4
+        mock_get_dev_side_eff = [None, fake_exc] + [fake_device] * 4
         mock_get_iscsi_device_from_session.side_effect = mock_get_dev_side_eff
 
-        self._initiator.ensure_lun_available(
+        dev_num, dev_path = self._initiator.ensure_lun_available(
             mock.sentinel.target_iqn,
             mock.sentinel.target_lun,
-            rescan_attempts=6)
+            retry_attempts=retry_count,
+            retry_interval=retry_interval,
+            rescan_disks=rescan_disks)
+
+        self.assertEqual(mock.sentinel.dev_num, dev_num)
+        self.assertEqual(mock.sentinel.dev_path, dev_path)
 
         mock_get_iscsi_target_sessions.assert_has_calls(
-            [mock.call(mock.sentinel.target_iqn)] * expected_try_count)
+            [mock.call(mock.sentinel.target_iqn)] * (retry_count + 1))
         mock_get_iscsi_device_from_session.assert_has_calls(
             [mock.call(mock.sentinel.session_id,
-                       mock.sentinel.target_lun)] * 4)
+                       mock.sentinel.target_lun)] * retry_count)
+
+        expected_rescan_count = retry_count if rescan_disks else 0
         self.assertEqual(
-            4,
+            expected_rescan_count,
             self._initiator._diskutils.rescan_disks.call_count)
+
+        if retry_interval:
+            mock_sleep.assert_has_calls(
+                [mock.call(retry_interval)] * retry_count)
+        else:
+            self.assertFalse(mock_sleep.called)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_target_sessions')
