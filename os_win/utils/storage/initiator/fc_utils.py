@@ -22,6 +22,7 @@ import textwrap
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
+from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils import win32utils
@@ -172,5 +173,6 @@ class FCUtils(object):
                 mappings.append(mapping)
         return mappings
 
+    @_utils.avoid_blocking_call_decorator
     def refresh_hba_configuration(self):
         hbaapi.HBA_RefreshAdapterConfiguration()
