@@ -32,6 +32,10 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
     _STORAGE_ALLOC_SETTING_DATA_CLASS = 'Msvm_StorageAllocationSettingData'
     _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'CIM_ResourceAllocationSettingData'
 
+    _MIGRATION_TYPE_VIRTUAL_SYSTEM = 32768
+    _MIGRATION_TYPE_VIRTUAL_SYSTEM_AND_STORAGE = 32771
+    _MIGRATION_TYPE_STAGED = 32770
+
     def __init__(self):
         super(LiveMigrationUtils, self).__init__()
         self._vmutils = vmutils.VMUtils()
@@ -94,9 +98,8 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
     def _create_planned_vm(self, conn_v2_local, conn_v2_remote,
                            vm, ip_addr_list, dest_host):
         # Staged
-        vsmsd = conn_v2_remote.query("select * from "
-                                     "Msvm_VirtualSystemMigrationSettingData "
-                                     "where MigrationType = 32770")[0]
+        vsmsd = conn_v2_remote.Msvm_VirtualSystemMigrationSettingData(
+            MigrationType=self._MIGRATION_TYPE_STAGED)[0]
         vsmsd.DestinationIPAddressList = ip_addr_list
         migration_setting_data = vsmsd.GetText_(1)
 
@@ -200,11 +203,10 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         return new_resource_setting_data
 
     def _live_migrate_vm(self, conn_v2_local, vm, planned_vm, rmt_ip_addr_list,
-                         new_resource_setting_data, dest_host):
+                         new_resource_setting_data, dest_host, migration_type):
         # VirtualSystemAndStorage
-        vsmsd = conn_v2_local.query("select * from "
-                                    "Msvm_VirtualSystemMigrationSettingData "
-                                    "where MigrationType = 32771")[0]
+        vsmsd = conn_v2_local.Msvm_VirtualSystemMigrationSettingData(
+            MigrationType=migration_type)[0]
         vsmsd.DestinationIPAddressList = rmt_ip_addr_list
         if planned_vm:
             vsmsd.DestinationPlannedVirtualSystemId = planned_vm.Name
@@ -226,7 +228,7 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         migr_svc_rmt = conn_v2.Msvm_VirtualSystemMigrationService()[0]
         return migr_svc_rmt.MigrationServiceListenerIPAddressList
 
-    def live_migrate_vm(self, vm_name, dest_host):
+    def live_migrate_vm(self, vm_name, dest_host, migrate_disks=True):
         self.check_live_migration_config()
 
         conn_v2_remote = self._get_conn_v2(dest_host)
@@ -263,10 +265,16 @@ class LiveMigrationUtils(baseutils.BaseUtilsVirt):
         else:
             planned_vm = planned_vms[0]
 
-        new_resource_setting_data = self._get_vhd_setting_data(vm)
+        if migrate_disks:
+            new_resource_setting_data = self._get_vhd_setting_data(vm)
+            migration_type = self._MIGRATION_TYPE_VIRTUAL_SYSTEM_AND_STORAGE
+        else:
+            new_resource_setting_data = None
+            migration_type = self._MIGRATION_TYPE_VIRTUAL_SYSTEM
+
         self._live_migrate_vm(self._compat_conn, vm, planned_vm,
                               rmt_ip_addr_list, new_resource_setting_data,
-                              dest_host)
+                              dest_host, migration_type)
 
     def create_planned_vm(self, vm_name, src_host, disk_path_mapping):
         # This is run on the destination host.
