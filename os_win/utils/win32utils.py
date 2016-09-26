@@ -19,6 +19,7 @@ import sys
 
 from oslo_log import log as logging
 
+from os_win._i18n import _LE
 from os_win import _utils
 from os_win import exceptions
 
@@ -128,3 +129,10 @@ class Win32Utils(object):
             return ctypes.c_uint(com_error.excepinfo[5]).value
         except Exception:
             LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
+
+    def local_free(self, handle):
+        try:
+            self._run_and_check_output(kernel32.LocalFree, handle)
+        except exceptions.Win32Exception:
+            LOG.exception(_LE("Could not deallocate memory. "
+                              "There could be a memory leak."))

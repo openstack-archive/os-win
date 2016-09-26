@@ -26,6 +26,7 @@ import six
 
 from os_win._i18n import _
 from os_win import exceptions
+from os_win.utils import _acl_utils
 from os_win.utils import win32utils
 
 if sys.platform == 'win32':
@@ -42,6 +43,7 @@ class PathUtils(object):
 
     def __init__(self):
         self._win32_utils = win32utils.Win32Utils()
+        self._acl_utils = _acl_utils.ACLUtils()
 
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
@@ -170,3 +172,61 @@ class PathUtils(object):
         finally:
             if tmp_file_path:
                 fileutils.delete_if_exists(tmp_file_path)
+
+    def add_acl_rule(self, path, trustee_name,
+                     access_rights, access_mode,
+                     inheritance_flags=0):
+        """Adds the requested access rule to a file or object.
+
+        Can be used for granting/revoking access.
+        """
+        p_to_free = []
+
+        try:
+            sec_info = self._acl_utils.get_named_security_info(
+                obj_name=path,
+                obj_type=_acl_utils.SE_FILE_OBJECT,
+                security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+            p_to_free.append(sec_info['pp_sec_desc'].contents)
+
+            access = _acl_utils.EXPLICIT_ACCESS()
+            access.grfAccessPermissions = access_rights
+            access.grfAccessMode = access_mode
+            access.grfInheritance = inheritance_flags
+            access.Trustee.TrusteeForm = _acl_utils.TRUSTEE_IS_NAME
+            access.Trustee.pstrName = ctypes.c_wchar_p(trustee_name)
+
+            pp_new_dacl = self._acl_utils.set_entries_in_acl(
+                entry_count=1,
+                p_explicit_entry_list=ctypes.pointer(access),
+                p_old_acl=sec_info['pp_dacl'].contents)
+            p_to_free.append(pp_new_dacl.contents)
+
+            self._acl_utils.set_named_security_info(
+                obj_name=path,
+                obj_type=_acl_utils.SE_FILE_OBJECT,
+                security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+                p_dacl=pp_new_dacl.contents)
+        finally:
+            for p in p_to_free:
+                self._win32_utils.local_free(p)
+
+    def copy_acls(self, source_path, dest_path):
+        p_to_free = []
+
+        try:
+            sec_info_flags = _acl_utils.DACL_SECURITY_INFORMATION
+            sec_info = self._acl_utils.get_named_security_info(
+                obj_name=source_path,
+                obj_type=_acl_utils.SE_FILE_OBJECT,
+                security_info_flags=sec_info_flags)
+            p_to_free.append(sec_info['pp_sec_desc'].contents)
+
+            self._acl_utils.set_named_security_info(
+                obj_name=dest_path,
+                obj_type=_acl_utils.SE_FILE_OBJECT,
+                security_info_flags=sec_info_flags,
+                p_dacl=sec_info['pp_dacl'].contents)
+        finally:
+            for p in p_to_free:
+                self._win32_utils.local_free(p)

@@ -12,13 +12,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
 import os
 import shutil
 
 import mock
 
+from os_win import constants
 from os_win import exceptions
 from os_win.tests import test_base
+from os_win.utils import _acl_utils
 from os_win.utils import pathutils
 
 
@@ -31,7 +34,9 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._pathutils = pathutils.PathUtils()
         self._pathutils._win32_utils = mock.Mock()
+        self._pathutils._acl_utils = mock.Mock()
         self._mock_run = self._pathutils._win32_utils.run_and_check_output
+        self._acl_utils = self._pathutils._acl_utils
 
     def _setup_lib_mocks(self):
         self._ctypes = mock.Mock()
@@ -39,10 +44,15 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._wintypes.BOOL = lambda x: (x, 'BOOL')
         self._ctypes.c_wchar_p = lambda x: (x, "c_wchar_p")
+        self._ctypes.pointer = lambda x: (x, 'pointer')
+
+        self._ctypes_patcher = mock.patch.object(
+            pathutils, 'ctypes', new=self._ctypes)
+        self._ctypes_patcher.start()
 
         mock.patch.multiple(pathutils,
                             wintypes=self._wintypes,
-                            ctypes=self._ctypes, kernel32=mock.DEFAULT,
+                            kernel32=mock.DEFAULT,
                             create=True).start()
 
     @mock.patch.object(pathutils.PathUtils, 'rename')
@@ -211,3 +221,86 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
             [mock.call(mock.sentinel.src), mock.call(mock.sentinel.dest)])
         mock_copytree.assert_called_once_with(mock.sentinel.src,
                                               mock.sentinel.dest)
+
+    def test_add_acl_rule(self):
+        # We raise an expected exception in order to
+        # easily verify the resource cleanup.
+        raised_exc = exceptions.OSWinException
+        self._ctypes_patcher.stop()
+
+        fake_trustee = 'FAKEDOMAIN\\FakeUser'
+        mock_sec_info = dict(pp_sec_desc=mock.Mock(),
+                             pp_dacl=mock.Mock())
+        self._acl_utils.get_named_security_info.return_value = mock_sec_info
+        self._acl_utils.set_named_security_info.side_effect = raised_exc
+        pp_new_dacl = self._acl_utils.set_entries_in_acl.return_value
+
+        self.assertRaises(raised_exc,
+                          self._pathutils.add_acl_rule,
+                          path=mock.sentinel.path,
+                          trustee_name=fake_trustee,
+                          access_rights=constants.ACE_GENERIC_READ,
+                          access_mode=constants.ACE_GRANT_ACCESS,
+                          inheritance_flags=constants.ACE_OBJECT_INHERIT)
+
+        self._acl_utils.get_named_security_info.assert_called_once_with(
+            obj_name=mock.sentinel.path,
+            obj_type=_acl_utils.SE_FILE_OBJECT,
+            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+        self._acl_utils.set_entries_in_acl.assert_called_once_with(
+            entry_count=1,
+            p_explicit_entry_list=mock.ANY,
+            p_old_acl=mock_sec_info['pp_dacl'].contents)
+        self._acl_utils.set_named_security_info.assert_called_once_with(
+            obj_name=mock.sentinel.path,
+            obj_type=_acl_utils.SE_FILE_OBJECT,
+            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+            p_dacl=pp_new_dacl.contents)
+
+        p_access = self._acl_utils.set_entries_in_acl.call_args_list[0][1][
+            'p_explicit_entry_list']
+        access = ctypes.cast(
+            p_access,
+            ctypes.POINTER(_acl_utils.EXPLICIT_ACCESS)).contents
+
+        self.assertEqual(constants.ACE_GENERIC_READ,
+                         access.grfAccessPermissions)
+        self.assertEqual(constants.ACE_GRANT_ACCESS,
+                         access.grfAccessMode)
+        self.assertEqual(constants.ACE_OBJECT_INHERIT,
+                         access.grfInheritance)
+        self.assertEqual(_acl_utils.TRUSTEE_IS_NAME,
+                         access.Trustee.TrusteeForm)
+        self.assertEqual(fake_trustee,
+                         access.Trustee.pstrName)
+
+        self._pathutils._win32_utils.local_free.assert_has_calls(
+            [mock.call(pointer)
+             for pointer in [mock_sec_info['pp_sec_desc'].contents,
+                             pp_new_dacl.contents]])
+
+    def test_copy_acls(self):
+        raised_exc = exceptions.OSWinException
+
+        mock_sec_info = dict(pp_sec_desc=mock.Mock(),
+                             pp_dacl=mock.Mock())
+        self._acl_utils.get_named_security_info.return_value = mock_sec_info
+        self._acl_utils.set_named_security_info.side_effect = raised_exc
+
+        self.assertRaises(raised_exc,
+                          self._pathutils.copy_acls,
+                          mock.sentinel.src,
+                          mock.sentinel.dest)
+
+        self._acl_utils.get_named_security_info.assert_called_once_with(
+            obj_name=mock.sentinel.src,
+            obj_type=_acl_utils.SE_FILE_OBJECT,
+            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+        self._acl_utils.set_named_security_info.assert_called_once_with(
+            obj_name=mock.sentinel.dest,
+            obj_type=_acl_utils.SE_FILE_OBJECT,
+            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+            p_dacl=mock_sec_info['pp_dacl'].contents)
+
+        self._pathutils._win32_utils.local_free.assert_called_once_with(
+            mock_sec_info['pp_sec_desc'].contents)

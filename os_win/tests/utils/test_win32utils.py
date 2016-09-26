@@ -14,6 +14,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ddt
 import mock
 from oslotest import base
 
@@ -22,6 +23,7 @@ from os_win import exceptions
 from os_win.utils import win32utils
 
 
+@ddt.ddt
 class Win32UtilsTestCase(base.BaseTestCase):
     def setUp(self):
         super(Win32UtilsTestCase, self).setUp()
@@ -209,3 +211,14 @@ class Win32UtilsTestCase(base.BaseTestCase):
     def get_com_error_hresult_missing_excepinfo(self):
         ret_val = self._win32_utils.get_com_error_hresult(None)
         self.assertIsNone(ret_val)
+
+    @ddt.data(0, 1)
+    @mock.patch.object(win32utils.LOG, 'exception')
+    def test_local_free(self, ret_val, mock_log_exc):
+        mock_localfree = win32utils.kernel32.LocalFree
+        mock_localfree.return_value = ret_val
+
+        self._win32_utils.local_free(mock.sentinel.handle)
+
+        mock_localfree.assert_any_call(mock.sentinel.handle)
+        self.assertEqual(bool(ret_val), mock_log_exc.called)
