@@ -205,6 +205,14 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             SystemName=mock_vm.Name)
         self.assertFalse(self._vmutils._jobutils.check_ret_val.called)
 
+    def test_get_vm_config_root_dir(self):
+        mock_vm = self._lookup_vm()
+
+        config_root_dir = self._vmutils.get_vm_config_root_dir(
+            self._FAKE_VM_NAME)
+
+        self.assertEqual(mock_vm.ConfigurationDataRoot, config_root_dir)
+
     @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
     def test_get_vm_storage_paths(self, mock_get_vm_disks):
         self._lookup_vm()
