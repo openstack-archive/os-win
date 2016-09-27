@@ -25,8 +25,11 @@ from eventlet import tpool
 from oslo_log import log as logging
 
 from os_win._i18n import _, _LE
+from os_win import _utils
+from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
+from os_win.utils.compute import _clusapi_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -55,6 +58,7 @@ class ClusterUtils(baseutils.BaseUtils):
 
     def __init__(self, host='.'):
         self._instance_name_regex = re.compile('Virtual Machine (.*)')
+        self._clusapi_utils = _clusapi_utils.ClusApiUtils()
 
         if sys.platform == 'win32':
             self._init_hyperv_conn(host)
@@ -178,20 +182,90 @@ class ClusterUtils(baseutils.BaseUtils):
     def vm_exists(self, vm_name):
         return self._lookup_vm(vm_name) is not None
 
-    def live_migrate_vm(self, vm_name, new_host):
-        self._migrate_vm(vm_name, new_host, self._LIVE_MIGRATION_TYPE)
+    def live_migrate_vm(self, vm_name, new_host, timeout=None):
+        valid_transition_states = [constants.CLUSTER_GROUP_PENDING]
+        self._migrate_vm(vm_name, new_host, self._LIVE_MIGRATION_TYPE,
+                         constants.CLUSTER_GROUP_ONLINE,
+                         valid_transition_states,
+                         timeout)
 
-    def _migrate_vm(self, vm_name, new_host, migration_type):
-        vm_group = self._lookup_vm_group_check(vm_name)
+    def _migrate_vm(self, vm_name, new_host, migration_type,
+                    exp_state_after_migr, valid_transition_states,
+                    timeout):
+        syntax = _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
+        migr_type = _clusapi_utils.DWORD(migration_type)
+
+        prop_entries = [
+            self._clusapi_utils.get_property_list_entry(
+                _clusapi_utils.CLUSPROP_NAME_VM, syntax, migr_type),
+            self._clusapi_utils.get_property_list_entry(
+                _clusapi_utils.CLUSPROP_NAME_VM_CONFIG, syntax, migr_type)
+        ]
+        prop_list = self._clusapi_utils.get_property_list(prop_entries)
+
+        flags = (
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
+
+        cluster_handle = None
+        group_handle = None
+        dest_node_handle = None
+
         try:
-            vm_group.MoveToNewNodeParams(self._IGNORE_LOCKED, new_host,
-                                         [migration_type])
-        except Exception as e:
-            LOG.error(_LE('Exception during cluster live migration of '
-                          '%(vm_name)s to %(host)s: %(exception)s'),
-                      {'vm_name': vm_name,
-                       'host': new_host,
-                       'exception': e})
+            cluster_handle = self._clusapi_utils.open_cluster()
+            group_handle = self._clusapi_utils.open_cluster_group(
+                cluster_handle, vm_name)
+            dest_node_handle = self._clusapi_utils.open_cluster_node(
+                cluster_handle, new_host)
+
+            self._clusapi_utils.move_cluster_group(group_handle,
+                                                   dest_node_handle,
+                                                   flags,
+                                                   prop_list)
+            self._wait_for_cluster_group_state(vm_name,
+                                               group_handle,
+                                               exp_state_after_migr,
+                                               new_host,
+                                               valid_transition_states,
+                                               timeout)
+        finally:
+            if group_handle:
+                self._clusapi_utils.close_cluster_group(group_handle)
+            if dest_node_handle:
+                self._clusapi_utils.close_cluster_node(dest_node_handle)
+            if cluster_handle:
+                self._clusapi_utils.close_cluster(cluster_handle)
+
+    def _wait_for_cluster_group_state(self, group_name, group_handle,
+                                      desired_state, desired_node,
+                                      valid_transition_states, timeout):
+        @_utils.retry_decorator(max_retry_count=None,
+                                timeout=timeout,
+                                exceptions=exceptions.InvalidClusterGroupState,
+                                pass_retry_context=True)
+        def _ensure_group_state(retry_context):
+            state_info = self._clusapi_utils.get_cluster_group_state(
+                group_handle)
+            owner_node = state_info['owner_node']
+            group_state = state_info['state']
+
+            reached_desired_state = desired_state == group_state
+            reached_desired_node = desired_node.lower() == owner_node.lower()
+
+            if not (reached_desired_state and reached_desired_node):
+                valid_states = [desired_state] + valid_transition_states
+                valid_state = group_state in valid_states
+                retry_context['prevent_retry'] = not valid_state
+
+                raise exceptions.InvalidClusterGroupState(
+                    group_name=group_name,
+                    expected_state=desired_state,
+                    expected_node=desired_node,
+                    group_state=group_state,
+                    owner_node=owner_node)
+
+        _ensure_group_state()
 
     def monitor_vm_failover(self, callback):
         """Creates a monitor to check for new WMI MSCluster_Resource

@@ -94,7 +94,8 @@ def get_wrapped_function(function):
 
 
 def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
-                    max_sleep_time=1, exceptions=(), error_codes=()):
+                    max_sleep_time=1, exceptions=(), error_codes=(),
+                    pass_retry_context=False):
     """Retries invoking the decorated method in case of expected exceptions.
 
     :param max_retry_count: The maximum number of retries performed. If 0, no
@@ -111,6 +112,13 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                         for example in case of Win32Exception. If this argument
                         is not passed, retries will be performed for any of the
                         expected exceptions.
+    :param pass_retry_context: Convenient way of letting a method aware of
+                               this decorator prevent a retry from being
+                               performed. The decorated method must accept an
+                               argument called 'retry_context', which will
+                               include a dict containing the 'prevent_retry'
+                               field. If this field is set, no further retries
+                               will be performed.
     """
 
     if isinstance(error_codes, six.integer_types):
@@ -121,6 +129,10 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
             try_count = 0
             sleep_time = 0
             time_start = time.time()
+
+            retry_context = dict(prevent_retry=False)
+            if pass_retry_context:
+                kwargs['retry_context'] = retry_context
 
             while True:
                 try:
@@ -139,6 +151,7 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                                       else 'undefined')
 
                         should_retry = (
+                            not retry_context['prevent_retry'] and
                             expected_err_code and
                             tries_left and
                             (time_left == 'undefined' or

@@ -13,13 +13,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ddt
 import mock
 
+from os_win import constants
 from os_win import exceptions
 from os_win.tests import test_base
+from os_win.utils.compute import _clusapi_utils
 from os_win.utils.compute import clusterutils
 
 
+@ddt.ddt
 class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ClusterUtilsBase class."""
 
@@ -34,6 +38,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusterutils = clusterutils.ClusterUtils()
         self._clusterutils._conn_cluster = mock.MagicMock()
         self._clusterutils._cluster = mock.MagicMock()
+        self._clusterutils._clusapi_utils = mock.Mock()
+        self._clusapi = self._clusterutils._clusapi_utils
 
     def test_init_hyperv_conn(self):
         fake_cluster_name = "fake_cluster"
@@ -277,24 +283,138 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(clusterutils.ClusterUtils, '_migrate_vm')
     def test_live_migrate_vm(self, mock_migrate_vm):
         self._clusterutils.live_migrate_vm(self._FAKE_VM_NAME,
-                                           self._FAKE_HOST)
+                                           self._FAKE_HOST,
+                                           mock.sentinel.timeout)
+
+        exp_valid_transition_states = [constants.CLUSTER_GROUP_PENDING]
         mock_migrate_vm.assert_called_once_with(
             self._FAKE_VM_NAME, self._FAKE_HOST,
+            self._clusterutils._LIVE_MIGRATION_TYPE,
+            constants.CLUSTER_GROUP_ONLINE,
+            exp_valid_transition_states,
+            mock.sentinel.timeout)
+
+    @mock.patch.object(_clusapi_utils, 'DWORD')
+    @mock.patch.object(clusterutils.ClusterUtils,
+                       '_wait_for_cluster_group_state')
+    @ddt.data(None, exceptions.ClusterException)
+    def test_migrate_vm(self, raised_exc, mock_wait_group, mock_dword):
+        mock_wait_group.side_effect = raised_exc
+
+        migrate_args = (self._FAKE_VM_NAME,
+                        self._FAKE_HOST,
+                        self._clusterutils._LIVE_MIGRATION_TYPE,
+                        constants.CLUSTER_GROUP_ONLINE,
+                        mock.sentinel.valid_transition_states,
+                        mock.sentinel.timeout)
+
+        if raised_exc:
+            self.assertRaises(raised_exc,
+                              self._clusterutils._migrate_vm,
+                              *migrate_args)
+        else:
+            self._clusterutils._migrate_vm(*migrate_args)
+
+        mock_dword.assert_called_once_with(
             self._clusterutils._LIVE_MIGRATION_TYPE)
 
-    @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm_group_check')
-    def test_migrate_vm(self, mock_lookup_vm_group_check):
-        vm_group = mock.MagicMock()
-        mock_lookup_vm_group_check.return_value = vm_group
+        self._clusapi.get_property_list_entry.assert_has_calls(
+            [mock.call(prop_name,
+                       _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
+                       mock_dword.return_value)
+             for prop_name in (_clusapi_utils.CLUSPROP_NAME_VM,
+                               _clusapi_utils.CLUSPROP_NAME_VM_CONFIG)])
 
-        self._clusterutils._migrate_vm(
-            self._FAKE_VM_NAME, self._FAKE_HOST,
-            self._clusterutils._LIVE_MIGRATION_TYPE)
+        expected_prop_entries = [
+            self._clusapi.get_property_list_entry.return_value] * 2
+        self._clusapi.get_property_list.assert_called_once_with(
+            expected_prop_entries)
 
-        vm_group.MoveToNewNodeParams.assert_called_once_with(
-            self._clusterutils._IGNORE_LOCKED,
+        expected_migrate_flags = (
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
+            _clusapi_utils.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
+
+        exp_clus_h = self._clusapi.open_cluster.return_value
+        exp_clus_node_h = self._clusapi.open_cluster_node.return_value
+        exp_clus_group_h = self._clusapi.open_cluster_group.return_value
+
+        self._clusapi.open_cluster.assert_called_once_with()
+        self._clusapi.open_cluster_group.assert_called_once_with(
+            exp_clus_h, self._FAKE_VM_NAME)
+        self._clusapi.open_cluster_node.assert_called_once_with(
+            exp_clus_h, self._FAKE_HOST)
+
+        self._clusapi.move_cluster_group.assert_called_once_with(
+            exp_clus_group_h, exp_clus_node_h, expected_migrate_flags,
+            self._clusapi.get_property_list.return_value)
+
+        mock_wait_group.assert_called_once_with(
+            self._FAKE_VM_NAME, exp_clus_group_h,
+            constants.CLUSTER_GROUP_ONLINE,
             self._FAKE_HOST,
-            [self._clusterutils._LIVE_MIGRATION_TYPE])
+            mock.sentinel.valid_transition_states,
+            mock.sentinel.timeout)
+
+        self._clusapi.close_cluster_group.assert_called_once_with(
+            exp_clus_group_h)
+        self._clusapi.close_cluster_node.assert_called_once_with(
+            exp_clus_node_h)
+        self._clusapi.close_cluster.assert_called_once_with(exp_clus_h)
+
+    @mock.patch.object(clusterutils._utils, 'time')
+    def test_wait_for_clus_group_state_failed(self, mock_time):
+        desired_host = self._FAKE_HOST
+        desired_state = constants.CLUSTER_GROUP_ONLINE
+        valid_transition_states = [constants.CLUSTER_GROUP_PENDING]
+
+        group_states = [dict(owner_node='other node',
+                             state=desired_state),
+                        dict(owner_node=desired_host,
+                             state=constants.CLUSTER_GROUP_PENDING),
+                        dict(owner_node=desired_host,
+                             state=constants.CLUSTER_GROUP_FAILED)]
+        self._clusapi.get_cluster_group_state.side_effect = group_states
+
+        # We don't want a timeout to be raised. We expect the tested
+        # function to force breaking the retry loop when the cluster
+        # group gets into a 'failed' state.
+        #
+        # As a precaution measure, we're still forcing a timeout at
+        # some point, to avoid an infinite loop if something goes wrong.
+        mock_time.time.side_effect = [0] * 10 + [100]
+
+        self.assertRaises(exceptions.InvalidClusterGroupState,
+                          self._clusterutils._wait_for_cluster_group_state,
+                          mock.sentinel.group_name,
+                          mock.sentinel.group_handle,
+                          desired_state,
+                          desired_host,
+                          valid_transition_states,
+                          timeout=10)
+
+        self._clusapi.get_cluster_group_state.assert_has_calls(
+            [mock.call(mock.sentinel.group_handle)] * 3)
+
+    @mock.patch.object(clusterutils._utils, 'time')
+    def test_wait_for_clus_group_state_success(self, mock_time):
+        desired_host = self._FAKE_HOST
+        desired_state = constants.CLUSTER_GROUP_ONLINE
+
+        group_state = dict(owner_node=desired_host.upper(),
+                           state=desired_state)
+        self._clusapi.get_cluster_group_state.return_value = group_state
+
+        self._clusterutils._wait_for_cluster_group_state(
+            mock.sentinel.group_name,
+            mock.sentinel.group_handle,
+            desired_state,
+            desired_host,
+            [],
+            timeout=10)
+
+        self._clusapi.get_cluster_group_state.assert_called_once_with(
+            mock.sentinel.group_handle)
 
     @mock.patch.object(clusterutils, 'tpool')
     @mock.patch.object(clusterutils, 'patcher')

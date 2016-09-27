@@ -172,3 +172,18 @@ class DNSZoneAlreadyExists(DNSException):
 
 class JobTerminateFailed(HyperVException):
     msg_fmt = _("Could not terminate the requested job(s).")
+
+
+class ClusterException(OSWinException):
+    pass
+
+
+class ClusterWin32Exception(ClusterException, Win32Exception):
+    pass
+
+
+class InvalidClusterGroupState(ClusterException):
+    msg_fmt = _("The cluster group %(group_name)s is in an invalid state. "
+                "Expected state %(expected_state)s. Expected owner node: "
+                "%(expected_node)s. Current group state: %(group_state)s. "
+                "Current owner node: %(owner_node)s.")
