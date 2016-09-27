@@ -127,7 +127,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def __init__(self, host='.'):
         super(VMUtils, self).__init__(host)
-        self._jobutils = jobutils.JobUtils()
+        self._jobutils = jobutils.JobUtils(host)
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
                                     six.iteritems(self._vm_power_states_map)}
