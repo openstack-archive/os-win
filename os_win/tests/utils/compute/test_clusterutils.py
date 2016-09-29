@@ -368,9 +368,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         desired_state = constants.CLUSTER_GROUP_ONLINE
         valid_transition_states = [constants.CLUSTER_GROUP_PENDING]
 
-        group_states = [dict(owner_node='other node',
-                             state=desired_state),
-                        dict(owner_node=desired_host,
+        group_states = [dict(owner_node=desired_host,
                              state=constants.CLUSTER_GROUP_PENDING),
                         dict(owner_node=desired_host,
                              state=constants.CLUSTER_GROUP_FAILED)]
@@ -394,7 +392,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
                           timeout=10)
 
         self._clusapi.get_cluster_group_state.assert_has_calls(
-            [mock.call(mock.sentinel.group_handle)] * 3)
+            [mock.call(mock.sentinel.group_handle)] * len(group_states))
 
     @mock.patch.object(clusterutils._utils, 'time')
     def test_wait_for_clus_group_state_success(self, mock_time):

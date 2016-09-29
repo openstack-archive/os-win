@@ -254,8 +254,7 @@ class ClusterUtils(baseutils.BaseUtils):
             reached_desired_node = desired_node.lower() == owner_node.lower()
 
             if not (reached_desired_state and reached_desired_node):
-                valid_states = [desired_state] + valid_transition_states
-                valid_state = group_state in valid_states
+                valid_state = group_state in valid_transition_states
                 retry_context['prevent_retry'] = not valid_state
 
                 raise exceptions.InvalidClusterGroupState(
