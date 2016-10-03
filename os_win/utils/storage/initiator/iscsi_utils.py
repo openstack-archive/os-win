@@ -19,10 +19,11 @@ import functools
 import inspect
 import socket
 import sys
+import time
 
 from oslo_log import log as logging
 
-from os_win._i18n import _LI
+from os_win._i18n import _LI, _LE
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -160,6 +161,7 @@ class ISCSIInitiatorUtils(object):
         str_list = str_list.split('\x00') if str_list else []
         return str_list
 
+    @retry_decorator(error_codes=iscsi_struct.ERROR_INSUFFICIENT_BUFFER)
     def _login_iscsi_target(self, target_name, portal=None, login_opts=None,
                             is_persistent=True, initiator_name=None):
         session_id = iscsi_struct.ISCSI_UNIQUE_SESSION_ID()
@@ -206,7 +208,8 @@ class ISCSIInitiatorUtils(object):
                 if session.TargetNodeName == target_name and
                 (session.ConnectionCount > 0 or not connected_only)]
 
-    @retry_decorator(error_codes=iscsierr.ISDSC_SESSION_BUSY)
+    @retry_decorator(error_codes=(iscsierr.ISDSC_SESSION_BUSY,
+                                  iscsierr.ISDSC_DEVICE_BUSY_ON_SESSION))
     @ensure_buff_and_retrieve_items(
         struct_type=iscsi_struct.ISCSI_DEVICE_ON_SESSION,
         func_requests_buff_sz=False)
@@ -232,26 +235,31 @@ class ISCSIInitiatorUtils(object):
             if device.ScsiAddress.Lun == target_lun:
                 return device
 
-    def _get_iscsi_device(self, target_name, target_lun):
-        sessions = self._get_iscsi_target_sessions(target_name)
-        for session in sessions:
-            device = self._get_iscsi_device_from_session(session.SessionId,
-                                                         target_lun)
-            if device:
-                return device
-
-    def get_device_number_for_target(self, target_name, target_lun):
+    def get_device_number_for_target(self, target_name, target_lun,
+                                     fail_if_not_found=False):
         # This method is preserved as it's used by the Hyper-V Nova driver.
-        device = self._get_iscsi_device(target_name, target_lun)
-        return device.StorageDeviceNumber.DeviceNumber if device else None
+        return self.get_device_number_and_path(target_name, target_lun,
+                                               fail_if_not_found)[0]
 
-    def get_device_number_and_path(self, target_name, target_lun):
+    def get_device_number_and_path(self, target_name, target_lun,
+                                   fail_if_not_found=False):
         # We try to avoid the need to seek the disk twice as this may take
         # unnecessary time.
-        device = self._get_iscsi_device(target_name, target_lun)
-        if device:
-            return device.StorageDeviceNumber.DeviceNumber, device.LegacyName
-        return None, None
+        device_number, device_path = None, None
+
+        try:
+            # Even if the disk was already discovered, under heavy load we may
+            # fail to locate it, in which case some retries will be performed.
+            (device_number,
+             device_path) = self.ensure_lun_available(target_name, target_lun,
+                                                      retry_attempts=10,
+                                                      retry_interval=0.1,
+                                                      rescan_disks=False)
+        except exceptions.ISCSILunNotAvailable:
+            if fail_if_not_found:
+                raise
+
+        return device_number, device_path
 
     def get_target_luns(self, target_name):
         # We only care about disk LUNs.
@@ -388,22 +396,38 @@ class ISCSIInitiatorUtils(object):
             self.ensure_lun_available(target_iqn, target_lun, rescan_attempts)
 
     def ensure_lun_available(self, target_iqn, target_lun,
-                             rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS):
-        for attempt in range(rescan_attempts):
+                             retry_attempts=_DEFAULT_RESCAN_ATTEMPTS,
+                             retry_interval=0,
+                             rescan_disks=True):
+        # This method should be called only after the iSCSI
+        # target has already been logged in.
+        for attempt in range(retry_attempts + 1):
             sessions = self._get_iscsi_target_sessions(target_iqn)
             for session in sessions:
                 try:
                     sid = session.SessionId
                     device = self._get_iscsi_device_from_session(sid,
                                                                  target_lun)
-                    if device and (device.StorageDeviceNumber.DeviceNumber
-                                   not in (None, -1)):
-                        return
-                except exceptions.ISCSIInitiatorAPIException as ex:
-                    LOG.exception(ex)
+                    if not device:
+                        continue
+
+                    device_number = device.StorageDeviceNumber.DeviceNumber
+                    device_path = device.LegacyName
+
+                    if device_path and device_number not in (None, -1):
+                        return device_number, device_path
+                except exceptions.ISCSIInitiatorAPIException:
+                    err_msg = _LE("Could not find lun %(target_lun)s "
+                                  "for iSCSI target %(target_iqn)s.")
+                    LOG.exception(err_msg,
+                                  dict(target_lun=target_lun,
+                                       target_iqn=target_iqn))
                     continue
-            if attempt <= rescan_attempts:
-                self._diskutils.rescan_disks()
+            if attempt <= retry_attempts:
+                if retry_interval:
+                    time.sleep(retry_interval)
+                if rescan_disks:
+                    self._diskutils.rescan_disks()
 
         raise exceptions.ISCSILunNotAvailable(target_lun=target_lun,
                                               target_iqn=target_iqn)
