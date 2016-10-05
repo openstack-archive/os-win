@@ -23,6 +23,7 @@ from eventlet import patcher
 from oslo_log import log as logging
 from oslo_utils import units
 
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import win32utils
@@ -151,6 +152,8 @@ class IOUtils(object):
                       eventlet_nonblocking_mode=eventlet_blocking_mode)
         return self._win32_utils.run_and_check_output(*args, **kwargs)
 
+    @_utils.retry_decorator(exceptions=exceptions.Win32IOException,
+                            max_sleep_time=2)
     def wait_named_pipe(self, pipe_name, timeout=WAIT_PIPE_DEFAULT_TIMEOUT):
         """Wait a given ammount of time for a pipe to become available."""
         self._run_and_check_output(kernel32.WaitNamedPipeW,
