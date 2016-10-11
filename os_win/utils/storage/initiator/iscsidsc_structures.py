@@ -49,6 +49,8 @@ ISCSI_LOGIN_OPTIONS_USERNAME = 0x00000020
 ISCSI_LOGIN_OPTIONS_PASSWORD = 0x00000040
 ISCSI_LOGIN_OPTIONS_AUTH_TYPE = 0x00000080
 
+ERROR_INSUFFICIENT_BUFFER = 122
+
 
 class GUID(ctypes.Structure):
     # This is also used in virdisk_structures.py, we should move
