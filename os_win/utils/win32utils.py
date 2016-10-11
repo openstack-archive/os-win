@@ -37,7 +37,19 @@ class Win32Utils(object):
         self._kernel32_lib_func_opts = dict(error_on_nonzero_ret_val=False,
                                             ret_val_is_err_code=False)
 
-    def run_and_check_output(self, func, *args, **kwargs):
+    def run_and_check_output(self, *args, **kwargs):
+        eventlet_nonblocking_mode = kwargs.pop(
+            'eventlet_nonblocking_mode', True)
+
+        if eventlet_nonblocking_mode:
+            # We have to make sure that the invoked function as well as the
+            # subsequent error handling are performed within the same thread.
+            return _utils.avoid_blocking_call(
+                self._run_and_check_output, *args, **kwargs)
+        else:
+            return self._run_and_check_output(*args, **kwargs)
+
+    def _run_and_check_output(self, func, *args, **kwargs):
         """Convenience helper method for running Win32 API methods."""
         kernel32_lib_func = kwargs.pop('kernel32_lib_func', False)
         if kernel32_lib_func:
@@ -63,13 +75,7 @@ class Win32Utils(object):
         # message table.
         error_msg_src = kwargs.pop('error_msg_src', {})
 
-        eventlet_nonblocking_mode = kwargs.pop(
-            'eventlet_nonblocking_mode', True)
-
-        if eventlet_nonblocking_mode:
-            ret_val = _utils.avoid_blocking_call(func, *args, **kwargs)
-        else:
-            ret_val = func(*args, **kwargs)
+        ret_val = func(*args, **kwargs)
 
         func_failed = (error_on_nonzero_ret_val and ret_val) or (
             ret_val in error_ret_vals)

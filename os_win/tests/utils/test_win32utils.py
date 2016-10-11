@@ -46,21 +46,15 @@ class Win32UtilsTestCase(base.BaseTestCase):
                             wintypes=mock.DEFAULT,
                             create=True).start()
 
-    @mock.patch.object(_utils, 'avoid_blocking_call')
     @mock.patch.object(win32utils.Win32Utils, 'get_error_message')
     @mock.patch.object(win32utils.Win32Utils, 'get_last_error')
     def _test_run_and_check_output(self, mock_get_last_err, mock_get_err_msg,
-                                   mock_avoid_blocking_call,
                                    ret_val=0, expected_exc=None,
                                    **kwargs):
         self._ctypes_patcher.stop()
 
         mock_func = mock.Mock()
         mock_func.return_value = ret_val
-        mock_avoid_blocking_call.return_value = ret_val
-
-        eventlet_nonblocking_mode = kwargs.get(
-            'eventlet_nonblocking_mode', True)
 
         if expected_exc:
             self.assertRaises(expected_exc,
@@ -77,20 +71,13 @@ class Win32UtilsTestCase(base.BaseTestCase):
                 **kwargs)
             self.assertEqual(ret_val, actual_ret_val)
 
-        if eventlet_nonblocking_mode:
-            mock_avoid_blocking_call.assert_called_once_with(
-                mock_func, mock.sentinel.arg, kwarg=mock.sentinel.kwarg)
-        else:
-            mock_func.assert_called_once_with(mock.sentinel.arg,
-                                              kwarg=mock.sentinel.kwarg)
+        mock_func.assert_called_once_with(mock.sentinel.arg,
+                                          kwarg=mock.sentinel.kwarg)
 
         return mock_get_last_err, mock_get_err_msg
 
     def test_run_and_check_output(self):
         self._test_run_and_check_output()
-
-    def test_run_and_check_output_nonblocking_mode_disabled(self):
-        self._test_run_and_check_output(eventlet_nonblocking_mode=False)
 
     def test_run_and_check_output_fail_on_nonzero_ret_val(self):
         ret_val = 1
@@ -147,6 +134,26 @@ class Win32UtilsTestCase(base.BaseTestCase):
         except Exception as ex:
             self.assertIsInstance(ex, exceptions.Win32Exception)
             self.assertIn(err_msg, ex.message)
+
+    @mock.patch.object(win32utils.Win32Utils, '_run_and_check_output')
+    def test_run_and_check_output_eventlet_nb_mode_disabled(self, mock_helper):
+        self._win32_utils.run_and_check_output(
+            mock.sentinel.func,
+            mock.sentinel.arg,
+            eventlet_nonblocking_mode=False)
+        mock_helper.assert_called_once_with(mock.sentinel.func,
+                                            mock.sentinel.arg)
+
+    @mock.patch.object(_utils, 'avoid_blocking_call')
+    def test_run_and_check_output_eventlet_nb_mode_enabled(self, mock_helper):
+        self._win32_utils.run_and_check_output(
+            mock.sentinel.func,
+            mock.sentinel.arg,
+            eventlet_nonblocking_mode=True)
+        mock_helper.assert_called_once_with(
+            self._win32_utils._run_and_check_output,
+            mock.sentinel.func,
+            mock.sentinel.arg)
 
     def test_get_error_message(self):
         err_msg = self._win32_utils.get_error_message(mock.sentinel.err_code)
