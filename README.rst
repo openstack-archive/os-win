@@ -48,7 +48,7 @@ You can run the unit tests with the following command.
 
 ::
 
-    C:\os_win> nosetests os_win\tests
+    C:\os_win> nosetests os_win\tests\unit
 
 
 How to contribute
