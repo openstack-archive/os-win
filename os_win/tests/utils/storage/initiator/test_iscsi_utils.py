@@ -351,19 +351,19 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
                        '_get_iscsi_sessions')
     def test_get_iscsi_target_sessions(self, mock_get_iscsi_sessions,
                                         target_sessions_found=True):
-        fake_session = mock.Mock(TargetNodeName=mock.sentinel.target_name,
+        fake_session = mock.Mock(TargetNodeName="FAKE_TARGET_NAME",
                                  ConnectionCount=1)
         fake_disconn_session = mock.Mock(
-            TargetNodeName=mock.sentinel.target_name,
+            TargetNodeName="fake_target_name",
             ConnectionCount=0)
-        other_session = mock.Mock(TargetNodeName=mock.sentinel.other_target,
+        other_session = mock.Mock(TargetNodeName="other_target_name",
                                   ConnectionCount=1)
 
         sessions = [fake_session, fake_disconn_session, other_session]
         mock_get_iscsi_sessions.return_value = sessions
 
         resulted_tgt_sessions = self._initiator._get_iscsi_target_sessions(
-            mock.sentinel.target_name)
+            "fake_target_name")
 
         self.assertEqual([fake_session], resulted_tgt_sessions)
 
