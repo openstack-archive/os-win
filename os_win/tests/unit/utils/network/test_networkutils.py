@@ -333,52 +333,89 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertFalse(mock_add_feature.called)
 
     @mock.patch.object(networkutils.NetworkUtils,
+                       '_set_switch_port_security_settings')
+    def test_set_vswitch_port_vsid(self, mock_set_port_sec_settings):
+        self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
+                                            mock.sentinel.switch_port_name)
+        mock_set_port_sec_settings.assert_called_once_with(
+            mock.sentinel.switch_port_name, VirtualSubnetId=mock.sentinel.vsid)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_set_switch_port_security_settings')
+    def test_set_vswitch_port_mac_spoofing(self, mock_set_port_sec_settings):
+        self.netutils.set_vswitch_port_mac_spoofing(
+            mock.sentinel.switch_port_name, mock.sentinel.state)
+        mock_set_port_sec_settings.assert_called_once_with(
+            mock.sentinel.switch_port_name,
+            AllowMacSpoofing=mock.sentinel.state)
+
+    @mock.patch.object(networkutils.NetworkUtils,
                        '_get_security_setting_data_from_port_alloc')
     @mock.patch.object(networkutils.NetworkUtils,
                        '_create_default_setting_data')
-    def _check_set_vswitch_port_vsid(self, mock_create_default_sd,
-                                     mock_get_security_sd, missing_vsid=False):
+    def _check_set_switch_port_security_settings(self, mock_create_default_sd,
+                                                 mock_get_security_sd,
+                                                 missing_sec=False):
         mock_port_alloc = self._mock_get_switch_port_alloc()
 
-        mock_vsid_settings = mock.MagicMock()
-        if missing_vsid:
-            side_effect = [mock_vsid_settings, None]
-        else:
-            side_effect = [mock_vsid_settings, mock_vsid_settings]
+        mock_sec_settings = mock.MagicMock()
+        mock_get_security_sd.return_value = (
+            None if missing_sec else mock_sec_settings)
+        mock_create_default_sd.return_value = mock_sec_settings
 
-        mock_get_security_sd.side_effect = side_effect
-        mock_create_default_sd.return_value = mock_vsid_settings
-
-        if missing_vsid:
+        if missing_sec:
             self.assertRaises(exceptions.HyperVException,
-                              self.netutils.set_vswitch_port_vsid,
-                              mock.sentinel.vsid,
-                              mock.sentinel.switch_port_name)
+                              self.netutils._set_switch_port_security_settings,
+                              mock.sentinel.switch_port_name,
+                              VirtualSubnetId=mock.sentinel.vsid)
+            mock_create_default_sd.assert_called_once_with(
+                self.netutils._PORT_SECURITY_SET_DATA)
         else:
-            self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
-                                                mock.sentinel.switch_port_name)
+            self.netutils._set_switch_port_security_settings(
+                mock.sentinel.switch_port_name,
+                VirtualSubnetId=mock.sentinel.vsid)
+            mock_remove_feature = self.netutils._jobutils.remove_virt_feature
+            mock_remove_feature.assert_called_once_with(mock_sec_settings)
 
-        mock_remove_feature = self.netutils._jobutils.remove_virt_feature
-        mock_remove_feature.assert_called_once_with(mock_vsid_settings)
+        self.assertEqual(mock.sentinel.vsid,
+                         mock_sec_settings.VirtualSubnetId)
         mock_add_feature = self.netutils._jobutils.add_virt_feature
-        mock_add_feature.assert_called_once_with(mock_vsid_settings,
+        mock_add_feature.assert_called_once_with(mock_sec_settings,
                                                  mock_port_alloc)
 
-    def test_set_vswitch_port_vsid(self):
-        self._check_set_vswitch_port_vsid()
+    def test_set_switch_port_security_settings(self):
+        self._check_set_switch_port_security_settings()
 
-    def test_set_vswitch_port_vsid_missing(self):
-        self._check_set_vswitch_port_vsid(missing_vsid=True)
+    def test_set_switch_port_security_settings_missing(self):
+        self._check_set_switch_port_security_settings(missing_sec=True)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_security_setting_data_from_port_alloc')
+    def test_set_switch_port_security_settings_already_set(self,
+                                                           mock_get_sec_sd):
+        self._mock_get_switch_port_alloc()
+        mock_sec_sd = mock.MagicMock(VirtualSubnetId=mock.sentinel.vsid,
+                                     AllowMacSpoofing=mock.sentinel.state)
+        mock_get_sec_sd.return_value = mock_sec_sd
+
+        self.netutils._set_switch_port_security_settings(
+            mock.sentinel.switch_port_name,
+            VirtualSubnetId=mock.sentinel.vsid,
+            AllowMacSpoofing=mock.sentinel.state)
+
+        self.assertFalse(self.netutils._jobutils.remove_virt_feature.called)
+        self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_set_vswitch_port_vsid_already_set(self, mock_get_elem_assoc_cls):
         self._mock_get_switch_port_alloc()
 
-        mock_vsid_settings = mock.MagicMock(VirtualSubnetId=mock.sentinel.vsid)
-        mock_get_elem_assoc_cls.return_value = (mock_vsid_settings, True)
+        mock_sec_settings = mock.MagicMock(
+            AllowMacSpoofing=mock.sentinel.state)
+        mock_get_elem_assoc_cls.return_value = (mock_sec_settings, True)
 
-        self.netutils.set_vswitch_port_vsid(mock.sentinel.vsid,
-                                            mock.sentinel.switch_port_name)
+        self.netutils.set_vswitch_port_mac_spoofing(
+            mock.sentinel.switch_port_name, mock.sentinel.state)
 
         self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
 

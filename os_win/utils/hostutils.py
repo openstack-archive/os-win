@@ -279,3 +279,11 @@ class HostUtils(baseutils.BaseUtilsVirt):
             guarded.
         """
         return False
+
+    def supports_nested_virtualization(self):
+        """Checks if the host supports nested virtualization.
+
+        :returns: False, only Windows / Hyper-V Server 2016 or newer supports
+            nested virtualization.
+        """
+        return False

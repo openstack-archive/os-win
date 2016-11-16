@@ -331,35 +331,49 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 _('Port VLAN not found: %s') % switch_port_name)
 
     def set_vswitch_port_vsid(self, vsid, switch_port_name):
-        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
+        self._set_switch_port_security_settings(switch_port_name,
+                                                VirtualSubnetId=vsid)
 
-        vsid_settings = self._get_security_setting_data_from_port_alloc(
+    def set_vswitch_port_mac_spoofing(self, switch_port_name, state):
+        """Sets the given port's MAC spoofing to the given state.
+
+        :param switch_port_name: the name of the port which will have MAC
+            spoofing set to the given state.
+        :param state: boolean, if MAC spoofing should be turned on or off.
+        """
+        self._set_switch_port_security_settings(switch_port_name,
+                                                AllowMacSpoofing=state)
+
+    def _set_switch_port_security_settings(self, switch_port_name, **kwargs):
+        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
+        sec_settings = self._get_security_setting_data_from_port_alloc(
             port_alloc)
 
-        if vsid_settings:
-            if vsid_settings.VirtualSubnetId == vsid:
-                # VSID already added, no need to readd it.
+        if sec_settings:
+            if all(getattr(sec_settings, k) == v for k, v in kwargs.items()):
+                # All desired properties already properly set. Nothing to do.
                 return
+
             # Removing the feature because it cannot be modified
             # due to a wmi exception.
-            self._jobutils.remove_virt_feature(vsid_settings)
+            self._jobutils.remove_virt_feature(sec_settings)
+        else:
+            sec_settings = self._create_default_setting_data(
+                self._PORT_SECURITY_SET_DATA)
 
-            # remove from cache.
-            self._vsid_sds.pop(port_alloc.InstanceID, None)
+        for k, v in kwargs.items():
+            setattr(sec_settings, k, v)
 
-        vsid_settings = self._create_default_setting_data(
-            self._PORT_SECURITY_SET_DATA)
-        vsid_settings.VirtualSubnetId = vsid
-        self._jobutils.add_virt_feature(vsid_settings, port_alloc)
+        self._jobutils.add_virt_feature(sec_settings, port_alloc)
 
         # TODO(claudiub): This will help solve the missing VSID issue, but it
         # comes with a performance cost. The root cause of the problem must
         # be solved.
-        vsid_settings = self._get_security_setting_data_from_port_alloc(
+        sec_settings = self._get_security_setting_data_from_port_alloc(
             port_alloc)
-        if not vsid_settings:
+        if not sec_settings:
             raise exceptions.HyperVException(
-                _('Port VSID not found: %s') % switch_port_name)
+                _('Port Security Settings not found: %s') % switch_port_name)
 
     def _get_vlan_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(

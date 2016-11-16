@@ -72,6 +72,25 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
         mock_vssd.assert_called_once_with(
             ElementName=self._vmutils._UEFI_CERTIFICATE_AUTH)
 
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    @mock.patch.object(vmutils10.VMUtils10, '_lookup_vm_check')
+    def test_set_nested_virtualization(self, mock_lookup_vm_check,
+                                       mock_get_element_associated_class):
+        mock_vmsettings = mock_lookup_vm_check.return_value
+        mock_procsettings = mock_get_element_associated_class.return_value[0]
+
+        self._vmutils.set_nested_virtualization(mock.sentinel.vm_name,
+                                                mock.sentinel.state)
+
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._conn, self._vmutils._PROCESSOR_SETTING_DATA_CLASS,
+            element_instance_id=mock_vmsettings.InstanceID)
+        self.assertEqual(mock.sentinel.state,
+                         mock_procsettings.ExposeVirtualizationExtensions)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_procsettings)
+
     def test_vm_gen_supports_remotefx(self):
         ret = self._vmutils.vm_gen_supports_remotefx(mock.sentinel.VM_GEN)
 

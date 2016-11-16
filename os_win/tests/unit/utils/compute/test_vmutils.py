@@ -298,6 +298,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.HyperVAuthorizationException,
                           self._vmutils.check_admin_permissions)
 
+    def test_set_nested_virtualization(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.set_nested_virtualization,
+                          mock.sentinel.vm_name, mock.sentinel.state)
+
     @ddt.data(
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
         {'snapshot_dir': mock.sentinel.snapshot_dir, 'is_planned_vm': True},
