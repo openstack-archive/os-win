@@ -23,12 +23,15 @@ from oslo_log import log as logging
 
 from os_win._i18n import _, _LW
 from os_win import _utils
+import os_win.conf
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils import win32utils
 
+CONF = os_win.conf.CONF
+
 if sys.platform == 'win32':
-    hbaapi = ctypes.cdll.hbaapi
+    hbaapi = ctypes.cdll.LoadLibrary(CONF.os_win.hbaapi_lib_path)
 
 LOG = logging.getLogger(__name__)
 
