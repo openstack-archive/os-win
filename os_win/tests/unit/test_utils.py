@@ -209,8 +209,8 @@ class UtilsTestCase(base.BaseTestCase):
 
         def fake_blocking_func(*args, **kwargs):
             self.assertEqual((mock.sentinel.arg, ), args)
-            self.assertDictEqual(dict(kwarg=mock.sentinel.kwarg),
-                                 kwargs)
+            self.assertEqual(dict(kwarg=mock.sentinel.kwarg),
+                             kwargs)
             return mock.sentinel.ret_val
 
         fake_blocking_func_decorated = (
