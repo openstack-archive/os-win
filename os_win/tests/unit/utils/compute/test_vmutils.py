@@ -301,7 +301,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @ddt.data(
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
         {'snapshot_dir': mock.sentinel.snapshot_dir, 'is_planned_vm': True},
-        {'is_planned_vm': True}, {})
+        {'is_planned_vm': True},
+        {'host_shutdown_action': mock.sentinel.shutdown_action},
+        {})
     @ddt.unpack
     @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
@@ -311,6 +313,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_update_vm(self, mock_get_virtual_system_type,
                        mock_lookup_vm_check, mock_set_mem, mock_set_vcpus,
                        mock_modify_virtual_system,
+                       host_shutdown_action=None,
                        configuration_root_dir=None,
                        snapshot_dir=None, is_planned_vm=False):
         mock_vmsettings = mock_lookup_vm_check.return_value
@@ -320,7 +323,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.memory_per_numa, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
-            snapshot_dir, is_planned_vm=is_planned_vm)
+            snapshot_dir,
+            host_shutdown_action=host_shutdown_action,
+            is_planned_vm=is_planned_vm)
 
         mock_get_virtual_system_type.assert_called_once_with(is_planned_vm)
         mock_lookup_vm_check.assert_called_once_with(
@@ -331,9 +336,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_set_vcpus.assert_called_once_with(
             mock_vmsettings, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features)
-        if configuration_root_dir or snapshot_dir:
+        if configuration_root_dir or snapshot_dir or host_shutdown_action:
             mock_modify_virtual_system.assert_called_once_with(
                 mock_vmsettings)
+        else:
+            mock_modify_virtual_system.assert_not_called()
 
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_create_vm_obj')

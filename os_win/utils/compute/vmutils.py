@@ -273,12 +273,15 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def update_vm(self, vm_name, memory_mb, memory_per_numa_node, vcpus_num,
                   vcpus_per_numa_node, limit_cpu_features, dynamic_mem_ratio,
                   configuration_root_dir=None, snapshot_dir=None,
+                  host_shutdown_action=None,
                   is_planned_vm=False):
         virtual_system_type = self._get_virtual_system_type(is_planned_vm)
 
         vmsetting = self._lookup_vm_check(
             vm_name, virtual_system_type=virtual_system_type)
 
+        if host_shutdown_action:
+            vmsetting.AutomaticShutdownAction = host_shutdown_action
         if configuration_root_dir:
             vmsetting.ConfigurationDataRoot = configuration_root_dir
         if snapshot_dir:
@@ -287,7 +290,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
                             dynamic_mem_ratio)
         self._set_vm_vcpus(vmsetting, vcpus_num, vcpus_per_numa_node,
                            limit_cpu_features)
-        if configuration_root_dir or snapshot_dir:
+
+        update_needed = (configuration_root_dir or snapshot_dir or
+                         host_shutdown_action)
+        if update_needed:
             self._modify_virtual_system(vmsetting)
 
     def check_admin_permissions(self):

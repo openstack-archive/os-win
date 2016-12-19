@@ -198,3 +198,9 @@ ACE_SET_AUDIT_FAILURE = 6
 # VLAN operation modes
 VLAN_MODE_ACCESS = 1
 VLAN_MODE_TRUNK = 2
+
+# Action that Hyper-V takes on the VM
+# when the host is shut down.
+HOST_SHUTDOWN_ACTION_TURN_OFF = 2
+HOST_SHUTDOWN_ACTION_SAVE = 3
+HOST_SHUTDOWN_ACTION_SHUTDOWN = 4
