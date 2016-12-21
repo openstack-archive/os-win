@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ddt
+
 import mock
 import platform
 
@@ -23,6 +25,7 @@ from os_win.utils.compute import livemigrationutils
 from os_win.utils.compute import vmutils
 
 
+@ddt.ddt
 class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V LiveMigrationUtils class."""
 
@@ -141,7 +144,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_create_planned_vm_helper(self):
         mock_vm = mock.MagicMock()
         mock_v2 = mock.MagicMock()
-        mock_vsmsd = mock_v2.query()[0]
+        mock_vsmsd_cls = mock_v2.Msvm_VirtualSystemMigrationSettingData
+        mock_vsmsd = mock_vsmsd_cls.return_value[0]
         self._conn.Msvm_PlannedComputerSystem.return_value = [mock_vm]
 
         migr_svc = mock_v2.Msvm_VirtualSystemMigrationService()[0]
@@ -154,6 +158,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(mock_vm, resulted_vm)
 
+        mock_vsmsd_cls.assert_called_once_with(
+            MigrationType=self.liveutils._MIGRATION_TYPE_STAGED)
         migr_svc.MigrateVirtualSystemToHost.assert_called_once_with(
             ComputerSystem=mock_vm.path_.return_value,
             DestinationHost=mock.sentinel.FAKE_HOST,
@@ -282,7 +288,9 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_live_migrate_vm_helper(self):
         mock_conn_local = mock.MagicMock()
         mock_vm = mock.MagicMock()
-        mock_vsmsd = mock_conn_local.query()[0]
+        mock_vsmsd_cls = (
+            mock_conn_local.Msvm_VirtualSystemMigrationSettingData)
+        mock_vsmsd = mock_vsmsd_cls.return_value[0]
 
         mock_vsmsvc = mock_conn_local.Msvm_VirtualSystemMigrationService()[0]
         mock_vsmsvc.MigrateVirtualSystemToHost.return_value = (
@@ -291,8 +299,11 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         self.liveutils._live_migrate_vm(
             mock_conn_local, mock_vm, None,
             [mock.sentinel.FAKE_REMOTE_IP_ADDR],
-            mock.sentinel.FAKE_RASD_PATH, mock.sentinel.FAKE_HOST)
+            mock.sentinel.FAKE_RASD_PATH, mock.sentinel.FAKE_HOST,
+            mock.sentinel.migration_type)
 
+        mock_vsmsd_cls.assert_called_once_with(
+            MigrationType=mock.sentinel.migration_type)
         mock_vsmsvc.MigrateVirtualSystemToHost.assert_called_once_with(
             ComputerSystem=mock_vm.path_.return_value,
             DestinationHost=mock.sentinel.FAKE_HOST,
@@ -309,8 +320,9 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                           mock.sentinel.vm_name,
                           mock.sentinel.host)
 
+    @ddt.data(True, False)
     @mock.patch.object(livemigrationutils, 'vmutils')
-    def test_live_migrate_no_planned_vm(self, mock_vm_utils):
+    def test_live_migrate_no_planned_vm(self, migrate_disks, mock_vm_utils):
         mock_vm_utils_remote = mock_vm_utils.VMUtils.return_value
         mock_vm = self._get_vm()
 
@@ -338,7 +350,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             self.liveutils._create_planned_vm.return_value = mock_vm
 
             self.liveutils.live_migrate_vm(mock.sentinel.vm_name,
-                                           mock.sentinel.FAKE_HOST)
+                                           mock.sentinel.FAKE_HOST,
+                                           migrate_disks=migrate_disks)
 
             self.liveutils._get_remote_disk_data.assert_called_once_with(
                 mock_vm_utils_remote, disk_paths, mock.sentinel.FAKE_HOST)
@@ -349,11 +362,22 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
             mocked_method.assert_called_once_with(
                 self._conn, mock_vm, mock.sentinel.vm_name,
                 mock_disk_paths)
+
+            if migrate_disks:
+                expected_migr_type = (
+                    self.liveutils._MIGRATION_TYPE_VIRTUAL_SYSTEM_AND_STORAGE)
+                exp_new_rsd = self.liveutils._get_vhd_setting_data.return_value
+            else:
+                expected_migr_type = (
+                    self.liveutils._MIGRATION_TYPE_VIRTUAL_SYSTEM)
+                exp_new_rsd = None
+
             self.liveutils._live_migrate_vm.assert_called_once_with(
                 self._conn, mock_vm, mock_vm,
                 [mock.sentinel.FAKE_REMOTE_IP_ADDR],
-                self.liveutils._get_vhd_setting_data.return_value,
-                mock.sentinel.FAKE_HOST)
+                exp_new_rsd,
+                mock.sentinel.FAKE_HOST,
+                expected_migr_type)
 
     def test_live_migrate_single_planned_vm(self):
         mock_vm = self._get_vm()
@@ -375,7 +399,8 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                 self._conn, mock_vm, mock_vm,
                 [mock.sentinel.FAKE_REMOTE_IP_ADDR],
                 self.liveutils._get_vhd_setting_data.return_value,
-                mock.sentinel.FAKE_HOST)
+                mock.sentinel.FAKE_HOST,
+                self.liveutils._MIGRATION_TYPE_VIRTUAL_SYSTEM_AND_STORAGE)
 
     @mock.patch.object(vmutils, 'VMUtils')
     @mock.patch.object(livemigrationutils.LiveMigrationUtils, '_get_vm')
