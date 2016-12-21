@@ -208,9 +208,11 @@ class FCUtilsTestCase(base.BaseTestCase):
     def test_get_fc_hba_ports(self, mock_get_fc_hba_count,
                               mock_get_adapter_name,
                               mock_get_adapter_ports):
-        fake_adapter_count = 2
+        fake_adapter_count = 3
 
-        mock_get_adapter_name.return_value = mock.sentinel.adapter_name
+        mock_get_adapter_name.side_effect = [Exception,
+                                             mock.sentinel.adapter_name,
+                                             mock.sentinel.adapter_name]
         mock_get_fc_hba_count.return_value = fake_adapter_count
         mock_get_adapter_ports.side_effect = [Exception,
                                               [mock.sentinel.port]]
@@ -223,7 +225,7 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_get_adapter_name.assert_has_calls(
             [mock.call(index) for index in range(fake_adapter_count)])
         mock_get_adapter_ports.assert_has_calls(
-            [mock.call(mock.sentinel.adapter_name)] * fake_adapter_count)
+            [mock.call(mock.sentinel.adapter_name)] * 2)
 
     @mock.patch.object(fc_utils.FCUtils, '_open_adapter')
     @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
