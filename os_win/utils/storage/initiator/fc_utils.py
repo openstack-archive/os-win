@@ -140,7 +140,16 @@ class FCUtils(object):
 
         adapter_count = self.get_fc_hba_count()
         for adapter_index in range(adapter_count):
-            adapter_name = self._get_adapter_name(adapter_index)
+            # We'll ignore unsupported FC HBA ports.
+            try:
+                adapter_name = self._get_adapter_name(adapter_index)
+            except Exception as exc:
+                msg = _LW("Could not retrieve FC HBA adapter name for "
+                          "adapter number: %(adapter_index)s. "
+                          "Exception: %(exc)s")
+                LOG.warning(msg, dict(adapter_index=adapter_index, exc=exc))
+                continue
+
             try:
                 hba_ports += self._get_fc_hba_adapter_ports(adapter_name)
             except Exception as exc:
