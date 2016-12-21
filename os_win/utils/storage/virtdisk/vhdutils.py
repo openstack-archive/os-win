@@ -173,7 +173,8 @@ class VHDUtils(object):
                 if f.read(8) == vdisk_const.VHD_SIGNATURE:
                     return constants.DISK_FORMAT_VHD
 
-    def get_vhd_info(self, vhd_path, info_members=None):
+    def get_vhd_info(self, vhd_path, info_members=None,
+                     open_parents=False):
         """Returns a dict containing VHD image informations.
 
         :param info_members: A list of information members to be retrieved.
@@ -196,10 +197,13 @@ class VHDUtils(object):
         vhd_info = {}
         info_members = info_members or self._vhd_info_members
 
+        open_flag = (vdisk_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS
+                     if not open_parents else 0)
         open_access_mask = (vdisk_const.VIRTUAL_DISK_ACCESS_GET_INFO |
                             vdisk_const.VIRTUAL_DISK_ACCESS_DETACH)
         handle = self._open(
             vhd_path,
+            open_flag=open_flag,
             open_access_mask=open_access_mask)
 
         try:
