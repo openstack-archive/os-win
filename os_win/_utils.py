@@ -16,7 +16,6 @@
 
 import netaddr
 import six
-import socket
 import time
 import types
 
@@ -32,7 +31,7 @@ from os_win._i18n import _LE
 
 LOG = logging.getLogger(__name__)
 
-
+socket = eventlet.import_patched('socket')
 synchronized = lockutils.synchronized_with_prefix('oswin-')
 
 

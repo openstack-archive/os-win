@@ -187,7 +187,7 @@ class UtilsTestCase(base.BaseTestCase):
         self.assertEqual(1, mock_side_effect.call_count)
         self.assertFalse(mock_sleep.called)
 
-    @mock.patch('socket.getaddrinfo')
+    @mock.patch.object(_utils.socket, 'getaddrinfo')
     def test_get_ips(self, mock_getaddrinfo):
         ips = ['1.2.3.4', '5.6.7.8']
         mock_getaddrinfo.return_value = [
