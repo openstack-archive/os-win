@@ -23,8 +23,9 @@ import re
 
 from eventlet import patcher
 from eventlet import tpool
+from oslo_utils import units
 
-from os_win._i18n import _
+from os_win._i18n import _, _LE
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
@@ -44,6 +45,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _PORT_VLAN_SET_DATA = 'Msvm_EthernetSwitchPortVlanSettingData'
     _PORT_SECURITY_SET_DATA = 'Msvm_EthernetSwitchPortSecuritySettingData'
     _PORT_ALLOC_ACL_SET_DATA = 'Msvm_EthernetSwitchPortAclSettingData'
+    _PORT_BANDWIDTH_SET_DATA = 'Msvm_EthernetSwitchPortBandwidthSettingData'
     _PORT_EXT_ACL_SET_DATA = _PORT_ALLOC_ACL_SET_DATA
     _LAN_ENDPOINT = 'Msvm_LANEndpoint'
     _STATE_DISABLED = 3
@@ -84,6 +86,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _vlan_sds = {}
     _vsid_sds = {}
     _sg_acl_sds = {}
+    _bandwidth_sds = {}
 
     def __init__(self):
         super(NetworkUtils, self).__init__()
@@ -116,6 +119,14 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             match = switch_port_id_regex.match(vsid_sd.InstanceID)
             if match:
                 self._vsid_sds[match.group()] = vsid_sd
+
+        # map between switch port's InstanceID and their bandwidth setting
+        # data WMI objects.
+        bandwidths = self._conn.Msvm_EthernetSwitchPortBandwidthSettingData()
+        for bandwidth_sd in bandwidths:
+            match = switch_port_id_regex.match(bandwidth_sd.InstanceID)
+            if match:
+                self._bandwidth_sds[match.group()] = bandwidth_sd
 
     def update_cache(self):
         # map between switch port ID and switch port WMI object.
@@ -298,6 +309,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         self._switch_ports.pop(switch_port_name, None)
         self._vlan_sds.pop(sw_port.InstanceID, None)
         self._vsid_sds.pop(sw_port.InstanceID, None)
+        self._bandwidth_sds.pop(sw_port.InstanceID, None)
 
     def set_vswitch_port_vlan_id(self, vlan_id=None, switch_port_name=None,
                                  **kwargs):
@@ -436,6 +448,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     def _get_security_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(
             port_alloc, self._vsid_sds, self._PORT_SECURITY_SET_DATA)
+
+    def _get_bandwidth_setting_data_from_port_alloc(self, port_alloc):
+        return self._get_setting_data_from_port_alloc(
+            port_alloc, self._bandwidth_sds, self._PORT_BANDWIDTH_SET_DATA)
 
     def _get_setting_data_from_port_alloc(self, port_alloc, cache, data_class):
         if port_alloc.InstanceID in cache:
@@ -660,6 +676,81 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                  have the recommended order for sg_rules' Action.
         """
         return [0] * len(sg_rules)
+
+    def set_port_qos_rule(self, port_id, qos_rule):
+        """Sets the QoS rule for the given port.
+
+        :param port_id: the port's ID to which the QoS rule will be applied to.
+        :param qos_rule: a dictionary containing the following keys:
+            min_kbps, max_kbps, max_burst_kbps, max_burst_size_kb.
+        :raises exceptions.HyperVInvalidException: if
+            - min_kbps is smaller than 10MB.
+            - max_kbps is smaller than min_kbps.
+            - max_burst_kbps is smaller than max_kbps.
+        :raises exceptions.HyperVException: if the QoS rule cannot be set.
+        """
+
+        # Hyper-V stores bandwidth limits in bytes.
+        min_bps = qos_rule.get("min_kbps", 0) * units.Ki
+        max_bps = qos_rule.get("max_kbps", 0) * units.Ki
+        max_burst_bps = qos_rule.get("max_burst_kbps", 0) * units.Ki
+        max_burst_sz = qos_rule.get("max_burst_size_kb", 0) * units.Ki
+
+        if not (min_bps or max_bps or max_burst_bps or max_burst_sz):
+            # no limits need to be set
+            return
+
+        if min_bps and min_bps < 10 * units.Mi:
+            raise exceptions.InvalidParameterValue(
+                param_name="min_kbps", param_value=min_bps)
+        if max_bps and max_bps < min_bps:
+            raise exceptions.InvalidParameterValue(
+                param_name="max_kbps", param_value=max_bps)
+        if max_burst_bps and max_burst_bps < max_bps:
+            raise exceptions.InvalidParameterValue(
+                param_name="max_burst_kbps", param_value=max_burst_bps)
+
+        port_alloc = self._get_switch_port_allocation(port_id)[0]
+        bandwidth = self._get_bandwidth_setting_data_from_port_alloc(
+            port_alloc)
+        if bandwidth:
+            # Removing the feature because it cannot be modified
+            # due to a wmi exception.
+            self._jobutils.remove_virt_feature(bandwidth)
+
+            # remove from cache.
+            self._bandwidth_sds.pop(port_alloc.InstanceID, None)
+
+        bandwidth = self._get_default_setting_data(
+            self._PORT_BANDWIDTH_SET_DATA)
+        bandwidth.Reservation = min_bps
+        bandwidth.Limit = max_bps
+        bandwidth.BurstLimit = max_burst_bps
+        bandwidth.BurstSize = max_burst_sz
+
+        try:
+            self._jobutils.add_virt_feature(bandwidth, port_alloc)
+        except Exception as ex:
+            if '0x80070057' in ex.message:
+                raise exceptions.InvalidParameterValue(
+                    param_name="qos_rule", param_value=qos_rule)
+            raise exceptions.HyperVException(
+                _LE('Unable to set qos rule %(qos_rule)s for port %(port)s. '
+                    'Error: %(error)s') %
+                dict(qos_rule=qos_rule, port=port_alloc, error=ex))
+
+    def remove_port_qos_rule(self, port_id):
+        """Removes the QoS rule from the given port.
+
+        :param port_id: the port's ID from which the QoS rule will be removed.
+        """
+        port_alloc = self._get_switch_port_allocation(port_id)[0]
+        bandwidth = self._get_bandwidth_setting_data_from_port_alloc(
+            port_alloc)
+        if bandwidth:
+            self._jobutils.remove_virt_feature(bandwidth)
+            # remove from cache.
+            self._bandwidth_sds.pop(port_alloc.InstanceID, None)
 
 
 class NetworkUtilsR2(NetworkUtils):
