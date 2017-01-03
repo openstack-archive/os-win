@@ -25,6 +25,7 @@ from eventlet import patcher
 from eventlet import tpool
 
 from os_win._i18n import _
+from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
@@ -46,7 +47,6 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _PORT_EXT_ACL_SET_DATA = _PORT_ALLOC_ACL_SET_DATA
     _LAN_ENDPOINT = 'Msvm_LANEndpoint'
     _STATE_DISABLED = 3
-    _OPERATION_MODE_ACCESS = 1
 
     _VIRTUAL_SYSTEM_SETTING_DATA = 'Msvm_VirtualSystemSettingData'
     _VM_SUMMARY_ENABLED_STATE = 100
@@ -299,28 +299,60 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         self._vlan_sds.pop(sw_port.InstanceID, None)
         self._vsid_sds.pop(sw_port.InstanceID, None)
 
-    def set_vswitch_port_vlan_id(self, vlan_id, switch_port_name):
+    def set_vswitch_port_vlan_id(self, vlan_id=None, switch_port_name=None,
+                                 **kwargs):
+        """Sets up operation mode, VLAN ID and VLAN trunk for the given port.
+
+        :param vlan_id: the VLAN ID to be set for the given switch port.
+        :param switch_port_name: the ElementName of the vSwitch port.
+        :param operation_mode: the VLAN operation mode. The acceptable values
+            are:
+            os_win.constants.VLAN_MODE_ACCESS, os_win.constants.VLAN_TRUNK_MODE
+            If not given, VLAN_MODE_ACCESS is used by default.
+        :param trunk_vlans: an array of VLAN IDs to be set in trunk mode.
+        :raises AttributeError: if an unsupported operation_mode is given, or
+            the given operation mode is VLAN_MODE_ACCESS and the given
+            trunk_vlans is not None.
+        """
+
+        operation_mode = kwargs.get('operation_mode',
+                                    constants.VLAN_MODE_ACCESS)
+        trunk_vlans = kwargs.get('trunk_vlans')
+
+        if operation_mode not in [constants.VLAN_MODE_ACCESS,
+                                  constants.VLAN_MODE_TRUNK]:
+            msg = _('Unsupported VLAN operation mode: %s')
+            raise AttributeError(msg % operation_mode)
+
+        if (operation_mode == constants.VLAN_MODE_ACCESS and
+                trunk_vlans is not None):
+            raise AttributeError(_('The given operation mode is ACCESS, '
+                                   'cannot set given trunk_vlans.'))
+
         port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
-
         vlan_settings = self._get_vlan_setting_data_from_port_alloc(port_alloc)
-        if vlan_settings:
-            if (vlan_settings.OperationMode == self._OPERATION_MODE_ACCESS and
-                    vlan_settings.AccessVlanId == vlan_id):
-                # VLAN already set to corect value, no need to change it.
-                return
 
+        if operation_mode == constants.VLAN_MODE_ACCESS:
+            new_vlan_settings = self._prepare_vlan_sd_access_mode(
+                vlan_settings, vlan_id)
+        else:
+            new_vlan_settings = self._prepare_vlan_sd_trunk_mode(
+                vlan_settings, vlan_id, trunk_vlans)
+
+        if not new_vlan_settings:
+            # if no object was returned, it means that the VLAN Setting Data
+            # was already added with the desired attributes.
+            return
+
+        if vlan_settings:
             # Removing the feature because it cannot be modified
             # due to a wmi exception.
             self._jobutils.remove_virt_feature(vlan_settings)
 
-            # remove from cache.
-            self._vlan_sds.pop(port_alloc.InstanceID, None)
+        # remove from cache.
+        self._vlan_sds.pop(port_alloc.InstanceID, None)
 
-        vlan_settings = self._create_default_setting_data(
-            self._PORT_VLAN_SET_DATA)
-        vlan_settings.AccessVlanId = vlan_id
-        vlan_settings.OperationMode = self._OPERATION_MODE_ACCESS
-        self._jobutils.add_virt_feature(vlan_settings, port_alloc)
+        self._jobutils.add_virt_feature(new_vlan_settings, port_alloc)
 
         # TODO(claudiub): This will help solve the missing VLAN issue, but it
         # comes with a performance cost. The root cause of the problem must
@@ -329,6 +361,42 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if not vlan_settings:
             raise exceptions.HyperVException(
                 _('Port VLAN not found: %s') % switch_port_name)
+
+    def _prepare_vlan_sd_access_mode(self, vlan_settings, vlan_id):
+        if vlan_settings:
+            # the given vlan_id might be None.
+            vlan_id = vlan_id or vlan_settings.AccessVlanId
+            if (vlan_settings.OperationMode == constants.VLAN_MODE_ACCESS and
+                    vlan_settings.AccessVlanId == vlan_id):
+                # VLAN already set to correct value, no need to change it.
+                return None
+
+        vlan_settings = self._create_default_setting_data(
+            self._PORT_VLAN_SET_DATA)
+        vlan_settings.AccessVlanId = vlan_id
+        vlan_settings.OperationMode = constants.VLAN_MODE_ACCESS
+
+        return vlan_settings
+
+    def _prepare_vlan_sd_trunk_mode(self, vlan_settings, vlan_id, trunk_vlans):
+        if vlan_settings:
+            # the given vlan_id might be None.
+            vlan_id = vlan_id or vlan_settings.NativeVlanId
+            trunk_vlans = trunk_vlans or vlan_settings.TrunkVlanIdArray or []
+            trunk_vlans = sorted(trunk_vlans)
+            if (vlan_settings.OperationMode == constants.VLAN_MODE_TRUNK and
+                    vlan_settings.NativeVlanId == vlan_id and
+                    sorted(vlan_settings.TrunkVlanIdArray) == trunk_vlans):
+                # VLAN already set to correct value, no need to change it.
+                return None
+
+        vlan_settings = self._create_default_setting_data(
+            self._PORT_VLAN_SET_DATA)
+        vlan_settings.NativeVlanId = vlan_id
+        vlan_settings.TrunkVlanIdArray = trunk_vlans
+        vlan_settings.OperationMode = constants.VLAN_MODE_TRUNK
+
+        return vlan_settings
 
     def set_vswitch_port_vsid(self, vsid, switch_port_name):
         port_alloc = self._get_switch_port_allocation(switch_port_name)[0]

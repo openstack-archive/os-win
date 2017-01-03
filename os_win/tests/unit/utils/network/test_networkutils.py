@@ -14,6 +14,7 @@
 
 import mock
 
+from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils import _wqlutils
@@ -282,9 +283,25 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
                           self.netutils._get_vswitch,
                           self._FAKE_VSWITCH_NAME)
 
+    def test_set_vswitch_port_vlan_id_invalid_mode(self):
+        self.assertRaises(
+            AttributeError, self.netutils.set_vswitch_port_vlan_id,
+            mock.sentinel.vlan_id, mock.sentinel.switch_port_name,
+            operation_mode=mock.sentinel.invalid_mode)
+
+    def test_set_vswitch_port_vlan_id_access_mode_trunked(self):
+        self.assertRaises(
+            AttributeError, self.netutils.set_vswitch_port_vlan_id,
+            mock.sentinel.vlan_id, mock.sentinel.switch_port_name,
+            trunk_vlans=[mock.sentinel.vlan_id])
+
     @mock.patch.object(networkutils.NetworkUtils,
-                       '_create_default_setting_data')
-    def _check_set_vswitch_port_vlan_id(self, mock_create_default_sd,
+                       '_prepare_vlan_sd_trunk_mode')
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_prepare_vlan_sd_access_mode')
+    def _check_set_vswitch_port_vlan_id(self, mock_prepare_vlan_sd_access,
+                                        mock_prepare_vlan_sd_trunk,
+                                        op_mode=constants.VLAN_MODE_ACCESS,
                                         missing_vlan=False):
         mock_port = self._mock_get_switch_port_alloc(found=True)
         old_vlan_settings = mock.MagicMock()
@@ -295,42 +312,97 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.netutils._get_vlan_setting_data_from_port_alloc = mock.MagicMock(
             side_effect=side_effect)
         mock_vlan_settings = mock.MagicMock()
-        mock_create_default_sd.return_value = mock_vlan_settings
+        mock_prepare_vlan_sd_access.return_value = mock_vlan_settings
+        mock_prepare_vlan_sd_trunk.return_value = mock_vlan_settings
 
         if missing_vlan:
             self.assertRaises(exceptions.HyperVException,
                               self.netutils.set_vswitch_port_vlan_id,
-                              self._FAKE_VLAN_ID, self._FAKE_PORT_NAME)
+                              self._FAKE_VLAN_ID, self._FAKE_PORT_NAME,
+                              operation_mode=op_mode)
         else:
-            self.netutils.set_vswitch_port_vlan_id(self._FAKE_VLAN_ID,
-                                                   self._FAKE_PORT_NAME)
+            self.netutils.set_vswitch_port_vlan_id(
+                self._FAKE_VLAN_ID, self._FAKE_PORT_NAME,
+                operation_mode=op_mode)
+
+        if op_mode == constants.VLAN_MODE_ACCESS:
+            mock_prepare_vlan_sd_access.assert_called_once_with(
+                old_vlan_settings, self._FAKE_VLAN_ID)
+        else:
+            mock_prepare_vlan_sd_trunk.assert_called_once_with(
+                old_vlan_settings, self._FAKE_VLAN_ID, None)
 
         mock_remove_feature = self.netutils._jobutils.remove_virt_feature
         mock_remove_feature.assert_called_once_with(old_vlan_settings)
         mock_add_feature = self.netutils._jobutils.add_virt_feature
         mock_add_feature.assert_called_once_with(mock_vlan_settings, mock_port)
 
-    def test_set_vswitch_port_vlan_id(self):
+    def test_set_vswitch_port_vlan_id_access(self):
         self._check_set_vswitch_port_vlan_id()
+
+    def test_set_vswitch_port_vlan_id_trunk(self):
+        self._check_set_vswitch_port_vlan_id(op_mode=constants.VLAN_MODE_TRUNK)
 
     def test_set_vswitch_port_vlan_id_missing(self):
         self._check_set_vswitch_port_vlan_id(missing_vlan=True)
 
     @mock.patch.object(networkutils.NetworkUtils,
-                       '_get_vlan_setting_data_from_port_alloc')
-    def test_set_vswitch_port_vlan_id_already_set(self, mock_get_vlan_sd):
+                       '_prepare_vlan_sd_access_mode')
+    def test_set_vswitch_port_vlan_id_already_set(self, mock_prepare_vlan_sd):
         self._mock_get_switch_port_alloc()
-        mock_get_vlan_sd.return_value = mock.MagicMock(
-            AccessVlanId=mock.sentinel.vlan_id,
-            OperationMode=self.netutils._OPERATION_MODE_ACCESS)
+        mock_prepare_vlan_sd.return_value = None
 
         self.netutils.set_vswitch_port_vlan_id(mock.sentinel.vlan_id,
                                                mock.sentinel.port_name)
 
         mock_remove_feature = self.netutils._jobutils.remove_virt_feature
         self.assertFalse(mock_remove_feature.called)
-        mock_add_feature = self.netutils._jobutils.add_virt_feature
-        self.assertFalse(mock_add_feature.called)
+
+    def test_prepare_vlan_sd_access_mode_already_set(self):
+        mock_vlan_sd = mock.MagicMock(OperationMode=constants.VLAN_MODE_ACCESS,
+                                      AccessVlanId=mock.sentinel.vlan_id)
+
+        actual_vlan_sd = self.netutils._prepare_vlan_sd_access_mode(
+            mock_vlan_sd, mock.sentinel.vlan_id)
+        self.assertIsNone(actual_vlan_sd)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_prepare_vlan_sd_access_mode(self, mock_create_default_sd):
+        mock_vlan_sd = mock_create_default_sd.return_value
+        actual_vlan_sd = self.netutils._prepare_vlan_sd_access_mode(
+            None, mock.sentinel.vlan_id)
+
+        self.assertEqual(mock_vlan_sd, actual_vlan_sd)
+        self.assertEqual(mock.sentinel.vlan_id, mock_vlan_sd.AccessVlanId)
+        self.assertEqual(constants.VLAN_MODE_ACCESS,
+                         mock_vlan_sd.OperationMode)
+        mock_create_default_sd.assert_called_once_with(
+            self.netutils._PORT_VLAN_SET_DATA)
+
+    def test_prepare_vlan_sd_trunk_mode_already_set(self):
+        mock_vlan_sd = mock.MagicMock(OperationMode=constants.VLAN_MODE_TRUNK,
+                                      NativeVlanId=mock.sentinel.vlan_id,
+                                      TrunkVlanIdArray=[100, 99])
+
+        actual_vlan_sd = self.netutils._prepare_vlan_sd_trunk_mode(
+            mock_vlan_sd, None, [99, 100])
+        self.assertIsNone(actual_vlan_sd)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_prepare_vlan_sd_trunk_mode(self, mock_create_default_sd):
+        mock_vlan_sd = mock_create_default_sd.return_value
+        actual_vlan_sd = self.netutils._prepare_vlan_sd_trunk_mode(
+            None, mock.sentinel.vlan_id, mock.sentinel.trunk_vlans)
+
+        self.assertEqual(mock_vlan_sd, actual_vlan_sd)
+        self.assertEqual(mock.sentinel.vlan_id, mock_vlan_sd.NativeVlanId)
+        self.assertEqual(mock.sentinel.trunk_vlans,
+                         mock_vlan_sd.TrunkVlanIdArray)
+        self.assertEqual(constants.VLAN_MODE_TRUNK, mock_vlan_sd.OperationMode)
+        mock_create_default_sd.assert_called_once_with(
+            self.netutils._PORT_VLAN_SET_DATA)
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_get_security_setting_data_from_port_alloc')
