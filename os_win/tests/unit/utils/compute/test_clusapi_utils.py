@@ -266,4 +266,4 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.group_handle)
         expected_state_info = dict(state=mock.sentinel.group_state,
                                    owner_node=owner_node)
-        self.assertDictEqual(expected_state_info, state_info)
+        self.assertEqual(expected_state_info, state_info)

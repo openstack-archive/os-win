@@ -125,7 +125,7 @@ class DNSUtilsTestCase(test_base.OsWinBaseTestCase):
             'master_servers': [mock.sentinel.ip_addrs],
             'data_file_name': mock.sentinel.data_file_name
         }
-        self.assertDictEqual(expected_zone_props, zone_properties)
+        self.assertEqual(expected_zone_props, zone_properties)
         mock_get_zone.assert_called_once_with(mock.sentinel.zone_name,
                                               ignore_missing=False)
 
