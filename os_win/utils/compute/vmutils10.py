@@ -76,6 +76,21 @@ class VMUtils10(vmutils.VMUtils):
             self._sec_svc_attr = self._conn.Msvm_SecurityService()[0]
         return self._sec_svc_attr
 
+    def set_nested_virtualization(self, vm_name, state):
+        """Enables nested virtualization for the given VM.
+
+        :param vm_name: the name of the VM.
+        :param state: boolean, if True, nested virtualization will be enabled,
+            disabled otherwise.
+        """
+        vmsettings = self._lookup_vm_check(vm_name)
+        procsettings = _wqlutils.get_element_associated_class(
+            self._conn, self._PROCESSOR_SETTING_DATA_CLASS,
+            element_instance_id=vmsettings.InstanceID)[0]
+
+        procsettings.ExposeVirtualizationExtensions = state
+        self._jobutils.modify_virt_resource(procsettings)
+
     def vm_gen_supports_remotefx(self, vm_gen):
         """RemoteFX is supported on both generation 1 and 2 virtual
 

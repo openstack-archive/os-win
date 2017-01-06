@@ -54,3 +54,11 @@ class HostUtils10(hostutils.HostUtils):
                         return_code)
             return False
         return host_config.IsHostGuarded
+
+    def supports_nested_virtualization(self):
+        """Checks if the host supports nested virtualization.
+
+        :returns: True, Windows / Hyper-V Server 2016 or newer supports nested
+            virtualization.
+        """
+        return True

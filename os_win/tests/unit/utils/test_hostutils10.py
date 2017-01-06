@@ -65,3 +65,6 @@ class HostUtils10TestCase(test_base.OsWinBaseTestCase):
 
     def test_is_not_guarded_host(self):
         self._test_is_host_guarded(is_host_guarded=False)
+
+    def test_supports_nested_virtualization(self):
+        self.assertTrue(self._hostutils.supports_nested_virtualization())

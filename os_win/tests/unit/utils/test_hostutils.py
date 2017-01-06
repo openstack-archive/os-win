@@ -293,3 +293,6 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_verify_host_remotefx_capability(self):
         self._set_verify_host_remotefx_capability_mocks()
         self._hostutils.verify_host_remotefx_capability()
+
+    def test_supports_nested_virtualization(self):
+        self.assertFalse(self._hostutils.supports_nested_virtualization())

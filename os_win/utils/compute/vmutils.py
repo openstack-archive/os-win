@@ -270,6 +270,15 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         self._jobutils.modify_virt_resource(procsetting)
 
+    def set_nested_virtualization(self, vm_name, state):
+        """Enables nested virtualization for the given VM.
+
+        :raises NotImplemented: Nested virtualization is supported on
+            Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('Nested virtualization is supported on '
+                                    'Windows / Hyper-V Server 2016 or newer.'))
+
     def update_vm(self, vm_name, memory_mb, memory_per_numa_node, vcpus_num,
                   vcpus_per_numa_node, limit_cpu_features, dynamic_mem_ratio,
                   configuration_root_dir=None, snapshot_dir=None,
