@@ -13,10 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ddt
-
-import mock
 import platform
+
+import ddt
+import mock
 
 from os_win import exceptions
 from os_win.tests.unit import test_base

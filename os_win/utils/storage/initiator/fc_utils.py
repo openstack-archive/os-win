@@ -15,11 +15,11 @@
 
 import contextlib
 import ctypes
-import six
 import sys
 import textwrap
 
 from oslo_log import log as logging
+import six
 
 from os_win._i18n import _, _LW
 from os_win import _utils

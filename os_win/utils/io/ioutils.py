@@ -15,13 +15,13 @@
 
 import ctypes
 import os
-import six
 import struct
 import sys
 
 from eventlet import patcher
 from oslo_log import log as logging
 from oslo_utils import units
+import six
 
 from os_win import _utils
 from os_win import constants
