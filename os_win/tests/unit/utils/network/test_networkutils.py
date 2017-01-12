@@ -64,6 +64,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.netutils._switches = {}
         self.netutils._switch_ports = {}
         self.netutils._vlan_sds = {}
+        self.netutils._profile_sds = {}
         self.netutils._vsid_sds = {}
         self.netutils._bandwidth_sds = {}
         conn = self.netutils._conn
@@ -77,6 +78,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_sd = mock.MagicMock(InstanceID=self._FAKE_INSTANCE_ID)
         mock_bad_sd = mock.MagicMock(InstanceID=self._FAKE_BAD_INSTANCE_ID)
+        conn.Msvm_EthernetSwitchPortProfileSettingData.return_value = [
+            mock_bad_sd, mock_sd]
         conn.Msvm_EthernetSwitchPortVlanSettingData.return_value = [
             mock_bad_sd, mock_sd]
         conn.Msvm_EthernetSwitchPortSecuritySettingData.return_value = [
@@ -90,6 +93,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
                          self.netutils._switches)
         self.assertEqual({mock.sentinel.port_name: mock_port},
                          self.netutils._switch_ports)
+        self.assertEqual([mock_sd], list(self.netutils._profile_sds.values()))
         self.assertEqual([mock_sd], list(self.netutils._vlan_sds.values()))
         self.assertEqual([mock_sd], list(self.netutils._vsid_sds.values()))
         self.assertEqual([mock_sd],
@@ -290,6 +294,71 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.HyperVException,
                           self.netutils._get_vswitch,
                           self._FAKE_VSWITCH_NAME)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_prepare_profile_sd')
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_profile_setting_data_from_port_alloc')
+    def _test_set_vswitch_port_profile_id(
+            self, mock_get_profile_setting_data_from_port_alloc,
+            mock_prepare_profile_sd, found, side_effect=None):
+        mock_port_profile = mock.MagicMock()
+        mock_new_port_profile = mock.MagicMock()
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+
+        mock_add_feature = self.netutils._jobutils.add_virt_feature
+        mock_remove_feature = self.netutils._jobutils.remove_virt_feature
+
+        mock_get_profile_setting_data_from_port_alloc.return_value = (
+            mock_port_profile if found else None
+        )
+        mock_prepare_profile_sd.return_value = mock_new_port_profile
+        mock_add_feature.side_effect = side_effect
+
+        fake_params = {
+            "switch_port_name": self._FAKE_PORT_NAME,
+            "profile_id": mock.sentinel.profile_id,
+            "profile_data": mock.sentinel.profile_data,
+            "profile_name": mock.sentinel.profile_name,
+            "net_cfg_instance_id": None,
+            "cdn_label_id": None,
+            "cdn_label_string": None,
+            "vendor_id": None,
+            "vendor_name": mock.sentinel.vendor_name,
+        }
+
+        if side_effect:
+            self.assertRaises(
+                exceptions.HyperVException,
+                self.netutils.set_vswitch_port_profile_id,
+                **fake_params)
+        else:
+            self.netutils.set_vswitch_port_profile_id(**fake_params)
+
+        fake_params.pop("switch_port_name")
+        mock_prepare_profile_sd.assert_called_once_with(**fake_params)
+
+        if found:
+            mock_remove_feature.assert_called_once_with(mock_port_profile)
+            self.assertNotIn(self._FAKE_INSTANCE_ID,
+                             self.netutils._profile_sds)
+
+        mock_get_profile_setting_data_from_port_alloc.assert_called_with(
+            mock_port_alloc)
+
+        self.assertNotIn(mock_port_alloc, self.netutils._profile_sds)
+        mock_add_feature.assert_called_once_with(mock_new_port_profile,
+                                                 mock_port_alloc)
+
+    def test_set_vswitch_port_profile_id(self):
+        self._test_set_vswitch_port_profile_id(found=True)
+
+    def test_set_vswitch_port_profile_id_not_found(self):
+        self._test_set_vswitch_port_profile_id(found=False)
+
+    def test_set_vswitch_port_profile_id_failed(self):
+        self._test_set_vswitch_port_profile_id(found=False,
+                                               side_effect=Exception)
 
     def test_set_vswitch_port_vlan_id_invalid_mode(self):
         self.assertRaises(
@@ -498,6 +567,17 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.switch_port_name, mock.sentinel.state)
 
         self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_setting_data_from_port_alloc')
+    def test_get_profile_setting_data_from_port_alloc(self, mock_get_sd):
+        result = self.netutils._get_profile_setting_data_from_port_alloc(
+            mock.sentinel.port)
+
+        self.assertEqual(mock_get_sd.return_value, result)
+        mock_get_sd.assert_called_once_with(
+            mock.sentinel.port, self.netutils._profile_sds,
+            self.netutils._PORT_PROFILE_SET_DATA)
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_get_setting_data_from_port_alloc')
@@ -915,6 +995,47 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_remove_feature = self.netutils._jobutils.remove_virt_feature
         mock_remove_feature.assert_called_once_with(
             mock_bandwidth_settings)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_prepare_profile_sd(self, mock_create_default_sd):
+        mock_profile_sd = mock_create_default_sd.return_value
+
+        actual_profile_sd = self.netutils._prepare_profile_sd(
+            profile_id=mock.sentinel.profile_id,
+            profile_data=mock.sentinel.profile_data,
+            profile_name=mock.sentinel.profile_name,
+            net_cfg_instance_id=mock.sentinel.net_cfg_instance_id,
+            cdn_label_id=mock.sentinel.cdn_label_id,
+            cdn_label_string=mock.sentinel.cdn_label_string,
+            vendor_id=mock.sentinel.vendor_id,
+            vendor_name=mock.sentinel.vendor_name)
+
+        self.assertEqual(mock_profile_sd, actual_profile_sd)
+        self.assertEqual(mock.sentinel.profile_id,
+                         mock_profile_sd.ProfileId)
+        self.assertEqual(mock.sentinel.profile_data,
+                         mock_profile_sd.ProfileData)
+        self.assertEqual(mock.sentinel.profile_name,
+                         mock_profile_sd.ProfileName)
+        self.assertEqual(mock.sentinel.net_cfg_instance_id,
+                         mock_profile_sd.NetCfgInstanceId)
+        self.assertEqual(mock.sentinel.cdn_label_id,
+                         mock_profile_sd.CdnLabelId)
+        self.assertEqual(mock.sentinel.cdn_label_string,
+                         mock_profile_sd.CdnLabelString)
+        self.assertEqual(mock.sentinel.vendor_id,
+                         mock_profile_sd.VendorId)
+        self.assertEqual(mock.sentinel.vendor_name,
+                         mock_profile_sd.VendorName)
+        mock_create_default_sd.assert_called_once_with(
+            self.netutils._PORT_PROFILE_SET_DATA)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_create_default_setting_data')
+    def test_prepare_profile_sd_failed(self, mock_create_default_sd):
+        self.assertRaises(TypeError, self.netutils._prepare_profile_sd,
+                          invalid_argument=mock.sentinel.invalid_argument)
 
 
 class TestNetworkUtilsR2(test_base.OsWinBaseTestCase):

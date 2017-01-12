@@ -32,6 +32,17 @@ from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
 
+_PORT_PROFILE_ATTR_MAP = {
+    "profile_id": "ProfileId",
+    "profile_data": "ProfileData",
+    "profile_name": "ProfileName",
+    "net_cfg_instance_id": "NetCfgInstanceId",
+    "cdn_label_id": "CdnLabelId",
+    "cdn_label_string": "CdnLabelString",
+    "vendor_id": "VendorId",
+    "vendor_name": "VendorName",
+}
+
 
 class NetworkUtils(baseutils.BaseUtilsVirt):
 
@@ -43,6 +54,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _ETHERNET_SWITCH_PORT = 'Msvm_EthernetSwitchPort'
     _PORT_ALLOC_SET_DATA = 'Msvm_EthernetPortAllocationSettingData'
     _PORT_VLAN_SET_DATA = 'Msvm_EthernetSwitchPortVlanSettingData'
+    _PORT_PROFILE_SET_DATA = 'Msvm_EthernetSwitchPortProfileSettingData'
     _PORT_SECURITY_SET_DATA = 'Msvm_EthernetSwitchPortSecuritySettingData'
     _PORT_ALLOC_ACL_SET_DATA = 'Msvm_EthernetSwitchPortAclSettingData'
     _PORT_BANDWIDTH_SET_DATA = 'Msvm_EthernetSwitchPortBandwidthSettingData'
@@ -84,6 +96,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _switches = {}
     _switch_ports = {}
     _vlan_sds = {}
+    _profile_sds = {}
     _vsid_sds = {}
     _sg_acl_sds = {}
     _bandwidth_sds = {}
@@ -105,6 +118,13 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         switch_port_id_regex = re.compile(
             "Microsoft:[0-9A-F-]*\\\\[0-9A-F-]*\\\\[0-9A-F-]",
             flags=re.IGNORECASE)
+
+        # map between switch port's InstanceID and their Port Profile settings
+        # data WMI objects.
+        for profile in self._conn.Msvm_EthernetSwitchPortProfileSettingData():
+            match = switch_port_id_regex.match(profile.InstanceID)
+            if match:
+                self._profile_sds[match.group()] = profile
 
         # map between switch port's InstanceID and their VLAN setting data WMI
         # objects.
@@ -307,9 +327,50 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 pass
 
         self._switch_ports.pop(switch_port_name, None)
+        self._profile_sds.pop(sw_port.InstanceID, None)
         self._vlan_sds.pop(sw_port.InstanceID, None)
         self._vsid_sds.pop(sw_port.InstanceID, None)
         self._bandwidth_sds.pop(sw_port.InstanceID, None)
+
+    def set_vswitch_port_profile_id(self, switch_port_name, profile_id,
+                                    profile_data, profile_name, vendor_name,
+                                    **kwargs):
+        """Sets up the port profile id.
+
+        :param switch_port_name: The ElementName of the vSwitch port.
+        :param profile_id: The profile id to be set for the given switch port.
+        :param profile_data: Additional data for the Port Profile.
+        :param profile_name: The name of the Port Profile.
+        :param net_cfg_instance_id: Unique device identifier of the
+            sub-interface.
+        :param cdn_label_id: The CDN Label Id.
+        :param cdn_label_string: The CDN label string.
+        :param vendor_id: The id of the Vendor defining the profile.
+        :param vendor_name: The name of the Vendor defining the profile.
+        """
+        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
+        port_profile = self._get_profile_setting_data_from_port_alloc(
+            port_alloc)
+
+        new_port_profile = self._prepare_profile_sd(
+            profile_id=profile_id, profile_data=profile_data,
+            profile_name=profile_name, vendor_name=vendor_name, **kwargs)
+
+        if port_profile:
+            # Removing the feature because it cannot be modified
+            # due to a wmi exception.
+            self._jobutils.remove_virt_feature(port_profile)
+
+            # remove from cache.
+            self._profile_sds.pop(port_alloc.InstanceID, None)
+
+        try:
+            self._jobutils.add_virt_feature(new_port_profile, port_alloc)
+        except Exception as ex:
+            raise exceptions.HyperVException(
+                _LE('Unable to set port profile settings %(port_profile)s '
+                    'for port %(port)s. Error: %(error)s') %
+                dict(port_profile=new_port_profile, port=port_alloc, error=ex))
 
     def set_vswitch_port_vlan_id(self, vlan_id=None, switch_port_name=None,
                                  **kwargs):
@@ -373,6 +434,21 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if not vlan_settings:
             raise exceptions.HyperVException(
                 _('Port VLAN not found: %s') % switch_port_name)
+
+    def _prepare_profile_sd(self, **kwargs):
+        profile_id_settings = self._create_default_setting_data(
+            self._PORT_PROFILE_SET_DATA)
+
+        for argument_name, attr_name in _PORT_PROFILE_ATTR_MAP.items():
+            attribute = kwargs.pop(argument_name, None)
+            if attribute is None:
+                continue
+            setattr(profile_id_settings, attr_name, attribute)
+
+        if kwargs:
+            raise TypeError("Unrecognized attributes %r" % kwargs)
+
+        return profile_id_settings
 
     def _prepare_vlan_sd_access_mode(self, vlan_settings, vlan_id):
         if vlan_settings:
@@ -454,6 +530,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if not sec_settings:
             raise exceptions.HyperVException(
                 _('Port Security Settings not found: %s') % switch_port_name)
+
+    def _get_profile_setting_data_from_port_alloc(self, port_alloc):
+        return self._get_setting_data_from_port_alloc(
+            port_alloc, self._profile_sds, self._PORT_PROFILE_SET_DATA)
 
     def _get_vlan_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(
