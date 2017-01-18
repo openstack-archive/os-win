@@ -444,7 +444,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_ensure_lun_available.assert_called_once_with(
             mock.sentinel.target_name, mock.sentinel.lun,
-            retry_attempts=10, retry_interval=0.1, rescan_disks=False)
+            rescan_attempts=10, retry_interval=0.1, rescan_disks=False)
 
         self.assertEqual(mock.sentinel.dev_num, dev_num)
         self.assertEqual(mock.sentinel.dev_path, dev_path)
@@ -760,7 +760,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         dev_num, dev_path = self._initiator.ensure_lun_available(
             mock.sentinel.target_iqn,
             mock.sentinel.target_lun,
-            retry_attempts=retry_count,
+            rescan_attempts=retry_count,
             retry_interval=retry_interval,
             rescan_disks=rescan_disks)
 

@@ -253,7 +253,7 @@ class ISCSIInitiatorUtils(object):
             # fail to locate it, in which case some retries will be performed.
             (device_number,
              device_path) = self.ensure_lun_available(target_name, target_lun,
-                                                      retry_attempts=10,
+                                                      rescan_attempts=10,
                                                       retry_interval=0.1,
                                                       rescan_disks=False)
         except exceptions.ISCSILunNotAvailable:
@@ -397,12 +397,12 @@ class ISCSIInitiatorUtils(object):
             self.ensure_lun_available(target_iqn, target_lun, rescan_attempts)
 
     def ensure_lun_available(self, target_iqn, target_lun,
-                             retry_attempts=_DEFAULT_RESCAN_ATTEMPTS,
+                             rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS,
                              retry_interval=0,
                              rescan_disks=True):
         # This method should be called only after the iSCSI
         # target has already been logged in.
-        for attempt in range(retry_attempts + 1):
+        for attempt in range(rescan_attempts + 1):
             sessions = self._get_iscsi_target_sessions(target_iqn)
             for session in sessions:
                 try:
@@ -424,7 +424,7 @@ class ISCSIInitiatorUtils(object):
                                   dict(target_lun=target_lun,
                                        target_iqn=target_iqn))
                     continue
-            if attempt <= retry_attempts:
+            if attempt <= rescan_attempts:
                 if retry_interval:
                     time.sleep(retry_interval)
                 if rescan_disks:
