@@ -287,3 +287,14 @@ class HostUtils(baseutils.BaseUtilsVirt):
             nested virtualization.
         """
         return False
+
+    def get_pci_passthrough_devices(self):
+        """Get host PCI devices path.
+
+        Discrete device assignment is supported only on Windows / Hyper-V
+        Server 2016 or newer.
+
+        :returns: a list of the assignable PCI devices.
+        """
+
+        return []

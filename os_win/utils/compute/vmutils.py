@@ -1126,3 +1126,21 @@ class VMUtils(baseutils.BaseUtilsVirt):
         return (
             self._VIRTUAL_SYSTEM_TYPE_PLANNED if is_planned_vm
             else self._VIRTUAL_SYSTEM_TYPE_REALIZED)
+
+    def add_pci_device(self, vm_name, vendor_id, product_id):
+        """Adds the given PCI device to the given VM.
+
+        :raises NotImplemented: PCI passthrough is supported on
+            Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('PCI passthrough is supported on '
+                                    'Windows / Hyper-V Server 2016 or newer.'))
+
+    def remove_pci_device(self, vm_name, vendor_id, product_id):
+        """Removes the given PCI device from the given VM.
+
+        :raises NotImplemented: PCI passthrough is supported on
+            Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('PCI passthrough is supported on '
+                                    'Windows / Hyper-V Server 2016 or newer.'))

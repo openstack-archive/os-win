@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ddt
 import mock
 
 from os_win import constants
@@ -21,8 +22,13 @@ from os_win.utils import _wqlutils
 from os_win.utils.compute import vmutils10
 
 
+@ddt.ddt
 class VMUtils10TestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V VMUtils10 class."""
+
+    _FAKE_PCI_ID = 'Microsoft:ED28B-7BDD0\\PCIP\\VEN_15B3&DEV_1007&SUBSYS_00'
+    _FAKE_VENDOR_ID = '15B3'
+    _FAKE_PRODUCT_ID = '1007'
 
     def setUp(self):
         super(VMUtils10TestCase, self).setUp()
@@ -245,3 +251,71 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
 
     def test_not_secure_vm(self):
         self._test_secure_vm(is_encrypted_vm=False)
+
+    @mock.patch.object(vmutils10.VMUtils10, '_get_assignable_pci_device')
+    @mock.patch.object(vmutils10.VMUtils10, '_get_new_setting_data')
+    @mock.patch.object(vmutils10.VMUtils10, '_lookup_vm_check')
+    def test_add_pci_device(self, mock_lookup_vm_check,
+                            mock_get_new_setting_data,
+                            mock_get_pci_device):
+        vmsettings = mock_lookup_vm_check.return_value
+        pci_setting_data = mock_get_new_setting_data.return_value
+        pci_device = mock_get_pci_device.return_value
+
+        self._vmutils.add_pci_device(mock.sentinel.vm_name,
+                                     mock.sentinel.vendor_id,
+                                     mock.sentinel.product_id)
+
+        self.assertEqual(pci_setting_data.HostResource,
+                         [pci_device.path_.return_value])
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
+        mock_get_new_setting_data.assert_called_once_with(
+            self._vmutils._PCI_EXPRESS_SETTING_DATA)
+        mock_get_pci_device.assert_called_once_with(
+            mock.sentinel.vendor_id, mock.sentinel.product_id)
+        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+            pci_setting_data, vmsettings)
+
+    @ddt.data(True, False)
+    def test_get_assignable_pci_device_exception(self, matched):
+        product_id = self._FAKE_PRODUCT_ID if matched else '0000'
+        pci_dev = mock.MagicMock(DeviceID=self._FAKE_PCI_ID)
+        pci_devs = [pci_dev] * 2 if matched else [pci_dev]
+        self._vmutils._conn.Msvm_PciExpress.return_value = pci_devs
+
+        self.assertRaises(exceptions.PciDeviceNotFound,
+                          self._vmutils._get_assignable_pci_device,
+                          self._FAKE_VENDOR_ID, product_id)
+
+        self._vmutils._conn.Msvm_PciExpress.assert_called_once_with()
+
+    def test_get_assignable_pci_device(self):
+        pci_dev = mock.MagicMock(DeviceID=self._FAKE_PCI_ID)
+        self._vmutils._conn.Msvm_PciExpress.return_value = [pci_dev]
+
+        result = self._vmutils._get_assignable_pci_device(
+            self._FAKE_VENDOR_ID, self._FAKE_PRODUCT_ID)
+
+        self.assertEqual(pci_dev, result)
+        self._vmutils._conn.Msvm_PciExpress.assert_called_once_with()
+
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    @mock.patch.object(vmutils10.VMUtils10, '_lookup_vm_check')
+    def test_remove_pci_device(self, mock_lookup_vm_check,
+                               mock_get_element_associated_class):
+        vmsettings = mock_lookup_vm_check.return_value
+        pci_setting_data = mock.MagicMock(HostResource=(self._FAKE_PCI_ID, ))
+        bad_pci_setting_data = mock.MagicMock(HostResource=('', ))
+        mock_get_element_associated_class.return_value = [
+            bad_pci_setting_data, pci_setting_data]
+
+        self._vmutils.remove_pci_device(mock.sentinel.vm_name,
+                                        self._FAKE_VENDOR_ID,
+                                        self._FAKE_PRODUCT_ID)
+
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._conn, self._vmutils._PCI_EXPRESS_SETTING_DATA,
+            vmsettings.InstanceID)
+        self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
+            pci_setting_data)
