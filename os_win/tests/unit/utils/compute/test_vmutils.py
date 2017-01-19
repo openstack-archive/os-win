@@ -301,9 +301,12 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
+    @mock.patch.object(vmutils.VMUtils, '_set_vm_snapshot_type')
     @mock.patch.object(vmutils.VMUtils, '_lookup_vm_check')
-    def test_update_vm(self, mock_lookup_vm_check, mock_set_mem,
-                       mock_set_vcpus, mock_modify_virtual_system,
+    def test_update_vm(self, mock_lookup_vm_check,
+                       mock_set_vm_snap_type,
+                       mock_set_mem, mock_set_vcpus,
+                       mock_modify_virtual_system,
                        host_shutdown_action=None,
                        configuration_root_dir=None, vnuma_enabled=None):
         mock_vmsettings = mock_lookup_vm_check.return_value
@@ -313,7 +316,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
             host_shutdown_action=host_shutdown_action,
-            vnuma_enabled=vnuma_enabled)
+            vnuma_enabled=vnuma_enabled,
+            snapshot_type=mock.sentinel.snap_type)
 
         mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
         mock_set_mem.assert_called_once_with(
@@ -340,11 +344,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         if vnuma_enabled:
             self.assertEqual(vnuma_enabled, mock_vmsettings.VirtualNumaEnabled)
 
-        if configuration_root_dir or host_shutdown_action or vnuma_enabled:
-            mock_modify_virtual_system.assert_called_once_with(
-                mock_vmsettings)
-        else:
-            mock_modify_virtual_system.assert_not_called()
+        mock_set_vm_snap_type.assert_called_once_with(
+            mock_vmsettings, mock.sentinel.snap_type)
+
+        mock_modify_virtual_system.assert_called_once_with(
+            mock_vmsettings)
 
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_create_vm_obj')

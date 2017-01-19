@@ -287,6 +287,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                   vcpus_per_numa_node, limit_cpu_features, dynamic_mem_ratio,
                   configuration_root_dir=None, snapshot_dir=None,
                   host_shutdown_action=None, vnuma_enabled=None,
+                  snapshot_type=constants.VM_SNAPSHOT_TYPE_PROD_FALLBACK,
                   is_planned_vm=False):
         vmsetting = self._lookup_vm_check(vm_name)
 
@@ -308,11 +309,9 @@ class VMUtils(baseutils.BaseUtilsVirt):
         self._set_vm_vcpus(vmsetting, vcpus_num, vcpus_per_numa_node,
                            limit_cpu_features)
 
-        update_needed = (configuration_root_dir or host_shutdown_action or
-                         vnuma_enabled is not None)
+        self._set_vm_snapshot_type(vmsetting, snapshot_type)
 
-        if update_needed:
-            self._modify_virtual_system(vmsetting)
+        self._modify_virtual_system(vmsetting)
 
     def check_admin_permissions(self):
         if not self._compat_conn.Msvm_VirtualSystemManagementService():
@@ -1205,4 +1204,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
         There are no PCI devices attached to Windows / Hyper-V Server 2012 R2
         or older VMs.
         """
+
+    def _set_vm_snapshot_type(self, vmsettings, snapshot_type):
+        # Supported on Windows Server 2016 or newer.
         pass

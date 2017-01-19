@@ -288,3 +288,7 @@ class VMUtils10(vmutils.VMUtils):
 
         if pci_sds:
             self._jobutils.remove_multiple_virt_resources(pci_sds)
+
+    def _set_vm_snapshot_type(self, vmsettings, snapshot_type):
+        # We expect the caller to actually push the vmsettings update.
+        vmsettings.UserSnapshotType = snapshot_type

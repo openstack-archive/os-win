@@ -349,3 +349,12 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
             self._vmutils._jobutils.remove_multiple_virt_resources)
         mock_remove_multiple_virt_resource.assert_called_once_with(
             mock_get_element_associated_class.return_value)
+
+    def test_set_snapshot_type(self):
+        vmsettings = mock.Mock()
+
+        self._vmutils._set_vm_snapshot_type(
+            vmsettings, mock.sentinel.snapshot_type)
+
+        self.assertEqual(mock.sentinel.snapshot_type,
+                         vmsettings.UserSnapshotType)
