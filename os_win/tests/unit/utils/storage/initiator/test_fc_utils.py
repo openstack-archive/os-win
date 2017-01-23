@@ -14,6 +14,7 @@
 #    under the License.
 
 import ctypes
+
 import mock
 from oslotest import base
 import six

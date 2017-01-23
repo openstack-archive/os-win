@@ -14,18 +14,18 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import netaddr
-import six
 import time
 import types
 
 import eventlet
 from eventlet import tpool
+import netaddr
 from oslo_concurrency import lockutils
 from oslo_concurrency import processutils
 from oslo_log import log as logging
 from oslo_utils import excutils
 from oslo_utils import reflection
+import six
 
 from os_win._i18n import _LE
 

@@ -14,7 +14,6 @@
 #    under the License.
 
 import ddt
-
 import mock
 from six.moves import range  # noqa
 

@@ -13,10 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.import mock
 
+import os
+
 import mock
 from oslotest import base
-
-import os
 import six
 
 from os_win import constants

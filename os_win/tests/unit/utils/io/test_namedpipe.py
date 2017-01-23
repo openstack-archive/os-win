@@ -14,6 +14,7 @@
 #    under the License.
 
 import errno
+
 import mock
 from oslotest import base
 from six.moves import builtins

@@ -14,7 +14,6 @@
 #    under the License.
 
 import ddt
-
 import mock
 
 from os_win import constants
