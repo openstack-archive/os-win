@@ -92,6 +92,23 @@ class PathUtils(object):
                         'Exception: %(exc)s')
             raise IOError(err_msg % dict(src=src, dest=dest, exc=exc))
 
+    def copy_folder_files(self, src_dir, dest_dir):
+        """Copies the files of the given src_dir to dest_dir.
+
+        It will ignore any nested folders.
+
+        :param src_dir: Given folder from which to copy files.
+        :param dest_dir: Folder to which to copy files.
+        """
+
+        self.check_create_dir(dest_dir)
+
+        for fname in os.listdir(src_dir):
+            src = os.path.join(src_dir, fname)
+            # ignore subdirs.
+            if os.path.isfile(src):
+                self.copy(src, os.path.join(dest_dir, fname))
+
     def move_folder_files(self, src_dir, dest_dir):
         """Moves the files of the given src_dir to dest_dir.
 
