@@ -387,9 +387,7 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(mock_unique_result.return_value, result)
         conn_class = self.utils._conn.Msvm_VirtualSystemSettingData
-        conn_class.assert_called_once_with(
-            ElementName=mock.sentinel.vm_name,
-            VirtualSystemType=self.utils._VIRTUAL_SYSTEM_TYPE_REALIZED)
+        conn_class.assert_called_once_with(ElementName=mock.sentinel.vm_name)
         mock_unique_result.assert_called_once_with(conn_class.return_value,
                                                    mock.sentinel.vm_name)
 

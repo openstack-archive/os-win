@@ -64,7 +64,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     _DEFINE_SYSTEM = 'DefineSystem'
     _DESTROY_SYSTEM = 'DestroySystem'
     _DESTROY_SNAPSHOT = 'DestroySnapshot'
-    _SETTING_TYPE = 'VirtualSystemType'
     _VM_GEN = constants.VM_GEN_2
 
     _VIRTUAL_SYSTEM_TYPE_REALIZED = 'Microsoft:Hyper-V:System:Realized'
@@ -119,11 +118,15 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                           as_vssd=False)
 
     def test_lookup_vm_as_vssd(self):
+        vssd = mock.MagicMock()
+        expected_vssd = mock.MagicMock(
+            VirtualSystemType=self._vmutils._VIRTUAL_SYSTEM_TYPE_REALIZED)
+
         self._vmutils._conn.Msvm_VirtualSystemSettingData.return_value = [
-            mock.sentinel.fake_vssd]
+            vssd, expected_vssd]
 
         vssd = self._vmutils._lookup_vm_check(self._FAKE_VM_NAME)
-        self.assertEqual(mock.sentinel.fake_vssd, vssd)
+        self.assertEqual(expected_vssd, vssd)
 
     def test_set_vm_memory_static(self):
         self._test_set_vm_memory_dynamic(dynamic_memory_ratio=1.0)
@@ -218,40 +221,27 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
     @mock.patch.object(vmutils.VMUtils, '_lookup_vm_check')
-    @mock.patch.object(vmutils.VMUtils, '_get_virtual_system_type')
-    def test_get_vm_storage_paths(self, mock_get_virtual_system_type,
-                                  mock_lookup_vm_check, mock_get_vm_disks):
-        virtual_system_type = mock_get_virtual_system_type.return_value
+    def test_get_vm_storage_paths(self, mock_lookup_vm_check,
+                                  mock_get_vm_disks):
         mock_rasds = self._create_mock_disks()
         mock_get_vm_disks.return_value = ([mock_rasds[0]], [mock_rasds[1]])
 
-        storage = self._vmutils.get_vm_storage_paths(
-            self._FAKE_VM_NAME,
-            is_planned_vm=False)
+        storage = self._vmutils.get_vm_storage_paths(self._FAKE_VM_NAME)
         (disk_files, volume_drives) = storage
 
         self.assertEqual([self._FAKE_VHD_PATH], disk_files)
         self.assertEqual([self._FAKE_VOLUME_DRIVE_PATH], volume_drives)
-        mock_get_virtual_system_type.assert_called_once_with(False)
-        mock_lookup_vm_check.assert_called_once_with(
-            self._FAKE_VM_NAME, virtual_system_type=virtual_system_type)
+        mock_lookup_vm_check.assert_called_once_with(self._FAKE_VM_NAME)
 
     @mock.patch.object(vmutils.VMUtils, '_get_vm_disks')
-    @mock.patch.object(vmutils.VMUtils, '_get_virtual_system_type')
-    def test_get_vm_disks_by_instance_name(self,
-                                           mock_get_virtual_system_type,
-                                           mock_get_vm_disks):
-        virtual_system_type = mock_get_virtual_system_type.return_value
+    def test_get_vm_disks_by_instance_name(self, mock_get_vm_disks):
         self._lookup_vm()
         mock_get_vm_disks.return_value = mock.sentinel.vm_disks
 
-        vm_disks = self._vmutils.get_vm_disks(
-            self._FAKE_VM_NAME, is_planned_vm=False)
+        vm_disks = self._vmutils.get_vm_disks(self._FAKE_VM_NAME)
 
-        mock_get_virtual_system_type.assert_called_once_with(False)
         self._vmutils._lookup_vm_check.assert_called_once_with(
-            self._FAKE_VM_NAME,
-            virtual_system_type=virtual_system_type)
+            self._FAKE_VM_NAME)
         self.assertEqual(mock.sentinel.vm_disks, vm_disks)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
@@ -305,7 +295,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @ddt.data(
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
-        {'is_planned_vm': True},
         {'host_shutdown_action': mock.sentinel.shutdown_action},
         {})
     @ddt.unpack
@@ -313,26 +302,19 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     @mock.patch.object(vmutils.VMUtils, '_lookup_vm_check')
-    @mock.patch.object(vmutils.VMUtils, '_get_virtual_system_type')
-    def test_update_vm(self, mock_get_virtual_system_type,
-                       mock_lookup_vm_check, mock_set_mem, mock_set_vcpus,
-                       mock_modify_virtual_system,
+    def test_update_vm(self, mock_lookup_vm_check, mock_set_mem,
+                       mock_set_vcpus, mock_modify_virtual_system,
                        host_shutdown_action=None,
-                       configuration_root_dir=None,
-                       is_planned_vm=False):
+                       configuration_root_dir=None):
         mock_vmsettings = mock_lookup_vm_check.return_value
-        virtual_system_type = mock_get_virtual_system_type.return_value
         self._vmutils.update_vm(
             mock.sentinel.vm_name, mock.sentinel.memory_mb,
             mock.sentinel.memory_per_numa, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
-            host_shutdown_action=host_shutdown_action,
-            is_planned_vm=is_planned_vm)
+            host_shutdown_action=host_shutdown_action)
 
-        mock_get_virtual_system_type.assert_called_once_with(is_planned_vm)
-        mock_lookup_vm_check.assert_called_once_with(
-            mock.sentinel.vm_name, virtual_system_type=virtual_system_type)
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
         mock_set_mem.assert_called_once_with(
             mock_vmsettings, mock.sentinel.memory_mb,
             mock.sentinel.memory_per_numa, mock.sentinel.dynamic_mem_ratio)
@@ -378,13 +360,10 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(vmutils.VMUtils, '_set_vm_vcpus')
     @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
     def test_old_create_vm(self, mock_set_mem, mock_set_vcpus):
+        mock_vmsetting = self._lookup_vm()
         mock_svc = self._vmutils._vs_man_svc
         getattr(mock_svc, self._DEFINE_SYSTEM).return_value = (
             None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-
-        mock_vmsetting = mock.MagicMock()
-        self._vmutils._conn.Msvm_VirtualSystemSettingData.return_value = [
-            mock_vmsetting]
 
         self._vmutils.create_vm(self._FAKE_VM_NAME, self._FAKE_MEMORY_MB,
                                 self._FAKE_VCPUS_NUM, False,
@@ -600,11 +579,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_get_vm_disks.return_value = ([], [mock_phys_disk])
 
-        result = self._vmutils.get_vm_physical_disk_mapping(
-            self._FAKE_VM_NAME, is_planned_vm=False)
+        result = self._vmutils.get_vm_physical_disk_mapping(self._FAKE_VM_NAME)
         self.assertEqual(expected_mapping, result)
-        mock_get_vm_disks.assert_called_once_with(
-            self._FAKE_VM_NAME, is_planned_vm=False)
+        mock_get_vm_disks.assert_called_once_with(self._FAKE_VM_NAME)
 
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
     def test_set_disk_host_res(self, mock_get_wmi_obj):
@@ -1309,15 +1286,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
             disk_resource)
         self.assertEqual(disk_resource.HostResource, [mock.sentinel.new_path])
-
-    @ddt.data(True, False)
-    def test_get_virtual_system_type(self, is_planned_vm):
-        exp_result = (
-            self._vmutils._VIRTUAL_SYSTEM_TYPE_PLANNED if is_planned_vm
-            else self._vmutils._VIRTUAL_SYSTEM_TYPE_REALIZED)
-        actual_result = self._vmutils._get_virtual_system_type(
-            is_planned_vm=is_planned_vm)
-        self.assertEqual(exp_result, actual_result)
 
     def test_add_pci_device(self):
         self.assertRaises(NotImplementedError,

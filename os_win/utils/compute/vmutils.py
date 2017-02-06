@@ -42,6 +42,9 @@ from os_win.utils import pathutils
 
 LOG = logging.getLogger(__name__)
 
+# TODO(claudiub): remove the is_planned_vm argument from methods once it is not
+# used  anymore.
+
 
 class VMUtils(baseutils.BaseUtilsVirt):
 
@@ -191,21 +194,19 @@ class VMUtils(baseutils.BaseUtilsVirt):
         settings = self.get_vm_summary_info(vm_name)
         return settings['EnabledState']
 
-    def _lookup_vm_check(self, vm_name, as_vssd=True, for_update=False,
-                         virtual_system_type=_VIRTUAL_SYSTEM_TYPE_REALIZED):
-        vm = self._lookup_vm(vm_name, as_vssd, for_update,
-                             virtual_system_type)
+    def _lookup_vm_check(self, vm_name, as_vssd=True, for_update=False):
+        vm = self._lookup_vm(vm_name, as_vssd, for_update)
         if not vm:
             raise exceptions.HyperVVMNotFoundException(vm_name=vm_name)
         return vm
 
-    def _lookup_vm(self, vm_name, as_vssd=True, for_update=False,
-                   virtual_system_type=_VIRTUAL_SYSTEM_TYPE_REALIZED):
+    def _lookup_vm(self, vm_name, as_vssd=True, for_update=False):
         if as_vssd:
             conn = self._compat_conn if for_update else self._conn
-            vms = conn.Msvm_VirtualSystemSettingData(
-                ElementName=vm_name,
-                VirtualSystemType=virtual_system_type)
+            vms = conn.Msvm_VirtualSystemSettingData(ElementName=vm_name)
+            vms = [v for v in vms if
+                   v.VirtualSystemType in [self._VIRTUAL_SYSTEM_TYPE_PLANNED,
+                                           self._VIRTUAL_SYSTEM_TYPE_REALIZED]]
         else:
             vms = self._conn.Msvm_ComputerSystem(ElementName=vm_name)
         n = len(vms)
@@ -284,10 +285,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                   configuration_root_dir=None, snapshot_dir=None,
                   host_shutdown_action=None,
                   is_planned_vm=False):
-        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
-
-        vmsetting = self._lookup_vm_check(
-            vm_name, virtual_system_type=virtual_system_type)
+        vmsetting = self._lookup_vm_check(vm_name)
 
         if host_shutdown_action:
             vmsetting.AutomaticShutdownAction = host_shutdown_action
@@ -526,7 +524,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def get_vm_physical_disk_mapping(self, vm_name, is_planned_vm=False):
         mapping = {}
         physical_disks = (
-            self.get_vm_disks(vm_name, is_planned_vm=is_planned_vm)[1])
+            self.get_vm_disks(vm_name)[1])
         for diskdrive in physical_disks:
             mapping[diskdrive.ElementName] = dict(
                 resource_path=diskdrive.path_(),
@@ -636,10 +634,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
         return vmsettings.ConfigurationDataRoot
 
     def get_vm_storage_paths(self, vm_name, is_planned_vm=False):
-        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
-        vmsettings = self._lookup_vm_check(
-            vm_name,
-            virtual_system_type=virtual_system_type)
+        vmsettings = self._lookup_vm_check(vm_name)
         (disk_resources, volume_resources) = self._get_vm_disks(vmsettings)
 
         volume_drives = []
@@ -655,9 +650,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
         return (disk_files, volume_drives)
 
     def get_vm_disks(self, vm_name, is_planned_vm=False):
-        virtual_system_type = self._get_virtual_system_type(is_planned_vm)
-        vmsettings = self._lookup_vm_check(
-            vm_name, virtual_system_type=virtual_system_type)
+        vmsettings = self._lookup_vm_check(vm_name)
         return self._get_vm_disks(vmsettings)
 
     def _get_vm_disks(self, vmsettings):
@@ -1125,11 +1118,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
             disk_path=disk_path, is_physical=is_physical)
         disk_resource.HostResource = [new_disk_path]
         self._jobutils.modify_virt_resource(disk_resource)
-
-    def _get_virtual_system_type(self, is_planned_vm):
-        return (
-            self._VIRTUAL_SYSTEM_TYPE_PLANNED if is_planned_vm
-            else self._VIRTUAL_SYSTEM_TYPE_REALIZED)
 
     def add_pci_device(self, vm_name, vendor_id, product_id):
         """Adds the given PCI device to the given VM.
