@@ -270,8 +270,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
     def _get_vm_setting_data(self, vm_name):
         vssds = self._conn.Msvm_VirtualSystemSettingData(
-            ElementName=vm_name,
-            VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED)
+            ElementName=vm_name)
         return self._unique_result(vssds, vm_name)
 
     @staticmethod
