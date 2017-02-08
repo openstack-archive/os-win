@@ -305,7 +305,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @ddt.data(
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
-        {'snapshot_dir': mock.sentinel.snapshot_dir, 'is_planned_vm': True},
         {'is_planned_vm': True},
         {'host_shutdown_action': mock.sentinel.shutdown_action},
         {})
@@ -320,7 +319,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                        mock_modify_virtual_system,
                        host_shutdown_action=None,
                        configuration_root_dir=None,
-                       snapshot_dir=None, is_planned_vm=False):
+                       is_planned_vm=False):
         mock_vmsettings = mock_lookup_vm_check.return_value
         virtual_system_type = mock_get_virtual_system_type.return_value
         self._vmutils.update_vm(
@@ -328,7 +327,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.memory_per_numa, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
-            snapshot_dir,
             host_shutdown_action=host_shutdown_action,
             is_planned_vm=is_planned_vm)
 
@@ -341,7 +339,22 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_set_vcpus.assert_called_once_with(
             mock_vmsettings, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features)
-        if configuration_root_dir or snapshot_dir or host_shutdown_action:
+
+        if configuration_root_dir:
+            self.assertEqual(configuration_root_dir,
+                             mock_vmsettings.ConfigurationDataRoot)
+            self.assertEqual(configuration_root_dir,
+                             mock_vmsettings.LogDataRoot)
+            self.assertEqual(configuration_root_dir,
+                             mock_vmsettings.SnapshotDataRoot)
+            self.assertEqual(configuration_root_dir,
+                             mock_vmsettings.SuspendDataRoot)
+            self.assertEqual(configuration_root_dir,
+                             mock_vmsettings.SwapFileDataRoot)
+        if host_shutdown_action:
+            self.assertEqual(host_shutdown_action,
+                             mock_vmsettings.AutomaticShutdownAction)
+        if configuration_root_dir or host_shutdown_action:
             mock_modify_virtual_system.assert_called_once_with(
                 mock_vmsettings)
         else:
