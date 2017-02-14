@@ -282,3 +282,18 @@ class VMUtils10(vmutils.VMUtils):
                       "%(product_id)s is not attached to %(vm_name)s",
                       {'vendor_id': vendor_id, 'product_id': product_id,
                        'vm_name': vm_name})
+
+    def remove_all_pci_devices(self, vm_name):
+        """Removes all the PCI devices from the given VM.
+
+        :param vm_name: the name of the VM from which all the PCI devices will
+            be detached from.
+        """
+        vmsettings = self._lookup_vm_check(vm_name)
+
+        pci_sds = _wqlutils.get_element_associated_class(
+            self._conn, self._PCI_EXPRESS_SETTING_DATA,
+            vmsettings.InstanceID)
+
+        if pci_sds:
+            self._jobutils.remove_multiple_virt_resources(pci_sds)

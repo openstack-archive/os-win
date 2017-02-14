@@ -1298,3 +1298,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._vmutils.remove_pci_device,
                           mock.sentinel.vm_name, mock.sentinel.vendor_id,
                           mock.sentinel.product_id)
+
+    def test_remove_all_pci_devices(self):
+        self._vmutils.remove_all_pci_devices(mock.sentinel.vm_name)
