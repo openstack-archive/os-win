@@ -200,10 +200,13 @@ class JobUtils(baseutils.BaseUtilsVirt):
             ResourceSettings=[virt_resource.GetText_(1)])
         self.check_ret_val(ret_val, job_path)
 
-    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def remove_virt_resource(self, virt_resource):
+        self.remove_multiple_virt_resources([virt_resource])
+
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
+    def remove_multiple_virt_resources(self, virt_resources):
         (job, ret_val) = self._vs_man_svc.RemoveResourceSettings(
-            ResourceSettings=[virt_resource.path_()])
+            ResourceSettings=[r.path_() for r in virt_resources])
         self.check_ret_val(ret_val, job)
 
     def add_virt_feature(self, virt_feature, parent):

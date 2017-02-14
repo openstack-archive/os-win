@@ -1135,3 +1135,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
         """
         raise NotImplementedError(_('PCI passthrough is supported on '
                                     'Windows / Hyper-V Server 2016 or newer.'))
+
+    def remove_all_pci_devices(self, vm_name):
+        """Removes all the PCI devices from the given VM.
+
+        There are no PCI devices attached to Windows / Hyper-V Server 2012 R2
+        or older VMs.
+        """
+        pass

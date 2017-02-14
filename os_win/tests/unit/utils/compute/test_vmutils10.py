@@ -319,3 +319,20 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
             vmsettings.InstanceID)
         self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
             pci_setting_data)
+
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    @mock.patch.object(vmutils10.VMUtils10, '_lookup_vm_check')
+    def test_remove_all_pci_devices(self, mock_lookup_vm_check,
+                                    mock_get_element_associated_class):
+        vmsettings = mock_lookup_vm_check.return_value
+
+        self._vmutils.remove_all_pci_devices(mock.sentinel.vm_name)
+
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._conn, self._vmutils._PCI_EXPRESS_SETTING_DATA,
+            vmsettings.InstanceID)
+        mock_remove_multiple_virt_resource = (
+            self._vmutils._jobutils.remove_multiple_virt_resources)
+        mock_remove_multiple_virt_resource.assert_called_once_with(
+            mock_get_element_associated_class.return_value)
