@@ -14,6 +14,7 @@
 
 import ddt
 import mock
+import six
 
 from os_win import constants
 from os_win import exceptions
@@ -117,6 +118,18 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
                           self._vmutils._validate_remotefx_params,
                           1, constants.REMOTEFX_MAX_RES_1024x768,
                           vram_bytes=10000)
+
+    def test_validate_remotefx(self):
+        self._vmutils._validate_remotefx_params(
+            1, constants.REMOTEFX_MAX_RES_1024x768)
+
+    def test_set_remotefx_vram(self):
+        remotefx_ctrl_res = mock.MagicMock()
+        vram_bytes = 512
+
+        self._vmutils._set_remotefx_vram(remotefx_ctrl_res, vram_bytes)
+        self.assertEqual(six.text_type(vram_bytes),
+                         remotefx_ctrl_res.VRAMSizeBytes)
 
     @mock.patch.object(vmutils10.VMUtils10, 'get_vm_generation')
     def _test_vm_has_s3_controller(self, vm_gen, mock_get_vm_gen):

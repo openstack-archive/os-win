@@ -16,6 +16,7 @@
 import re
 
 from oslo_log import log as logging
+import six
 
 from os_win._i18n import _
 from os_win import constants
@@ -112,26 +113,16 @@ class VMUtils10(vmutils.VMUtils):
                                   vram_bytes=None):
         super(VMUtils10, self)._validate_remotefx_params(monitor_count,
                                                          max_resolution)
-        if vram_bytes not in self._remotefx_vram_vals:
+        if vram_bytes and vram_bytes not in self._remotefx_vram_vals:
             raise exceptions.HyperVRemoteFXException(
                 _("Unsuported RemoteFX VRAM value: %(requested_value)s."
                   "The supported VRAM values are: %(supported_values)s") %
                 {'requested_value': vram_bytes,
                  'supported_values': self._remotefx_vram_vals})
 
-    def _add_3d_display_controller(self, vm, monitor_count,
-                                   max_resolution, vram_bytes=None):
-        synth_3d_disp_ctrl_res = self._get_new_resource_setting_data(
-            self._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE,
-            self._SYNTH_3D_DISP_ALLOCATION_SETTING_DATA_CLASS)
-
-        synth_3d_disp_ctrl_res.MaximumMonitors = monitor_count
-        synth_3d_disp_ctrl_res.MaximumScreenResolution = max_resolution
-
+    def _set_remotefx_vram(self, remotefx_disp_ctrl_res, vram_bytes):
         if vram_bytes:
-            synth_3d_disp_ctrl_res.VRAMSizeBytes = unicode(vram_bytes)
-
-        self._jobutils.add_virt_resource(synth_3d_disp_ctrl_res, vm)
+            remotefx_disp_ctrl_res.VRAMSizeBytes = six.text_type(vram_bytes)
 
     def _vm_has_s3_controller(self, vm_name):
         return self.get_vm_generation(vm_name) == constants.VM_GEN_1

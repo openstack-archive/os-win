@@ -1210,12 +1210,51 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._vmutils._validate_remotefx_params,
                           1, '1024x700')
 
+    @ddt.data(True, False)
+    @mock.patch.object(vmutils.VMUtils, '_set_remotefx_vram')
+    @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
+    def test_set_remotefx_display_controller(self, new_obj, mock_get_new_rsd,
+                                             mock_set_remotefx_vram):
+        if new_obj:
+            remotefx_ctrl_res = None
+            expected_res = mock_get_new_rsd.return_value
+        else:
+            remotefx_ctrl_res = mock.MagicMock()
+            expected_res = remotefx_ctrl_res
+
+        self._vmutils._set_remotefx_display_controller(
+            mock.sentinel.fake_vm, remotefx_ctrl_res,
+            mock.sentinel.monitor_count, mock.sentinel.max_resolution,
+            mock.sentinel.vram_bytes)
+
+        self.assertEqual(mock.sentinel.monitor_count,
+                         expected_res.MaximumMonitors)
+        self.assertEqual(mock.sentinel.max_resolution,
+                         expected_res.MaximumScreenResolution)
+        mock_set_remotefx_vram.assert_called_once_with(
+            expected_res, mock.sentinel.vram_bytes)
+
+        if new_obj:
+            mock_get_new_rsd.assert_called_once_with(
+                self._vmutils._REMOTEFX_DISP_CTRL_RES_SUB_TYPE,
+                self._vmutils._REMOTEFX_DISP_ALLOCATION_SETTING_DATA_CLASS)
+            self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+                expected_res, mock.sentinel.fake_vm)
+        else:
+            self.assertFalse(mock_get_new_rsd.called)
+            modify_virt_res = self._vmutils._jobutils.modify_virt_resource
+            modify_virt_res.assert_called_once_with(expected_res)
+
+    def test_set_remotefx_vram(self):
+        self._vmutils._set_remotefx_vram(mock.sentinel.remotefx_ctrl_res,
+                                         mock.sentinel.vram_bytes)
+
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
-    @mock.patch.object(vmutils.VMUtils, '_add_3d_display_controller')
+    @mock.patch.object(vmutils.VMUtils, '_set_remotefx_display_controller')
     @mock.patch.object(vmutils.VMUtils, '_vm_has_s3_controller')
     def test_enable_remotefx_video_adapter(self,
                                            mock_vm_has_s3_controller,
-                                           mock_add_3d_ctrl,
+                                           mock_set_remotefx_ctrl,
                                            mock_get_element_associated_class):
         mock_vm = self._lookup_vm()
 
@@ -1235,12 +1274,12 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_element_associated_class.assert_called_once_with(
             self._vmutils._conn,
             self._vmutils._CIM_RES_ALLOC_SETTING_DATA_CLASS,
-            element_uuid=mock_vm.Name)
+            element_instance_id=mock_vm.InstanceID)
         self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
             mock_r1)
 
-        mock_add_3d_ctrl.assert_called_once_with(
-            mock_vm, self._FAKE_MONITOR_COUNT,
+        mock_set_remotefx_ctrl.assert_called_once_with(
+            mock_vm, None, self._FAKE_MONITOR_COUNT,
             self._vmutils._remote_fx_res_map[
                 constants.REMOTEFX_MAX_RES_1024x768],
             None)
@@ -1250,24 +1289,53 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(self._vmutils._DISP_CTRL_ADDRESS_DX_11,
                          mock_r2.Address)
 
+    @mock.patch.object(vmutils.VMUtils, '_vm_has_s3_controller')
+    @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
-    def test_enable_remotefx_video_adapter_already_configured(
-            self, mock_get_element_associated_class):
+    def test_disable_remotefx_video_adapter(self,
+                                            mock_get_element_associated_class,
+                                            mock_get_new_rsd,
+                                            mock_vm_has_s3_controller):
         mock_vm = self._lookup_vm()
+        mock_r1 = mock.MagicMock(
+            ResourceSubType=self._vmutils._REMOTEFX_DISP_CTRL_RES_SUB_TYPE)
+        mock_r2 = mock.MagicMock(
+            ResourceSubType=self._vmutils._S3_DISP_CTRL_RES_SUB_TYPE)
 
-        mock_r = mock.MagicMock()
-        mock_r.ResourceSubType = self._vmutils._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE
+        mock_get_element_associated_class.return_value = [mock_r1, mock_r2]
 
-        mock_get_element_associated_class.return_value = [mock_r]
+        self._vmutils.disable_remotefx_video_adapter(
+            mock.sentinel.fake_vm_name)
 
-        self.assertRaises(exceptions.HyperVRemoteFXException,
-                          self._vmutils.enable_remotefx_video_adapter,
-                          mock.sentinel.fake_vm_name, self._FAKE_MONITOR_COUNT,
-                          constants.REMOTEFX_MAX_RES_1024x768)
         mock_get_element_associated_class.assert_called_once_with(
             self._vmutils._conn,
             self._vmutils._CIM_RES_ALLOC_SETTING_DATA_CLASS,
-            element_uuid=mock_vm.Name)
+            element_instance_id=mock_vm.InstanceID)
+        self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
+            mock_r1)
+        mock_get_new_rsd.assert_called_once_with(
+            self._vmutils._SYNTH_DISP_CTRL_RES_SUB_TYPE,
+            self._vmutils._SYNTH_DISP_ALLOCATION_SETTING_DATA_CLASS)
+        self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
+            mock_get_new_rsd.return_value, mock_vm)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_r2)
+        self.assertEqual(self._vmutils._DISP_CTRL_ADDRESS, mock_r2.Address)
+
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_disable_remotefx_video_adapter_not_found(
+            self, mock_get_element_associated_class):
+        mock_vm = self._lookup_vm()
+        mock_get_element_associated_class.return_value = []
+
+        self._vmutils.disable_remotefx_video_adapter(
+            mock.sentinel.fake_vm_name)
+
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._conn,
+            self._vmutils._CIM_RES_ALLOC_SETTING_DATA_CLASS,
+            element_instance_id=mock_vm.InstanceID)
+        self.assertFalse(self._vmutils._jobutils.remove_virt_resource.called)
 
     @mock.patch.object(vmutils.VMUtils, 'get_vm_generation')
     def test_vm_has_s3_controller(self, mock_get_vm_generation):

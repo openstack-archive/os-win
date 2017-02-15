@@ -75,9 +75,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
     _S3_DISP_CTRL_RES_SUB_TYPE = 'Microsoft:Hyper-V:S3 Display Controller'
     _SYNTH_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic Display '
                                      'Controller')
-    _SYNTH_3D_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic 3D '
+    _REMOTEFX_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic 3D '
                                         'Display Controller')
-    _SYNTH_3D_DISP_ALLOCATION_SETTING_DATA_CLASS = (
+    _SYNTH_DISP_ALLOCATION_SETTING_DATA_CLASS = (
+        'Msvm_SyntheticDisplayControllerSettingData')
+    _REMOTEFX_DISP_ALLOCATION_SETTING_DATA_CLASS = (
         'Msvm_Synthetic3DDisplayControllerSettingData')
 
     _VIRTUAL_SYSTEM_SUBTYPE = 'VirtualSystemSubType'
@@ -112,6 +114,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
     }
 
     _DISP_CTRL_ADDRESS_DX_11 = "02C1,00000000,01"
+    _DISP_CTRL_ADDRESS = "5353,00000000,00"
 
     _vm_power_states_map = {constants.HYPERV_VM_STATE_ENABLED: 2,
                             constants.HYPERV_VM_STATE_DISABLED: 3,
@@ -1067,44 +1070,86 @@ class VMUtils(baseutils.BaseUtilsVirt):
                    'max_monitors':
                    self._remotefx_max_monitors_map[max_resolution]})
 
-    def _add_3d_display_controller(self, vm, monitor_count,
-                                   max_resolution, vram_bytes=None):
-        synth_3d_disp_ctrl_res = self._get_new_resource_setting_data(
-            self._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE,
-            self._SYNTH_3D_DISP_ALLOCATION_SETTING_DATA_CLASS)
+    def _set_remotefx_display_controller(self, vm, remotefx_disp_ctrl_res,
+                                         monitor_count, max_resolution,
+                                         vram_bytes=None):
+        new_wmi_obj = False
+        if not remotefx_disp_ctrl_res:
+            new_wmi_obj = True
+            remotefx_disp_ctrl_res = self._get_new_resource_setting_data(
+                self._REMOTEFX_DISP_CTRL_RES_SUB_TYPE,
+                self._REMOTEFX_DISP_ALLOCATION_SETTING_DATA_CLASS)
 
-        synth_3d_disp_ctrl_res.MaximumMonitors = monitor_count
-        synth_3d_disp_ctrl_res.MaximumScreenResolution = max_resolution
+        remotefx_disp_ctrl_res.MaximumMonitors = monitor_count
+        remotefx_disp_ctrl_res.MaximumScreenResolution = max_resolution
+        self._set_remotefx_vram(remotefx_disp_ctrl_res, vram_bytes)
 
-        self._jobutils.add_virt_resource(synth_3d_disp_ctrl_res, vm)
+        if new_wmi_obj:
+            self._jobutils.add_virt_resource(remotefx_disp_ctrl_res, vm)
+        else:
+            self._jobutils.modify_virt_resource(remotefx_disp_ctrl_res)
+
+    def _set_remotefx_vram(self, remotefx_disp_ctrl_res, vram_bytes):
+        pass
 
     def enable_remotefx_video_adapter(self, vm_name, monitor_count,
                                       max_resolution, vram_bytes=None):
-        vm = self._lookup_vm_check(vm_name, as_vssd=False)
-
         self._validate_remotefx_params(monitor_count, max_resolution,
                                        vram_bytes=vram_bytes)
 
+        vm = self._lookup_vm_check(vm_name)
         rasds = _wqlutils.get_element_associated_class(
             self._compat_conn, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
-            element_uuid=vm.Name)
-        if [r for r in rasds if r.ResourceSubType ==
-                self._SYNTH_3D_DISP_CTRL_RES_SUB_TYPE]:
-            raise exceptions.HyperVRemoteFXException(
-                _("RemoteFX is already configured for this VM"))
+            element_instance_id=vm.InstanceID)
 
         synth_disp_ctrl_res_list = [r for r in rasds if r.ResourceSubType ==
                                     self._SYNTH_DISP_CTRL_RES_SUB_TYPE]
         if synth_disp_ctrl_res_list:
+            # we need to remove the generic display controller first.
             self._jobutils.remove_virt_resource(synth_disp_ctrl_res_list[0])
 
+        remotefx_disp_ctrl_res = [r for r in rasds if r.ResourceSubType ==
+                                  self._REMOTEFX_DISP_CTRL_RES_SUB_TYPE]
+        remotefx_disp_ctrl_res = (remotefx_disp_ctrl_res[0]
+                                  if remotefx_disp_ctrl_res else None)
+
         max_res_value = self._remote_fx_res_map.get(max_resolution)
-        self._add_3d_display_controller(vm, monitor_count, max_res_value,
-                                        vram_bytes)
-        if self._vm_has_s3_controller(vm.ElementName):
+        self._set_remotefx_display_controller(
+            vm, remotefx_disp_ctrl_res, monitor_count, max_res_value,
+            vram_bytes)
+
+        if self._vm_has_s3_controller(vm_name):
             s3_disp_ctrl_res = [r for r in rasds if r.ResourceSubType ==
                                 self._S3_DISP_CTRL_RES_SUB_TYPE][0]
-            s3_disp_ctrl_res.Address = self._DISP_CTRL_ADDRESS_DX_11
+            if s3_disp_ctrl_res.Address != self._DISP_CTRL_ADDRESS_DX_11:
+                s3_disp_ctrl_res.Address = self._DISP_CTRL_ADDRESS_DX_11
+                self._jobutils.modify_virt_resource(s3_disp_ctrl_res)
+
+    def disable_remotefx_video_adapter(self, vm_name):
+        vm = self._lookup_vm_check(vm_name)
+        rasds = _wqlutils.get_element_associated_class(
+            self._compat_conn, self._CIM_RES_ALLOC_SETTING_DATA_CLASS,
+            element_instance_id=vm.InstanceID)
+
+        remotefx_disp_ctrl_res = [r for r in rasds if r.ResourceSubType ==
+                                  self._REMOTEFX_DISP_CTRL_RES_SUB_TYPE]
+
+        if not remotefx_disp_ctrl_res:
+            # VM does not have RemoteFX configured.
+            return
+
+        # we need to remove the RemoteFX display controller first.
+        self._jobutils.remove_virt_resource(remotefx_disp_ctrl_res[0])
+
+        synth_disp_ctrl_res = self._get_new_resource_setting_data(
+            self._SYNTH_DISP_CTRL_RES_SUB_TYPE,
+            self._SYNTH_DISP_ALLOCATION_SETTING_DATA_CLASS)
+        self._jobutils.add_virt_resource(synth_disp_ctrl_res, vm)
+
+        if self._vm_has_s3_controller(vm_name):
+            s3_disp_ctrl_res = [r for r in rasds if r.ResourceSubType ==
+                                self._S3_DISP_CTRL_RES_SUB_TYPE][0]
+            s3_disp_ctrl_res.Address = self._DISP_CTRL_ADDRESS
             self._jobutils.modify_virt_resource(s3_disp_ctrl_res)
 
     def _vm_has_s3_controller(self, vm_name):
