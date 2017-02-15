@@ -13,24 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_config import cfg
 from oslo_utils import importutils
 
 from os_win._i18n import _, _LW  # noqa
 from os_win import exceptions
 from os_win.utils import hostutils
 from os_win.utils.io import namedpipe
-from os_win.utils.storage.initiator import iscsi_cli_utils
-
-hyper_opts = [
-    cfg.BoolOpt('force_volumeutils_v1',
-                default=False,
-                help='DEPRECATED: Force V1 volume utility class',
-                deprecated_for_removal=True),
-]
-
-CONF = cfg.CONF
-CONF.register_opts(hyper_opts, 'hyperv')
 
 utils = hostutils.HostUtils()
 
@@ -196,10 +184,7 @@ def get_pathutils():
     return _get_class(class_type='pathutils')
 
 
-def get_iscsi_initiator_utils(use_iscsi_cli=False):
-    use_iscsi_cli = use_iscsi_cli or CONF.hyperv.force_volumeutils_v1
-    if use_iscsi_cli:
-        return iscsi_cli_utils.ISCSIInitiatorCLIUtils()
+def get_iscsi_initiator_utils():
     return _get_class(class_type='iscsi_initiator_utils')
 
 
