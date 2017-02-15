@@ -291,16 +291,20 @@ class VMUtils(baseutils.BaseUtilsVirt):
         if host_shutdown_action:
             vmsetting.AutomaticShutdownAction = host_shutdown_action
         if configuration_root_dir:
+            # Created VMs must have their *DataRoot paths in the same location
+            # as the VM's path.
             vmsetting.ConfigurationDataRoot = configuration_root_dir
-        if snapshot_dir:
-            vmsetting.SnapshotDataRoot = snapshot_dir
+            vmsetting.LogDataRoot = configuration_root_dir
+            vmsetting.SnapshotDataRoot = configuration_root_dir
+            vmsetting.SuspendDataRoot = configuration_root_dir
+            vmsetting.SwapFileDataRoot = configuration_root_dir
+
         self._set_vm_memory(vmsetting, memory_mb, memory_per_numa_node,
                             dynamic_mem_ratio)
         self._set_vm_vcpus(vmsetting, vcpus_num, vcpus_per_numa_node,
                            limit_cpu_features)
 
-        update_needed = (configuration_root_dir or snapshot_dir or
-                         host_shutdown_action)
+        update_needed = configuration_root_dir or host_shutdown_action
         if update_needed:
             self._modify_virtual_system(vmsetting)
 
