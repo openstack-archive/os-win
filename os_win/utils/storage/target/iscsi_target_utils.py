@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log as logging
+import six
 
 from os_win._i18n import _, _LI
 from os_win import constants
@@ -26,6 +27,7 @@ from os_win.utils import win32utils
 LOG = logging.getLogger(__name__)
 
 
+@six.add_metaclass(baseutils.SynchronizedMeta)
 class ISCSITargetUtils(baseutils.BaseUtils):
     ID_METHOD_DNS_NAME = 1
     ID_METHOD_IPV4_ADDR = 2
