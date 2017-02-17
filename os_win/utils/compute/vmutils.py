@@ -71,6 +71,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
     _CIM_RES_ALLOC_SETTING_DATA_CLASS = 'Cim_ResourceAllocationSettingData'
     _COMPUTER_SYSTEM_CLASS = "Msvm_ComputerSystem"
     _LOGICAL_IDENTITY_CLASS = 'Msvm_LogicalIdentity'
+    _VIRTUAL_SYSTEM_SNAP_ASSOC_CLASS = 'Msvm_SnapshotOfVirtualSystem'
 
     _S3_DISP_CTRL_RES_SUB_TYPE = 'Microsoft:Hyper-V:S3 Display Controller'
     _SYNTH_DISP_CTRL_RES_SUB_TYPE = ('Microsoft:Hyper-V:Synthetic Display '
@@ -682,21 +683,34 @@ class VMUtils(baseutils.BaseUtilsVirt):
         (job_path, ret_val) = self._vs_man_svc.DestroySystem(vm.path_())
         self._jobutils.check_ret_val(ret_val, job_path)
 
-    def take_vm_snapshot(self, vm_name):
+    def take_vm_snapshot(self, vm_name, snapshot_name=None):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)
         vs_snap_svc = self._compat_conn.Msvm_VirtualSystemSnapshotService()[0]
 
         (job_path, snp_setting_data, ret_val) = vs_snap_svc.CreateSnapshot(
             AffectedSystem=vm.path_(),
             SnapshotType=self._SNAPSHOT_FULL)
-        self._jobutils.check_ret_val(ret_val, job_path)
 
-        vm_path = vm.path_().lower()
-        current_snapshots = self._conn.Msvm_MostCurrentSnapshotInBranch()
-        snp_setting_data = [s for s in current_snapshots if
-                            s.Antecedent.path_().lower() == vm_path][0]
+        job = self._jobutils.check_ret_val(ret_val, job_path)
+        snp_setting_data = job.associators(
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS,
+            wmi_association_class=self._AFFECTED_JOB_ELEMENT_CLASS)[0]
 
-        return snp_setting_data.Dependent.path_()
+        if snapshot_name is not None:
+            snp_setting_data.ElementName = snapshot_name
+            self._modify_virtual_system(snp_setting_data)
+
+        return snp_setting_data.path_()
+
+    def get_vm_snapshots(self, vm_name, snapshot_name=None):
+        vm = self._lookup_vm_check(vm_name, as_vssd=False)
+        snapshots = vm.associators(
+            wmi_association_class=self._VIRTUAL_SYSTEM_SNAP_ASSOC_CLASS,
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)
+
+        return [
+            s.path_() for s in snapshots
+            if snapshot_name is None or s.ElementName == snapshot_name]
 
     def remove_vm_snapshot(self, snapshot_path):
         vs_snap_svc = self._compat_conn.Msvm_VirtualSystemSnapshotService()[0]
