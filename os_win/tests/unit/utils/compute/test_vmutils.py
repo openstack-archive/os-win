@@ -293,6 +293,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                           mock.sentinel.vm_name, mock.sentinel.state)
 
     @ddt.data(
+        {'vnuma_enabled': mock.sentinel.vnuma_enabled},
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
         {'host_shutdown_action': mock.sentinel.shutdown_action},
         {})
@@ -304,14 +305,15 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_update_vm(self, mock_lookup_vm_check, mock_set_mem,
                        mock_set_vcpus, mock_modify_virtual_system,
                        host_shutdown_action=None,
-                       configuration_root_dir=None):
+                       configuration_root_dir=None, vnuma_enabled=None):
         mock_vmsettings = mock_lookup_vm_check.return_value
         self._vmutils.update_vm(
             mock.sentinel.vm_name, mock.sentinel.memory_mb,
             mock.sentinel.memory_per_numa, mock.sentinel.vcpus_num,
             mock.sentinel.vcpus_per_numa, mock.sentinel.limit_cpu_features,
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
-            host_shutdown_action=host_shutdown_action)
+            host_shutdown_action=host_shutdown_action,
+            vnuma_enabled=vnuma_enabled)
 
         mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
         mock_set_mem.assert_called_once_with(
@@ -335,7 +337,10 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         if host_shutdown_action:
             self.assertEqual(host_shutdown_action,
                              mock_vmsettings.AutomaticShutdownAction)
-        if configuration_root_dir or host_shutdown_action:
+        if vnuma_enabled:
+            self.assertEqual(vnuma_enabled, mock_vmsettings.VirtualNumaEnabled)
+
+        if configuration_root_dir or host_shutdown_action or vnuma_enabled:
             mock_modify_virtual_system.assert_called_once_with(
                 mock_vmsettings)
         else:
