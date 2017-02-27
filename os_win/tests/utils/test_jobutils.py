@@ -110,10 +110,54 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         self.jobutils._conn.Msvm_AffectedJobElement.assert_called_once_with(
             AffectedElement=mock_affected_element.path_.return_value)
 
+    @mock.patch.object(jobutils, 'wmi', create=True)
+    @mock.patch.object(jobutils.JobUtils, '_is_not_found_exc')
+    def test_get_pending_jobs_ignored(self, mock_is_not_found_exc, mock_wmi):
+        mock_wmi.x_wmi = test_base.FakeWMIExc
+        mock_not_found_mapping = mock.MagicMock()
+        type(mock_not_found_mapping).AffectingElement = mock.PropertyMock(
+            side_effect=mock_wmi.x_wmi)
+        self.jobutils._conn.Msvm_AffectedJobElement.return_value = [
+            mock_not_found_mapping]
+
+        pending_jobs = self.jobutils._get_pending_jobs_affecting_element(
+            mock.MagicMock())
+        self.assertEqual([], pending_jobs)
+
+    @mock.patch.object(jobutils, 'wmi', create=True)
+    @mock.patch.object(jobutils.JobUtils, '_is_not_found_exc')
+    def test_get_pending_jobs_reraised(self, mock_is_not_found_exc, mock_wmi):
+        mock_wmi.x_wmi = test_base.FakeWMIExc
+        mock_is_not_found_exc.return_value = False
+        mock_not_found_mapping = mock.MagicMock()
+        type(mock_not_found_mapping).AffectingElement = mock.PropertyMock(
+            side_effect=mock_wmi.x_wmi)
+        self.jobutils._conn.Msvm_AffectedJobElement.return_value = [
+            mock_not_found_mapping]
+
+        self.assertRaises(mock_wmi.x_wmi,
+                          self.jobutils._get_pending_jobs_affecting_element,
+                          mock.MagicMock())
+
+    @ddt.data(jobutils.JobUtils._WBEM_E_NOT_FOUND, mock.sentinel.wbem_error)
+    @mock.patch.object(jobutils.win32utils.Win32Utils, 'get_com_error_hresult')
+    def test_is_not_found_exc(self, hresult, mock_get_com_error_hresult):
+        mock_get_com_error_hresult.return_value = hresult
+        exc = mock.MagicMock()
+
+        result = self.jobutils._is_not_found_exc(exc)
+
+        expected = hresult == self.jobutils._WBEM_E_NOT_FOUND
+        self.assertEqual(expected, result)
+        mock_get_com_error_hresult.assert_called_once_with(exc.com_error)
+
     @ddt.data(True, False)
+    @mock.patch.object(jobutils, 'wmi', create=True)
     @mock.patch.object(jobutils.JobUtils,
                        '_get_pending_jobs_affecting_element')
-    def test_stop_jobs_helper(self, jobs_ended, mock_get_pending_jobs):
+    def test_stop_jobs_helper(self, jobs_ended, mock_get_pending_jobs,
+                              mock_wmi):
+        mock_wmi.x_wmi = test_base.FakeWMIExc
         mock_job1 = mock.Mock(Cancellable=True)
         mock_job2 = mock.Mock(Cancellable=True)
         mock_job3 = mock.Mock(Cancellable=False)
