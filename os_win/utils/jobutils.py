@@ -121,13 +121,23 @@ class JobUtils(baseutils.BaseUtilsVirt):
         # the affected element and the affecting job.
         mappings = self._conn.Msvm_AffectedJobElement(
             AffectedElement=element.path_())
-        pending_jobs = [
-            mapping.AffectingElement
-            for mapping in mappings
-            if (mapping.AffectingElement and not
-                self._is_job_completed(mapping.AffectingElement,
-                                       ignore_error_state))]
+        pending_jobs = []
+        for mapping in mappings:
+            try:
+                if mapping.AffectingElement and not self._is_job_completed(
+                        mapping.AffectingElement, ignore_error_state):
+                    pending_jobs.append(mapping.AffectingElement)
+
+            except exceptions.x_wmi as ex:
+                # NOTE(claudiub): we can ignore "Not found" type exceptions.
+                if not self._is_not_found_exc(ex):
+                    raise
+
         return pending_jobs
+
+    def _is_not_found_exc(self, exc):
+        hresult = win32utils.Win32Utils.get_com_error_hresult(exc.com_error)
+        return hresult == self._WBEM_E_NOT_FOUND
 
     def _stop_jobs(self, element):
         pending_jobs = self._get_pending_jobs_affecting_element(
@@ -144,11 +154,9 @@ class JobUtils(baseutils.BaseUtilsVirt):
                 job.RequestStateChange(
                     self._KILL_JOB_STATE_CHANGE_REQUEST)
             except exceptions.x_wmi as ex:
-                hresult = win32utils.Win32Utils.get_com_error_hresult(
-                    ex.com_error)
                 # The job may had been completed right before we've
                 # attempted to kill it.
-                if not hresult == self._WBEM_E_NOT_FOUND:
+                if not self._is_not_found_exc(ex):
                     LOG.debug("Failed to stop job. Exception: %s", ex)
 
         pending_jobs = self._get_pending_jobs_affecting_element(element)
