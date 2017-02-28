@@ -73,11 +73,31 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
         self._pathutils.move_folder_files(src_dir, dest_dir)
         mock_rename.assert_called_once_with(src_fname, dest_fname)
 
-    @mock.patch.object(pathutils.PathUtils, 'rmtree')
-    def test_rmtree(self, mock_rmtree):
+    @mock.patch('time.sleep')
+    @mock.patch.object(pathutils.shutil, 'rmtree')
+    def test_rmtree(self, mock_rmtree, mock_sleep):
+        exc = exceptions.WindowsError()
+        exc.winerror = pathutils.ERROR_DIR_IS_NOT_EMPTY
+        mock_rmtree.side_effect = [exc] * 5 + [None]
+
         self._pathutils.rmtree(mock.sentinel.FAKE_PATH)
 
-        mock_rmtree.assert_called_once_with(mock.sentinel.FAKE_PATH)
+        mock_rmtree.assert_has_calls([mock.call(mock.sentinel.FAKE_PATH)] * 6)
+
+    @mock.patch('time.sleep')
+    @mock.patch.object(pathutils.shutil, 'rmtree')
+    def _check_rmtree(self, mock_rmtree, mock_sleep, side_effect):
+        mock_rmtree.side_effect = side_effect
+        self.assertRaises(exceptions.OSWinException, self._pathutils.rmtree,
+                          mock.sentinel.FAKE_PATH)
+
+    def test_rmtree_unexpected(self):
+        self._check_rmtree(side_effect=exceptions.WindowsError)
+
+    def test_rmtree_exceeded(self):
+        exc = exceptions.WindowsError()
+        exc.winerror = pathutils.ERROR_DIR_IS_NOT_EMPTY
+        self._check_rmtree(side_effect=[exc] * 6)
 
     @mock.patch.object(pathutils.PathUtils, 'makedirs')
     @mock.patch.object(pathutils.PathUtils, 'exists')
