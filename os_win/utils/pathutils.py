@@ -25,6 +25,7 @@ from oslo_utils import fileutils
 import six
 
 from os_win._i18n import _
+from os_win import _utils
 from os_win import exceptions
 from os_win.utils import _acl_utils
 from os_win.utils import win32utils
@@ -107,8 +108,16 @@ class PathUtils(object):
             if os.path.isfile(src):
                 self.rename(src, os.path.join(dest_dir, fname))
 
+    @_utils.retry_decorator(exceptions=exceptions.OSWinException,
+                            error_codes=[ERROR_DIR_IS_NOT_EMPTY])
     def rmtree(self, path):
-        shutil.rmtree(path)
+        try:
+            shutil.rmtree(path)
+        except exceptions.WindowsError as ex:
+            # NOTE(claudiub): convert it to an OSWinException in order to use
+            # the retry_decorator.
+            raise exceptions.OSWinException(six.text_type(ex),
+                                            error_code=ex.winerror)
 
     def check_create_dir(self, path):
         if not self.exists(path):
