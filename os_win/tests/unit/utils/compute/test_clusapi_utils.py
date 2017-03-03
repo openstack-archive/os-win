@@ -26,6 +26,8 @@ from os_win.utils.compute import _clusapi_utils
 
 @ddt.ddt
 class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
+    _LIVE_MIGRATION_TYPE = 4
+
     def setUp(self):
         super(ClusApiUtilsTestCase, self).setUp()
 
@@ -45,6 +47,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self._ctypes.byref = lambda x: (x, "byref")
         self._ctypes.c_wchar_p = lambda x: (x, 'c_wchar_p')
         self._ctypes.sizeof = lambda x: (x, 'sizeof')
+        self._ctypes.c_ulong = lambda x: (x, 'c_ulong')
 
         mock.patch.object(_clusapi_utils, 'ctypes', self._ctypes).start()
 
@@ -194,9 +197,15 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusapi.CloseClusterNode.assert_called_once_with(
             mock.sentinel.handle)
 
-    def test_cancel_cluster_group_operation(self):
-        self._clusapi_utils.cancel_cluster_group_operation(
+    @ddt.data(0, _clusapi_utils.ERROR_IO_PENDING)
+    def test_cancel_cluster_group_operation(self, cancel_ret_val):
+        self._mock_run.return_value = cancel_ret_val
+
+        expected_ret_val = cancel_ret_val != _clusapi_utils.ERROR_IO_PENDING
+        ret_val = self._clusapi_utils.cancel_cluster_group_operation(
             mock.sentinel.group_handle)
+
+        self.assertEqual(expected_ret_val, ret_val)
 
         self._mock_run.assert_called_once_with(
             self._clusapi.CancelClusterGroupOperation,
@@ -267,3 +276,251 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         expected_state_info = dict(state=mock.sentinel.group_state,
                                    owner_node=owner_node)
         self.assertEqual(expected_state_info, state_info)
+
+    @ddt.data({'notif_filters': (_clusapi_utils.NOTIFY_FILTER_AND_TYPE * 2)(),
+               'exp_notif_filters_len': 2},
+              {'notif_filters': _clusapi_utils.NOTIFY_FILTER_AND_TYPE(),
+               'notif_port_h': mock.sentinel.notif_port_h,
+               'notif_key': mock.sentinel.notif_key})
+    @ddt.unpack
+    def test_create_cluster_notify_port(self, notif_filters,
+                                        exp_notif_filters_len=1,
+                                        notif_port_h=None,
+                                        notif_key=None):
+        self._mock_ctypes()
+        self._ctypes.Array = ctypes.Array
+
+        self._clusapi_utils.create_cluster_notify_port_v2(
+            mock.sentinel.cluster_handle,
+            notif_filters,
+            notif_port_h,
+            notif_key)
+
+        exp_notif_key_p = self._ctypes.byref(notif_key) if notif_key else None
+        exp_notif_port_h = notif_port_h or _clusapi_utils.INVALID_HANDLE_VALUE
+
+        self._mock_run.assert_called_once_with(
+            self._clusapi.CreateClusterNotifyPortV2,
+            exp_notif_port_h,
+            mock.sentinel.cluster_handle,
+            self._ctypes.byref(notif_filters),
+            self._ctypes.c_ulong(exp_notif_filters_len),
+            exp_notif_key_p,
+            **self._clusapi_utils._open_handle_check_flags)
+
+    def test_close_cluster_notify_port(self):
+        self._clusapi_utils.close_cluster_notify_port(mock.sentinel.handle)
+        self._clusapi.CloseClusterNotifyPort.assert_called_once_with(
+            mock.sentinel.handle)
+
+    def test_get_cluster_notify_v2(self):
+        fake_notif_key = 1
+        fake_notif_port_h = 2
+        fake_notif_type = 3
+        fake_filter_flags = 4
+        fake_clus_obj_name = 'fake-changed-clus-object'
+        fake_event_buff = 'fake-event-buff'
+
+        notif_key = ctypes.c_ulong(fake_notif_key)
+        requested_buff_sz = 1024
+
+        def fake_get_cluster_notify(func, notif_port_h, pp_notif_key,
+                                    p_filter_and_type,
+                                    p_buff, p_buff_sz,
+                                    p_obj_id_buff, p_obj_id_buff_sz,
+                                    p_parent_id_buff, p_parent_id_buff_sz,
+                                    p_obj_name_buff, p_obj_name_buff_sz,
+                                    p_obj_type, p_obj_type_sz,
+                                    timeout_ms):
+            self.assertEqual(self._clusapi.GetClusterNotifyV2, func)
+            self.assertEqual(fake_notif_port_h, notif_port_h)
+
+            obj_name_buff_sz = ctypes.cast(
+                p_obj_name_buff_sz,
+                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+            buff_sz = ctypes.cast(
+                p_buff_sz,
+                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+
+            # We'll just request the tested method to pass us
+            # a buffer this large.
+            if (buff_sz.value < requested_buff_sz or
+                    obj_name_buff_sz.value < requested_buff_sz):
+                buff_sz.value = requested_buff_sz
+                obj_name_buff_sz.value = requested_buff_sz
+                raise exceptions.ClusterWin32Exception(
+                    error_code=_clusapi_utils.ERROR_MORE_DATA,
+                    func_name='GetClusterNotify',
+                    error_message='error more data')
+
+            pp_notif_key = ctypes.cast(pp_notif_key, ctypes.c_void_p)
+            p_notif_key = ctypes.c_void_p.from_address(pp_notif_key.value)
+            p_notif_key.value = ctypes.addressof(notif_key)
+
+            filter_and_type = ctypes.cast(
+                p_filter_and_type,
+                ctypes.POINTER(_clusapi_utils.NOTIFY_FILTER_AND_TYPE)).contents
+            filter_and_type.dwObjectType = fake_notif_type
+            filter_and_type.FilterFlags = fake_filter_flags
+
+            obj_name_buff = ctypes.cast(
+                p_obj_name_buff,
+                ctypes.POINTER(
+                    ctypes.c_wchar *
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
+                ).contents
+            ctypes.memset(obj_name_buff, 0, obj_name_buff_sz.value)
+            obj_name_buff.value = fake_clus_obj_name
+
+            buff = ctypes.cast(
+                p_buff,
+                ctypes.POINTER(
+                    ctypes.c_wchar *
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
+                ).contents
+            ctypes.memset(buff, 0, buff_sz.value)
+            buff.value = fake_event_buff
+
+            self.assertEqual(mock.sentinel.timeout_ms, timeout_ms)
+
+        self._mock_run.side_effect = fake_get_cluster_notify
+
+        event = self._clusapi_utils.get_cluster_notify_v2(
+            fake_notif_port_h, mock.sentinel.timeout_ms)
+        w_event_buff = ctypes.cast(
+            event['buff'],
+            ctypes.POINTER(
+                ctypes.c_wchar *
+                (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
+            ).contents[:]
+        event['buff'] = w_event_buff.split('\x00')[0]
+
+        expected_event = dict(cluster_object_name=fake_clus_obj_name,
+                              object_type=fake_notif_type,
+                              filter_flags=fake_filter_flags,
+                              buff=fake_event_buff,
+                              buff_sz=requested_buff_sz,
+                              notif_key=fake_notif_key)
+        self.assertEqual(expected_event, event)
+
+    def _get_fake_prop_list(self):
+        syntax = _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
+        migr_type = _clusapi_utils.DWORD(self._LIVE_MIGRATION_TYPE)
+
+        prop_entries = [
+            self._clusapi_utils.get_property_list_entry(
+                _clusapi_utils.CLUSPROP_NAME_VM, syntax, migr_type),
+            self._clusapi_utils.get_property_list_entry(
+                _clusapi_utils.CLUSPROP_NAME_VM_CONFIG, syntax, migr_type),
+            self._clusapi_utils.get_property_list_entry(
+                _clusapi_utils.CLUSPROP_GROUP_STATUS_INFO,
+                _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER,
+                ctypes.c_ulonglong(_clusapi_utils.
+                    CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE))  # noqa
+        ]
+
+        prop_list = self._clusapi_utils.get_property_list(prop_entries)
+        return prop_list
+
+    def test_get_prop_list_entry_p_not_found(self):
+        prop_list = self._get_fake_prop_list()
+
+        self.assertRaises(exceptions.ClusterPropertyListEntryNotFound,
+                          self._clusapi_utils.get_prop_list_entry_p,
+                          ctypes.byref(prop_list),
+                          ctypes.sizeof(prop_list),
+                          'InexistentProperty')
+
+    def test_get_prop_list_entry_p_parsing_error(self):
+        prop_list = self._get_fake_prop_list()
+
+        prop_entry_name_len_addr = ctypes.addressof(
+            prop_list.entries_buff) + ctypes.sizeof(ctypes.c_ulong)
+        prop_entry_name_len = ctypes.c_ulong.from_address(
+            prop_entry_name_len_addr)
+        prop_entry_name_len.value = ctypes.sizeof(prop_list)
+
+        self.assertRaises(exceptions.ClusterPropertyListParsingError,
+                          self._clusapi_utils.get_prop_list_entry_p,
+                          ctypes.byref(prop_list),
+                          ctypes.sizeof(prop_list),
+                          _clusapi_utils.CLUSPROP_NAME_VM)
+
+    def test_get_prop_list_entry_p(self):
+        prop_list = self._get_fake_prop_list()
+
+        prop_entry = self._clusapi_utils.get_prop_list_entry_p(
+            ctypes.byref(prop_list),
+            ctypes.sizeof(prop_list),
+            _clusapi_utils.CLUSPROP_NAME_VM_CONFIG)
+
+        self.assertEqual(
+            _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
+            prop_entry['syntax'])
+        self.assertEqual(
+            ctypes.sizeof(ctypes.c_ulong),
+            prop_entry['length'])
+
+        val = ctypes.c_ulong.from_address(prop_entry['val_p'].value).value
+        self.assertEqual(self._LIVE_MIGRATION_TYPE, val)
+
+    def test_cluster_group_control(self):
+        fake_out_buff = 'fake-event-buff'
+
+        requested_buff_sz = 1024
+
+        def fake_cluster_group_ctrl(func, group_handle, node_handle,
+                                    control_code,
+                                    in_buff_p, in_buff_sz,
+                                    out_buff_p, out_buff_sz,
+                                    requested_buff_sz_p):
+            self.assertEqual(self._clusapi.ClusterGroupControl, func)
+            self.assertEqual(mock.sentinel.group_handle, group_handle)
+            self.assertEqual(mock.sentinel.node_handle, node_handle)
+            self.assertEqual(mock.sentinel.control_code, control_code)
+            self.assertEqual(mock.sentinel.in_buff_p, in_buff_p)
+            self.assertEqual(mock.sentinel.in_buff_sz, in_buff_sz)
+
+            req_buff_sz = ctypes.cast(
+                requested_buff_sz_p,
+                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+            req_buff_sz.value = requested_buff_sz
+
+            # We'll just request the tested method to pass us
+            # a buffer this large.
+            if (out_buff_sz.value < requested_buff_sz):
+                raise exceptions.ClusterWin32Exception(
+                    error_code=_clusapi_utils.ERROR_MORE_DATA,
+                    func_name='ClusterGroupControl',
+                    error_message='error more data')
+
+            out_buff = ctypes.cast(
+                out_buff_p,
+                ctypes.POINTER(
+                    ctypes.c_wchar *
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
+                ).contents
+            out_buff.value = fake_out_buff
+
+        self._mock_run.side_effect = fake_cluster_group_ctrl
+
+        out_buff, out_buff_sz = self._clusapi_utils.cluster_group_control(
+            mock.sentinel.group_handle, mock.sentinel.control_code,
+            mock.sentinel.node_handle, mock.sentinel.in_buff_p,
+            mock.sentinel.in_buff_sz)
+
+        self.assertEqual(requested_buff_sz, out_buff_sz)
+        wp_out_buff = ctypes.cast(
+            out_buff,
+            ctypes.POINTER(ctypes.c_wchar * requested_buff_sz))
+        self.assertEqual(fake_out_buff,
+                         wp_out_buff.contents[:len(fake_out_buff)])
+
+    def test_get_cluster_group_status_info(self):
+        prop_list = self._get_fake_prop_list()
+
+        status_info = self._clusapi_utils.get_cluster_group_status_info(
+            ctypes.byref(prop_list), ctypes.sizeof(prop_list))
+        self.assertEqual(
+            _clusapi_utils.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE,
+            status_info)

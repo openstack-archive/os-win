@@ -21,6 +21,10 @@ from six.moves import builtins
 from os_win import exceptions
 
 
+class TestingException(Exception):
+    pass
+
+
 class FakeWMIExc(exceptions.x_wmi):
     def __init__(self, hresult=None):
         excepinfo = [None] * 5 + [hresult]
