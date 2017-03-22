@@ -123,6 +123,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
                             constants.HYPERV_VM_STATE_PAUSED: 9,
                             constants.HYPERV_VM_STATE_SUSPENDED: 6}
 
+    _disk_ctrl_type_mapping = {
+        _SCSI_CTRL_RES_SUB_TYPE: constants.CTRL_TYPE_SCSI,
+        _IDE_CTRL_RES_SUB_TYPE: constants.CTRL_TYPE_IDE
+    }
+
     _DEFAULT_EVENT_CHECK_TIMEFRAME = 60  # seconds
     _DEFAULT_EVENT_TIMEOUT_MS = 2000
 
@@ -494,6 +499,34 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         # Add the new vhd object as a virtual hard disk to the vm.
         self._jobutils.add_virt_resource(res, vm)
+
+    def get_disk_attachment_info(self, attached_disk_path, is_physical=True):
+        res = self._get_mounted_disk_resource_from_path(attached_disk_path,
+                                                        is_physical)
+        if not res:
+            err_msg = _("Disk '%s' is not attached to a vm.")
+            raise exceptions.DiskNotFound(err_msg % attached_disk_path)
+
+        if is_physical:
+            drive = res
+        else:
+            drive = self._get_wmi_obj(res.Parent)
+
+        ctrl_slot = int(drive.AddressOnParent)
+        ctrl_path = drive.Parent
+        ctrl_type = self._get_disk_controller_type(ctrl_path)
+
+        attachment_info = dict(controller_slot=ctrl_slot,
+                               controller_path=ctrl_path,
+                               controller_type=ctrl_type)
+        return attachment_info
+
+    def _get_disk_controller_type(self, controller_path):
+        ctrl = self._get_wmi_obj(controller_path)
+        res_sub_type = ctrl.ResourceSubType
+
+        ctrl_type = self._disk_ctrl_type_mapping[res_sub_type]
+        return ctrl_type
 
     def create_scsi_controller(self, vm_name):
         """Create an iscsi controller ready to mount volumes."""
