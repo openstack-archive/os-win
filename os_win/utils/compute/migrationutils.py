@@ -30,9 +30,9 @@ class MigrationUtils(baseutils.BaseUtilsVirt):
 
     def _get_export_setting_data(self, vm_name):
         vm = self._vmutils._lookup_vm(vm_name)
-        export_setting_data = self._conn.Msvm_VirtualSystemExportSettingData(
+        export_sd = self._compat_conn.Msvm_VirtualSystemExportSettingData(
             InstanceID=vm.InstanceID)
-        return export_setting_data[0]
+        return export_sd[0]
 
     def export_vm(self, vm_name, export_path,
                   copy_snapshots_config=constants.EXPORT_CONFIG_SNAPSHOTS_ALL,
