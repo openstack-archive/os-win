@@ -34,11 +34,12 @@ class MigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         self._migrationutils = migrationutils.MigrationUtils()
         self._migrationutils._vmutils = mock.MagicMock()
         self._migrationutils._conn_attr = mock.MagicMock()
+        self._migrationutils._compat_conn_attr = mock.MagicMock()
         self._migrationutils._jobutils = mock.MagicMock()
 
     def test_get_export_setting_data(self):
         mock_vm = self._migrationutils._vmutils._lookup_vm.return_value
-        mock_conn = self._migrationutils._conn
+        mock_conn = self._migrationutils._compat_conn
         mock_exp = mock_conn.Msvm_VirtualSystemExportSettingData
         mock_exp.return_value = [mock.sentinel.export_setting_data]
         expected_result = mock.sentinel.export_setting_data

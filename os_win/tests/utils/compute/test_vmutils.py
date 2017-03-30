@@ -324,7 +324,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_get_virtual_system_type.assert_called_once_with(is_planned_vm)
         mock_lookup_vm_check.assert_called_once_with(
-            mock.sentinel.vm_name, virtual_system_type=virtual_system_type)
+            mock.sentinel.vm_name, for_update=True,
+            virtual_system_type=virtual_system_type)
         mock_set_mem.assert_called_once_with(
             mock_vmsettings, mock.sentinel.memory_mb,
             mock.sentinel.memory_per_numa, mock.sentinel.dynamic_mem_ratio)
