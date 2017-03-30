@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.import mock
 
-import os
-
 import mock
 from oslotest import base
 import six
@@ -22,46 +20,6 @@ import six
 from os_win import constants
 from os_win import exceptions
 from os_win.utils.io import ioutils
-
-
-class IOThreadTestCase(base.BaseTestCase):
-    _FAKE_SRC = r'fake_source_file'
-    _FAKE_DEST = r'fake_dest_file'
-    _FAKE_MAX_BYTES = 1
-
-    def setUp(self):
-        self._iothread = ioutils.IOThread(
-            self._FAKE_SRC, self._FAKE_DEST, self._FAKE_MAX_BYTES)
-        super(IOThreadTestCase, self).setUp()
-
-    @mock.patch.object(six.moves.builtins, 'open')
-    @mock.patch('os.rename')
-    @mock.patch('os.path.exists')
-    @mock.patch('os.remove')
-    def test_copy(self, fake_remove, fake_exists, fake_rename, fake_open):
-        fake_data = 'a'
-        fake_src = mock.Mock()
-        fake_dest = mock.Mock()
-
-        fake_src.read.return_value = fake_data
-        fake_dest.tell.return_value = 0
-        fake_exists.return_value = True
-
-        mock_context_manager = mock.MagicMock()
-        fake_open.return_value = mock_context_manager
-        mock_context_manager.__enter__.side_effect = [fake_src, fake_dest]
-        self._iothread._stopped.isSet = mock.Mock(side_effect=[False, True])
-
-        self._iothread._copy()
-
-        fake_dest.seek.assert_called_once_with(0, os.SEEK_END)
-        fake_dest.write.assert_called_once_with(fake_data)
-        fake_dest.close.assert_called_once_with()
-        fake_rename.assert_called_once_with(
-            self._iothread._dest, self._iothread._dest_archive)
-        fake_remove.assert_called_once_with(
-            self._iothread._dest_archive)
-        self.assertEqual(3, fake_open.call_count)
 
 
 class IOUtilsTestCase(base.BaseTestCase):

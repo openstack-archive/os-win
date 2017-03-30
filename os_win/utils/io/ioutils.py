@@ -14,7 +14,6 @@
 #    under the License.
 
 import ctypes
-import os
 import struct
 import sys
 
@@ -29,8 +28,6 @@ from os_win import exceptions
 from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
-
-native_threading = patcher.original('threading')
 
 # Avoid using six.moves.queue as we need a non monkey patched class
 if sys.version_info > (3, 0):
@@ -93,50 +90,6 @@ WAIT_INFINITE_TIMEOUT = 0xFFFFFFFF
 
 IO_QUEUE_TIMEOUT = 2
 IO_QUEUE_BURST_TIMEOUT = 0.05
-
-
-# TODO(lpetrut): Remove this class after the patch which
-# interactively handles serial ports merges in Nova.
-class IOThread(native_threading.Thread):
-    def __init__(self, src, dest, max_bytes):
-        super(IOThread, self).__init__()
-        self.setDaemon(True)
-        self._src = src
-        self._dest = dest
-        self._dest_archive = dest + '.1'
-        self._max_bytes = max_bytes
-        self._stopped = native_threading.Event()
-
-    def run(self):
-        try:
-            self._copy()
-        except Exception:
-            self._stopped.set()
-
-    def _copy(self):
-        with open(self._src, 'rb') as src:
-            with open(self._dest, 'ab', 0) as dest:
-                dest.seek(0, os.SEEK_END)
-                log_size = dest.tell()
-                while (not self._stopped.isSet()):
-                    # Read one byte at a time to avoid blocking.
-                    data = src.read(1)
-                    dest.write(data)
-                    log_size += len(data)
-                    if (log_size >= self._max_bytes):
-                        dest.close()
-                        if os.path.exists(self._dest_archive):
-                            os.remove(self._dest_archive)
-                        os.rename(self._dest, self._dest_archive)
-                        dest = open(self._dest, 'ab', 0)
-                        log_size = 0
-
-    def join(self):
-        self._stopped.set()
-        super(IOThread, self).join()
-
-    def is_active(self):
-        return not self._stopped.isSet()
 
 
 class IOUtils(object):
