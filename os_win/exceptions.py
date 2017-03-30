@@ -35,7 +35,10 @@ else:
             self.winerror = winerror
 
     class x_wmi(Exception):
-        pass
+        def __init__(self, info='', com_error=None):
+            super(x_wmi, self).__init__()
+            self.info = info
+            self.com_error = com_error
 
     class x_wmi_timed_out(x_wmi):
         pass

@@ -46,8 +46,18 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         self.liveutils._iscsi_initiator = mock.MagicMock()
         self.liveutils._jobutils = mock.Mock()
 
-        self.liveutils._get_conn_v2 = mock.MagicMock(return_value=self._conn)
+        self.liveutils._get_wmi_obj = mock.MagicMock(return_value=self._conn)
         self.liveutils._conn_v2 = self._conn
+
+    def test_get_conn_v2(self):
+        self.liveutils._get_wmi_obj.side_effect = exceptions.x_wmi(
+            com_error=mock.Mock())
+
+        self.assertRaises(exceptions.HyperVException,
+                          self.liveutils._get_conn_v2, '.')
+
+        self.liveutils._get_wmi_obj.assert_called_once_with(
+            self.liveutils._wmi_namespace % '.', compatibility_mode=True)
 
     def test_check_live_migration_config(self):
         mock_migr_svc = (
@@ -404,7 +414,7 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_vm = mock.MagicMock()
         mock_get_vm.return_value = mock_vm
         mock_conn_v2 = mock.MagicMock()
-        self.liveutils._get_conn_v2.return_value = mock_conn_v2
+        self.liveutils._get_wmi_obj.return_value = mock_conn_v2
 
         mock_get_disk_data.return_value = mock.sentinel.disk_data
         mock_get_ip_address_list.return_value = mock.sentinel.ip_address_list

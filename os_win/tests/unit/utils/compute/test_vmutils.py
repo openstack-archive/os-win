@@ -316,7 +316,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             host_shutdown_action=host_shutdown_action,
             vnuma_enabled=vnuma_enabled)
 
-        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name)
+        mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name,
+                                                     for_update=True)
         mock_set_mem.assert_called_once_with(
             mock_vmsettings, mock.sentinel.memory_mb,
             mock.sentinel.memory_per_numa, mock.sentinel.dynamic_mem_ratio)
