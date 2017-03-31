@@ -96,6 +96,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
                          list(self.netutils._bandwidth_sds.values()))
 
     def test_update_cache(self):
+        self.netutils._switch_ports[mock.sentinel.other] = mock.sentinel.port
         conn = self.netutils._conn
         mock_port = mock.MagicMock(ElementName=mock.sentinel.port_name)
         conn.Msvm_EthernetPortAllocationSettingData.return_value = [
@@ -105,6 +106,11 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual({mock.sentinel.port_name: mock_port},
                          self.netutils._switch_ports)
+
+        # assert that other networkutils have the same cache.
+        netutils = networkutils.NetworkUtils()
+        self.assertEqual({mock.sentinel.port_name: mock_port},
+                         netutils._switch_ports)
 
     def test_clear_port_sg_acls_cache(self):
         self.netutils._sg_acl_sds[mock.sentinel.port_id] = [mock.sentinel.acl]
