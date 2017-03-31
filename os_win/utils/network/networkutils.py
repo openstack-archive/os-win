@@ -119,9 +119,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
 
     def update_cache(self):
         # map between switch port ID and switch port WMI object.
-        self._switch_ports = {
-            port.ElementName: port for port in
-            self._conn.Msvm_EthernetPortAllocationSettingData()}
+        self._switch_ports.clear()
+        for port in self._conn.Msvm_EthernetPortAllocationSettingData():
+            self._switch_ports[port.ElementName] = port
 
     def clear_port_sg_acls_cache(self, switch_port_name):
         self._sg_acl_sds.pop(switch_port_name, None)
