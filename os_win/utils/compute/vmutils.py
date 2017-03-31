@@ -497,8 +497,17 @@ class VMUtils(baseutils.BaseUtilsVirt):
         res.Parent = drive_path
         res.HostResource = [path]
 
-        # Add the new vhd object as a virtual hard disk to the vm.
-        self._jobutils.add_virt_resource(res, vm)
+        try:
+            # Add the new vhd object as a virtual hard disk to the vm.
+            self._jobutils.add_virt_resource(res, vm)
+        except Exception:
+            LOG.exception(_LE("Failed to attach disk image %(disk_path)s "
+                              "to vm %(vm_name)s. Reverting attachment."),
+                          dict(disk_path=path, vm_name=vm_name))
+
+            drive = self._get_wmi_obj(drive_path)
+            self._jobutils.remove_virt_resource(drive)
+            raise
 
     def get_disk_attachment_info(self, attached_disk_path, is_physical=True):
         res = self._get_mounted_disk_resource_from_path(attached_disk_path,
