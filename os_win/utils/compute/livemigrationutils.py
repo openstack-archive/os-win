@@ -49,7 +49,7 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
                 msg = (_('Target live migration host "%s" is unreachable')
                        % host)
             else:
-                msg = _('Live migration failed: %s') % ex.message
+                msg = _('Live migration failed: %r') % ex
             raise exceptions.HyperVException(msg)
 
     def check_live_migration_config(self):
