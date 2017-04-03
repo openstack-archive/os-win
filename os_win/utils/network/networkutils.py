@@ -24,6 +24,7 @@ import re
 from eventlet import patcher
 from eventlet import tpool
 from oslo_utils import units
+import six
 
 from os_win._i18n import _, _LE
 from os_win import constants
@@ -745,7 +746,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         try:
             self._jobutils.add_virt_feature(bandwidth, port_alloc)
         except Exception as ex:
-            if '0x80070057' in ex.message:
+            if '0x80070057' in six.text_type(ex):
                 raise exceptions.InvalidParameterValue(
                     param_name="qos_rule", param_value=qos_rule)
             raise exceptions.HyperVException(
