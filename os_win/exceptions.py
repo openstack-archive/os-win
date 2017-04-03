@@ -198,8 +198,36 @@ class ClusterWin32Exception(ClusterException, Win32Exception):
     pass
 
 
+# TODO(lpetrut): Remove this exception in Q. It was never used outside
+# os-win.
 class InvalidClusterGroupState(ClusterException):
     msg_fmt = _("The cluster group %(group_name)s is in an invalid state. "
                 "Expected state %(expected_state)s. Expected owner node: "
                 "%(expected_node)s. Current group state: %(group_state)s. "
                 "Current owner node: %(owner_node)s.")
+
+
+class ClusterGroupMigrationFailed(ClusterException):
+    msg_fmt = _("Failed to migrate cluster group %(group_name)s. "
+                "Expected state %(expected_state)s. "
+                "Expected owner node: %(expected_node)s. "
+                "Current group state: %(group_state)s. "
+                "Current owner node: %(owner_node)s.")
+
+
+class ClusterGroupMigrationTimeOut(ClusterGroupMigrationFailed):
+    msg_fmt = _("Cluster group '%(group_name)s' migration "
+                "timed out after %(time_elapsed)0.3fs. ")
+
+
+class ClusterPropertyRetrieveFailed(ClusterException):
+    msg_fmt = _("Failed to retrieve a cluster property.")
+
+
+class ClusterPropertyListEntryNotFound(ClusterPropertyRetrieveFailed):
+    msg_fmt = _("The specified cluster property list does not contain "
+                "an entry named '%(property_name)s'")
+
+
+class ClusterPropertyListParsingError(ClusterPropertyRetrieveFailed):
+    msg_fmt = _("Parsing a cluster property list failed.")

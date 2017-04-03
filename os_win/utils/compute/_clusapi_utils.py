@@ -16,27 +16,51 @@
 import ctypes
 import sys
 
-if sys.platform == 'win32':
-    clusapi = ctypes.windll.clusapi
-
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import win32utils
 
+if sys.platform == 'win32':
+    clusapi = ctypes.windll.clusapi
+    resutils = ctypes.windll.resutils
+
+
 DWORD = ctypes.c_ulong
+
+# TODO(lpetrut): aggregate windows specific constants
+INVALID_HANDLE_VALUE = -1
 
 CLUSPROP_SYNTAX_NAME = 262147
 CLUSPROP_SYNTAX_ENDMARK = 0
 CLUSPROP_SYNTAX_LIST_VALUE_DWORD = 65538
+CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER = 65542
 
 CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR = 2
 CLUSAPI_GROUP_MOVE_QUEUE_ENABLED = 4
 CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START = 8
 
+CLUSTER_OBJECT_TYPE_GROUP = 2
+
+CLUSTER_CHANGE_GROUP_COMMON_PROPERTY_V2 = 2
+CLUSTER_CHANGE_GROUP_STATE_V2 = 8
+
+CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE = 4
+
+ERROR_MORE_DATA = 234
+ERROR_INVALID_STATE = 5023
+ERROR_WAIT_TIMEOUT = 258
 ERROR_IO_PENDING = 997
 
+CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES = 0x3000055
+
+CLUSPROP_GROUP_STATUS_INFO = 'StatusInformation'
 CLUSPROP_NAME_VM = 'Virtual Machine'
 CLUSPROP_NAME_VM_CONFIG = 'Virtual Machine Configuration'
+
+
+class NOTIFY_FILTER_AND_TYPE(ctypes.Structure):
+    _fields_ = [('dwObjectType', DWORD),
+                ('FilterFlags', ctypes.c_longlong)]
 
 
 class ClusApiUtils(object):
@@ -158,14 +182,22 @@ class ClusApiUtils(object):
         clusapi.CloseClusterNode(node_handle)
 
     def cancel_cluster_group_operation(self, group_handle):
-        """Requests a pending move operation to be canceled."""
-        # This only applies to move operations requested by
-        # MoveClusterGroup(Ex), thus it will not apply to fail overs.
-        self._run_and_check_output(
+        """Requests a pending move operation to be canceled.
+
+        This only applies to move operations requested by
+        MoveClusterGroup(Ex), thus it will not apply to fail overs.
+
+        return: True if the cancel request completed succesfuly,
+                False if it's still in progress.
+        """
+        ret_val = self._run_and_check_output(
             clusapi.CancelClusterGroupOperation,
             group_handle,
             0,  # cancel flags (reserved for future use by MS)
             ignored_error_codes=[ERROR_IO_PENDING])
+
+        cancel_completed = ret_val != ERROR_IO_PENDING
+        return cancel_completed
 
     def move_cluster_group(self, group_handle, destination_node_handle,
                            move_flags, property_list):
@@ -195,3 +227,180 @@ class ClusApiUtils(object):
 
         return {'state': group_state,
                 'owner_node': node_name_buff.value}
+
+    def create_cluster_notify_port_v2(self, cluster_handle, notif_filters,
+                                      notif_port_h=None, notif_key=None):
+        """Creates or updates a cluster notify port.
+
+        This allows us to subscribe to specific types of cluster events.
+
+        :param cluster_handle: an open cluster handle, for which we'll
+                               receive events. This handle must remain open
+                               while fetching events.
+        :param notif_filters: an array of NOTIFY_FILTER_AND_TYPE structures,
+                              specifying the event types we're listening to.
+        :param notif_port_h: an open cluster notify port handle, when adding
+                             new filters to an existing cluster notify port,
+                             or INVALID_HANDLE_VALUE when creating a new
+                             notify port.
+        :param notif_key: a DWORD value that will be mapped to a specific
+                          event type. When fetching events, the cluster API
+                          will send us back a reference to the according
+                          notification key. For this reason, we must ensure
+                          that this variable will not be garbage collected
+                          while waiting for events.
+        :return: the requested notify port handle,
+        """
+        notif_port_h = notif_port_h or INVALID_HANDLE_VALUE
+        notif_filters_len = (len(notif_filters)
+                             if isinstance(notif_filters, ctypes.Array)
+                             else 1)
+        notif_key_p = (ctypes.byref(notif_key)
+                       if notif_key is not None else None)
+        # If INVALID_HANDLE_VALUE is passed as the notification handle,
+        # a new one will be created. Otherwise, new events are added to the
+        # specified notification port.
+        notif_port_h = self._run_and_check_output(
+            clusapi.CreateClusterNotifyPortV2,
+            notif_port_h,
+            cluster_handle,
+            ctypes.byref(notif_filters),
+            ctypes.c_ulong(notif_filters_len),
+            notif_key_p,
+            **self._open_handle_check_flags)
+        return notif_port_h
+
+    def close_cluster_notify_port(self, notif_port_h):
+        # Always returns True.
+        clusapi.CloseClusterNotifyPort(notif_port_h)
+
+    def get_cluster_notify_v2(self, notif_port_h, timeout_ms):
+        filter_and_type = NOTIFY_FILTER_AND_TYPE()
+        obj_name_buff_sz = ctypes.c_ulong(self._MAX_NODE_NAME)
+        notif_key_p = ctypes.c_void_p()
+        buff_sz = ctypes.c_ulong(self._MAX_NODE_NAME)
+
+        # Event notification buffer. The notification format depends
+        # on the event type and filter flags.
+        buff = (ctypes.c_ubyte * buff_sz.value)()
+        obj_name_buff = (ctypes.c_wchar * obj_name_buff_sz.value)()
+
+        def get_args(buff, obj_name_buff):
+            return (clusapi.GetClusterNotifyV2,
+                    notif_port_h,
+                    ctypes.byref(notif_key_p),
+                    ctypes.byref(filter_and_type),
+                    ctypes.byref(buff),
+                    ctypes.byref(buff_sz),
+                    None,  # object id
+                    None,  # object id sz
+                    None,  # parent id
+                    None,  # parent id sz
+                    ctypes.byref(obj_name_buff),
+                    ctypes.byref(obj_name_buff_sz),
+                    None,  # object type
+                    None,  # object type sz
+                    timeout_ms)
+        try:
+            self._run_and_check_output(*get_args(buff, obj_name_buff))
+        except exceptions.ClusterWin32Exception as ex:
+            if ex.error_code == ERROR_MORE_DATA:
+                # This function will specify the buffer sizes it needs using
+                # the references we pass.
+                buff = (ctypes.c_ubyte * buff_sz.value)()
+                obj_name_buff = (ctypes.c_wchar * obj_name_buff_sz.value)()
+
+                self._run_and_check_output(*get_args(buff, obj_name_buff))
+            else:
+                raise
+
+        # We'll leverage notification key values instead of their addresses,
+        # although this returns us the address we passed in when setting up
+        # the notification port.
+        notif_key = DWORD.from_address(notif_key_p.value).value
+        event = {'cluster_object_name': obj_name_buff.value,
+                 'object_type': filter_and_type.dwObjectType,
+                 'filter_flags': filter_and_type.FilterFlags,
+                 'buff': buff,
+                 'buff_sz': buff_sz.value,
+                 'notif_key': notif_key}
+        return event
+
+    def get_prop_list_entry_p(self, prop_list_p, prop_list_sz, property_name):
+        # We may add a nice property list parser at some point.
+        # ResUtilFindULargeIntegerProperty is also helpful for our use case
+        # but it's available only starting with WS 2016.
+        #
+        # NOTE(lpetrut): in most cases, we're using 'byref' when passing
+        # references to DLL functions. The issue is that those pointers
+        # cannot be used directly, for which reason we have a cast here.
+        prop_list_p = ctypes.cast(
+            prop_list_p, ctypes.POINTER(ctypes.c_ubyte * prop_list_sz))
+        wb_prop_name = bytearray(ctypes.create_unicode_buffer(property_name))
+
+        prop_list_addr = ctypes.addressof(prop_list_p.contents)
+        prop_name_pos = bytearray(prop_list_p.contents).find(wb_prop_name)
+        if prop_name_pos == -1:
+            raise exceptions.ClusterPropertyListEntryNotFound(
+                property_name=property_name)
+
+        prop_name_len_pos = prop_name_pos - ctypes.sizeof(DWORD)
+        prop_name_len_addr = prop_list_addr + prop_name_len_pos
+        prop_name_len = self._dword_align(
+            DWORD.from_address(prop_name_len_addr).value)
+        prop_addr = prop_name_len_addr + prop_name_len + ctypes.sizeof(DWORD)
+        if (prop_addr + ctypes.sizeof(DWORD * 3) >
+                prop_list_addr + prop_list_sz):
+            raise exceptions.ClusterPropertyListParsingError()
+
+        prop_entry = {
+            'syntax': DWORD.from_address(prop_addr).value,
+            'length': DWORD.from_address(
+                prop_addr + ctypes.sizeof(DWORD)).value,
+            'val_p': ctypes.c_void_p(prop_addr + 2 * ctypes.sizeof(DWORD))
+        }
+
+        return prop_entry
+
+    def cluster_group_control(self, group_handle, control_code,
+                              node_handle=None,
+                              in_buff_p=None, in_buff_sz=0):
+        out_buff_sz = ctypes.c_ulong(self._MAX_NODE_NAME)
+        out_buff = (ctypes.c_ubyte * out_buff_sz.value)()
+
+        def get_args(out_buff):
+            return (clusapi.ClusterGroupControl,
+                    group_handle,
+                    node_handle,
+                    control_code,
+                    in_buff_p,
+                    in_buff_sz,
+                    ctypes.byref(out_buff),
+                    out_buff_sz,
+                    ctypes.byref(out_buff_sz))
+
+        try:
+            self._run_and_check_output(*get_args(out_buff))
+        except exceptions.ClusterWin32Exception as ex:
+            if ex.error_code == ERROR_MORE_DATA:
+                out_buff = (ctypes.c_ubyte * out_buff_sz.value)()
+                self._run_and_check_output(*get_args(out_buff))
+            else:
+                raise
+
+        return out_buff, out_buff_sz.value
+
+    def get_cluster_group_status_info(self, prop_list_p, prop_list_sz):
+        prop_entry = self.get_prop_list_entry_p(
+            prop_list_p, prop_list_sz,
+            CLUSPROP_GROUP_STATUS_INFO)
+
+        if (prop_entry['length'] != ctypes.sizeof(ctypes.c_ulonglong) or
+                prop_entry['syntax'] !=
+                CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER):
+            raise exceptions.ClusterPropertyListParsingError()
+
+        status_info_p = prop_entry['val_p']
+        status_info = ctypes.c_ulonglong.from_address(
+            status_info_p.value).value
+        return status_info
