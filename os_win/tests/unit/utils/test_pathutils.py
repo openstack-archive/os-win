@@ -55,6 +55,28 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
                             kernel32=mock.DEFAULT,
                             create=True).start()
 
+    @mock.patch.object(pathutils.PathUtils, 'copy')
+    @mock.patch.object(os.path, 'isfile')
+    @mock.patch.object(os, 'listdir')
+    @mock.patch.object(pathutils.PathUtils, 'check_create_dir')
+    def test_copy_folder_files(self, mock_check_create_dir, mock_listdir,
+                               mock_isfile, mock_copy):
+        src_dir = 'src'
+        dest_dir = 'dest'
+        fname = 'tmp_file.txt'
+        subdir = 'tmp_folder'
+        src_fname = os.path.join(src_dir, fname)
+        dest_fname = os.path.join(dest_dir, fname)
+
+        # making sure src_subdir is not copied.
+        mock_listdir.return_value = [fname, subdir]
+        mock_isfile.side_effect = [True, False]
+
+        self._pathutils.copy_folder_files(src_dir, dest_dir)
+
+        mock_check_create_dir.assert_called_once_with(dest_dir)
+        mock_copy.assert_called_once_with(src_fname, dest_fname)
+
     @mock.patch.object(pathutils.PathUtils, 'rename')
     @mock.patch.object(os.path, 'isfile')
     @mock.patch.object(os, 'listdir')
