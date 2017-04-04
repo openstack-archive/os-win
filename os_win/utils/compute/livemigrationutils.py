@@ -41,7 +41,8 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
 
     def _get_conn_v2(self, host='localhost'):
         try:
-            return self._get_wmi_obj(self._wmi_namespace % host)
+            return self._get_wmi_obj(self._wmi_namespace % host,
+                                     compatibility_mode=True)
         except exceptions.x_wmi as ex:
             LOG.exception(_LE('Get version 2 connection error'))
             if ex.com_error.hresult == -2147217394:

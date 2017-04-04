@@ -288,7 +288,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                   configuration_root_dir=None, snapshot_dir=None,
                   host_shutdown_action=None, vnuma_enabled=None,
                   is_planned_vm=False):
-        vmsetting = self._lookup_vm_check(vm_name)
+        vmsetting = self._lookup_vm_check(vm_name, for_update=True)
 
         if host_shutdown_action:
             vmsetting.AutomaticShutdownAction = host_shutdown_action
