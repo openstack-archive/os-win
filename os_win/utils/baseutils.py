@@ -97,6 +97,9 @@ class BaseUtilsVirt(BaseUtils):
         return self._vs_man_svc_attr
 
     def _get_wmi_compat_conn(self, moniker, **kwargs):
+        # old WMI should be used on Windows / Hyper-V Server 2012 whenever
+        # .GetText_ is used (e.g.: AddResourceSettings). PyMI's and WMI's
+        # .GetText_ have different results.
         if not BaseUtilsVirt._old_wmi:
             old_wmi_path = "%s.py" % wmi.__path__[0]
             BaseUtilsVirt._old_wmi = imp.load_source('old_wmi', old_wmi_path)
