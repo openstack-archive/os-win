@@ -136,6 +136,8 @@ class SMBUtils(baseutils.BaseUtils):
         addr = share_path.lstrip('\\').split('\\', 1)[0]
 
         local_ips = _utils.get_ips(socket.gethostname())
+        local_ips += _utils.get_ips('localhost')
+
         dest_ips = _utils.get_ips(addr)
         is_local = bool(set(local_ips).intersection(set(dest_ips)))
 
