@@ -18,7 +18,7 @@ import socket
 
 from oslo_log import log as logging
 
-from os_win._i18n import _, _LW
+from os_win._i18n import _
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -192,14 +192,14 @@ class HostUtils(baseutils.BaseUtilsVirt):
             memory_info = self._get_numa_memory_info(numa_node_assoc,
                                                      system_memory)
             if not memory_info:
-                LOG.warning(_LW("Could not find memory information for NUMA "
-                                "node. Skipping node measurements."))
+                LOG.warning("Could not find memory information for NUMA "
+                            "node. Skipping node measurements.")
                 continue
 
             cpu_info = self._get_numa_cpu_info(numa_node_assoc, processors)
             if not cpu_info:
-                LOG.warning(_LW("Could not find CPU information for NUMA "
-                                "node. Skipping node measurements."))
+                LOG.warning("Could not find CPU information for NUMA "
+                            "node. Skipping node measurements.")
                 continue
 
             node_info = {

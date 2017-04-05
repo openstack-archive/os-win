@@ -15,7 +15,7 @@
 
 import re
 
-from os_win._i18n import _, _LW
+from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import hostutils
 from oslo_log import log as logging
@@ -55,8 +55,8 @@ class HostUtils10(hostutils.HostUtils):
         (return_code,
          host_config) = self._conn_hgs.MSFT_HgsClientConfiguration.Get()
         if return_code:
-            LOG.warning(_LW('Retrieving the local Host Guardian Service '
-                            'Client configuration failed with code: %s'),
+            LOG.warning('Retrieving the local Host Guardian Service '
+                        'Client configuration failed with code: %s',
                         return_code)
             return False
         return host_config.IsHostGuarded

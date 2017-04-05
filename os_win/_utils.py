@@ -27,7 +27,6 @@ from oslo_utils import excutils
 from oslo_utils import reflection
 import six
 
-from os_win._i18n import _LE
 
 LOG = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ def parse_server_string(server_str):
         return (address, port)
 
     except (ValueError, netaddr.AddrFormatError):
-        LOG.error(_LE('Invalid server_string: %s'), server_str)
+        LOG.error('Invalid server_string: %s', server_str)
         return ('', '')
 
 

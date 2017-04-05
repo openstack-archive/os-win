@@ -23,7 +23,6 @@ import time
 
 from oslo_log import log as logging
 
-from os_win._i18n import _LI, _LE
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -136,8 +135,8 @@ class ISCSIInitiatorUtils(object):
                                        ctypes.byref(buff))
             return buff.value
         except exceptions.ISCSIInitiatorAPIException as ex:
-            LOG.info(_LI("The ISCSI initiator node name can't be found. "
-                         "Choosing the default one. Exception: %s"), ex)
+            LOG.info("The ISCSI initiator node name can't be found. "
+                     "Choosing the default one. Exception: %s", ex)
             return "%s:%s" % (self._MS_IQN_PREFIX, socket.getfqdn().lower())
 
     @ensure_buff_and_retrieve_items(
@@ -418,8 +417,8 @@ class ISCSIInitiatorUtils(object):
                     if device_path and device_number not in (None, -1):
                         return device_number, device_path
                 except exceptions.ISCSIInitiatorAPIException:
-                    err_msg = _LE("Could not find lun %(target_lun)s "
-                                  "for iSCSI target %(target_iqn)s.")
+                    err_msg = ("Could not find lun %(target_lun)s  "
+                               "for iSCSI target %(target_iqn)s.")
                     LOG.exception(err_msg,
                                   dict(target_lun=target_lun,
                                        target_iqn=target_iqn))

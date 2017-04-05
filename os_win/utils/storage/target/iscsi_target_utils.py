@@ -16,7 +16,7 @@
 from oslo_log import log as logging
 import six
 
-from os_win._i18n import _, _LI
+from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -125,7 +125,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
                 raise exceptions.ISCSITargetWMIException(err_msg % target_name,
                                                          wmi_exc=wmi_exc)
             else:
-                LOG.info(_LI('The iSCSI target %s already exists.'),
+                LOG.info('The iSCSI target %s already exists.',
                          target_name)
 
     def delete_iscsi_target(self, target_name):

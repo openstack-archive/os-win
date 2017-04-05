@@ -15,7 +15,6 @@
 
 from oslo_log import log as logging
 
-from os_win._i18n import _, _LI, _LW, _LE  # noqa
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -158,7 +157,7 @@ class NvgreUtils(baseutils.BaseUtils):
                     if n.DriverDescription == self._HYPERV_VIRT_ADAPTER]
 
         if not networks:
-            LOG.error(_LE('No vswitch was found with name: %s'), network_name)
+            LOG.error('No vswitch was found with name: %s', network_name)
             return None, None
 
         ip_addr = self._scimv2.MSFT_NetIPAddress(
@@ -166,7 +165,7 @@ class NvgreUtils(baseutils.BaseUtils):
             AddressFamily=self._IPV4_ADDRESS_FAMILY)
 
         if not ip_addr:
-            LOG.error(_LE('No IP Address could be found for network: %s'),
+            LOG.error('No IP Address could be found for network: %s',
                       network_name)
             return None, None
 

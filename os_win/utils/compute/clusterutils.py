@@ -29,7 +29,7 @@ from oslo_log import log as logging
 from oslo_utils import excutils
 from six.moves import queue
 
-from os_win._i18n import _, _LI, _LE, _LW
+from os_win._i18n import _
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -248,9 +248,9 @@ class ClusterUtils(baseutils.BaseUtils):
                                                      exp_state_after_migr,
                                                      new_host)
                             LOG.warning(
-                                _LW('Cluster group migration completed '
-                                    'successfuly after cancel attempt. '
-                                    'Suppressing timeout exception.'))
+                                'Cluster group migration completed '
+                                'successfuly after cancel attempt. '
+                                'Suppressing timeout exception.')
                             ctxt.reraise = False
                         except exceptions.ClusterGroupMigrationFailed:
                             pass
@@ -307,7 +307,7 @@ class ClusterUtils(baseutils.BaseUtils):
                                         group_name, group_handle,
                                         expected_state,
                                         timeout=None):
-        LOG.info(_LI("Canceling cluster group '%s' migration"), group_name)
+        LOG.info("Canceling cluster group '%s' migration", group_name)
         try:
             cancel_finished = (
                 self._clusapi_utils.cancel_cluster_group_operation(
@@ -335,10 +335,10 @@ class ClusterUtils(baseutils.BaseUtils):
                     expected_state,
                     timeout=timeout)
             except Exception:
-                LOG.exception(_LE("Failed to cancel cluster group migration."))
+                LOG.exception("Failed to cancel cluster group migration.")
                 raise exceptions.JobTerminateFailed()
 
-        LOG.info(_LI("Cluster group migration canceled."))
+        LOG.info("Cluster group migration canceled.")
 
     def _is_migration_queued(self, group_status_info):
         return bool(
@@ -394,7 +394,7 @@ class ClusterUtils(baseutils.BaseUtils):
             if not migration_pending:
                 return
 
-        LOG.error(_LE("Cluster group migration timed out."))
+        LOG.error("Cluster group migration timed out.")
         raise exceptions.ClusterGroupMigrationTimeOut(
             group_name=group_name,
             time_elapsed=time.time() - time_start)
@@ -475,7 +475,7 @@ class ClusterUtils(baseutils.BaseUtils):
                     callback(vm_name, old_host, new_host)
                 except Exception:
                     LOG.exception(
-                        _LE("Exception during failover callback."))
+                        "Exception during failover callback.")
         except exceptions.x_wmi_timed_out:
             pass
 
@@ -567,8 +567,8 @@ class _ClusterEventListener(object):
             except Exception:
                 if self._running:
                     LOG.exception(
-                        _LE("Unexpected exception in event listener loop. "
-                            "The cluster event listener will now close."))
+                        "Unexpected exception in event listener loop. "
+                        "The cluster event listener will now close.")
                     self._signal_stopped()
 
     def _process_event(self, event):

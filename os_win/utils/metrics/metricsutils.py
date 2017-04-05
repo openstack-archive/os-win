@@ -21,7 +21,7 @@ Hyper-V Server / Windows Server 2012.
 
 from oslo_log import log as logging
 
-from os_win._i18n import _, _LW
+from os_win._i18n import _
 from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
@@ -100,7 +100,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
             for metrics_name in metrics_names:
                 metrics_def = self._metrics_defs.get(metrics_name)
                 if not metrics_def:
-                    LOG.warning(_LW("Metric not found: %s"), metrics_name)
+                    LOG.warning("Metric not found: %s", metrics_name)
                     continue
                 definition_paths.append(metrics_def.path_())
 

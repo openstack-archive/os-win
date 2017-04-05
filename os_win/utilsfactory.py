@@ -15,7 +15,7 @@
 
 from oslo_utils import importutils
 
-from os_win._i18n import _, _LW  # noqa
+from os_win._i18n import _  # noqa
 from os_win import exceptions
 from os_win.utils import hostutils
 from os_win.utils.io import namedpipe
