@@ -438,7 +438,8 @@ class ClusterUtils(baseutils.BaseUtils):
         state_info['status_info'] = status_info
         return state_info
 
-    def monitor_vm_failover(self, callback):
+    def monitor_vm_failover(self, callback,
+                            event_timeout_ms=_WMI_EVENT_TIMEOUT_MS):
         """Creates a monitor to check for new WMI MSCluster_Resource
 
         events.
@@ -450,15 +451,19 @@ class ClusterUtils(baseutils.BaseUtils):
         Any event object caught will then be processed.
         """
 
+        # TODO(lpetrut): mark this method as private once compute-hyperv
+        # stops using it. We should also remove the instance '_watcher'
+        # attribute since we end up spawning unused event listeners.
+
         vm_name = None
         new_host = None
         try:
             # wait for new event for _WMI_EVENT_TIMEOUT_MS miliseconds.
             if patcher.is_monkey_patched('thread'):
                 wmi_object = tpool.execute(self._watcher,
-                                           self._WMI_EVENT_TIMEOUT_MS)
+                                           event_timeout_ms)
             else:
-                wmi_object = self._watcher(self._WMI_EVENT_TIMEOUT_MS)
+                wmi_object = self._watcher(event_timeout_ms)
 
             old_host = wmi_object.previous.OwnerNode
             new_host = wmi_object.OwnerNode
@@ -478,6 +483,25 @@ class ClusterUtils(baseutils.BaseUtils):
                         "Exception during failover callback.")
         except exceptions.x_wmi_timed_out:
             pass
+
+    def get_vm_owner_change_listener(self):
+        def listener(callback):
+            while True:
+                # We avoid setting an infinite timeout in order to let
+                # the process gracefully stop. Note that the os-win WMI
+                # event listeners are meant to be used as long running
+                # daemons, so no stop API is provided ATM.
+                try:
+                    self.monitor_vm_failover(
+                        callback,
+                        constants.DEFAULT_WMI_EVENT_TIMEOUT_MS)
+                except Exception:
+                    LOG.exception("The VM cluster group owner change "
+                                  "event listener encountered an "
+                                  "unexpected exception.")
+                    time.sleep(constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
+
+        return listener
 
 
 # At the moment, those event listeners are not meant to be used outside

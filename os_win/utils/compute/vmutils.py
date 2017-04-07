@@ -128,7 +128,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
     }
 
     _DEFAULT_EVENT_CHECK_TIMEFRAME = 60  # seconds
-    _DEFAULT_EVENT_TIMEOUT_MS = 2000
 
     def __init__(self, host='.'):
         super(VMUtils, self).__init__(host)
@@ -906,7 +905,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
     def get_vm_power_state_change_listener(
             self, timeframe=_DEFAULT_EVENT_CHECK_TIMEFRAME,
-            event_timeout=_DEFAULT_EVENT_TIMEOUT_MS,
+            event_timeout=constants.DEFAULT_WMI_EVENT_TIMEOUT_MS,
             filtered_states=None, get_handler=False):
         field = self._VM_ENABLED_STATE_PROP
         query = self._get_event_wql_query(cls=self._COMPUTER_SYSTEM_CLASS,
