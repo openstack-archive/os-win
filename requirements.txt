@@ -3,7 +3,7 @@
 # process, which may cause wedges in the gate later.
 
 pbr>=2.0.0 # Apache-2.0
-Babel>=2.3.4 # BSD
+Babel!=2.4.0,>=2.3.4 # BSD
 
 eventlet!=0.18.3,>=0.18.2 # MIT
 oslo.concurrency>=3.8.0 # Apache-2.0
