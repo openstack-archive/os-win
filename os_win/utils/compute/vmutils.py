@@ -28,7 +28,6 @@ from eventlet import patcher
 from eventlet import tpool
 from oslo_log import log as logging
 from oslo_utils import uuidutils
-import six
 from six.moves import range  # noqa
 
 from os_win._i18n import _, _LE, _LW
@@ -136,7 +135,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
         self._jobutils = jobutils.JobUtils(host)
         self._pathutils = pathutils.PathUtils()
         self._enabled_states_map = {v: k for k, v in
-                                    six.iteritems(self._vm_power_states_map)}
+                                    self._vm_power_states_map.items()}
 
     def list_instance_notes(self):
         instance_notes = []
