@@ -24,11 +24,16 @@ from os_win._i18n import _
 # Define WMI specific exceptions, so WMI won't have to be imported in any
 # module that expects those exceptions.
 if sys.platform == 'win32':
+    from six.moves.builtins import WindowsError
     import wmi
 
     x_wmi = wmi.x_wmi
     x_wmi_timed_out = wmi.x_wmi_timed_out
 else:
+    class WindowsError(Exception):
+        def __init__(self, winerror=None):
+            self.winerror = winerror
+
     class x_wmi(Exception):
         pass
 
@@ -41,6 +46,7 @@ class OSWinException(Exception):
 
     def __init__(self, message=None, **kwargs):
         self.kwargs = kwargs
+        self.error_code = kwargs.get('error_code')
 
         if not message:
             message = self.msg_fmt % kwargs
@@ -85,10 +91,6 @@ class Win32Exception(OSWinException):
     msg_fmt = _("Executing Win32 API function %(func_name)s failed. "
                 "Error code: %(error_code)s. "
                 "Error message: %(error_message)s")
-
-    def __init__(self, message=None, **kwargs):
-        self.error_code = kwargs.get('error_code')
-        super(Win32Exception, self).__init__(message=message, **kwargs)
 
 
 class VHDException(OSWinException):
