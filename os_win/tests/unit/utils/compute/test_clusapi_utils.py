@@ -367,8 +367,8 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                 p_obj_name_buff,
                 ctypes.POINTER(
                     ctypes.c_wchar *
-                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
-                ).contents
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
+            obj_name_buff = obj_name_buff.contents
             ctypes.memset(obj_name_buff, 0, obj_name_buff_sz.value)
             obj_name_buff.value = fake_clus_obj_name
 
@@ -376,8 +376,8 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                 p_buff,
                 ctypes.POINTER(
                     ctypes.c_wchar *
-                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
-                ).contents
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
+            buff = buff.contents
             ctypes.memset(buff, 0, buff_sz.value)
             buff.value = fake_event_buff
 
@@ -391,8 +391,8 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             event['buff'],
             ctypes.POINTER(
                 ctypes.c_wchar *
-                (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
-            ).contents[:]
+                (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
+        w_event_buff = w_event_buff.contents[:]
         event['buff'] = w_event_buff.split('\x00')[0]
 
         expected_event = dict(cluster_object_name=fake_clus_obj_name,
@@ -498,8 +498,8 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                 out_buff_p,
                 ctypes.POINTER(
                     ctypes.c_wchar *
-                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar)))
-                ).contents
+                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
+            out_buff = out_buff.contents
             out_buff.value = fake_out_buff
 
         self._mock_run.side_effect = fake_cluster_group_ctrl
