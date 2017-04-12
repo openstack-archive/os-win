@@ -30,7 +30,7 @@ from oslo_log import log as logging
 from oslo_utils import uuidutils
 from six.moves import range  # noqa
 
-from os_win._i18n import _, _LE, _LW
+from os_win._i18n import _
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -500,8 +500,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
             # Add the new vhd object as a virtual hard disk to the vm.
             self._jobutils.add_virt_resource(res, vm)
         except Exception:
-            LOG.exception(_LE("Failed to attach disk image %(disk_path)s "
-                              "to vm %(vm_name)s. Reverting attachment."),
+            LOG.exception("Failed to attach disk image %(disk_path)s "
+                          "to vm %(vm_name)s. Reverting attachment.",
                           dict(disk_path=path, vm_name=vm_name))
 
             drive = self._get_wmi_obj(drive_path)
@@ -608,9 +608,9 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 disk_found = True
                 break
         if not disk_found:
-            LOG.warning(_LW('Disk not found on controller '
-                            '"%(controller_path)s" with '
-                            'address "%(address)s"'),
+            LOG.warning('Disk not found on controller '
+                        '"%(controller_path)s" with '
+                        'address "%(address)s"',
                         {'controller_path': controller_path,
                          'address': address})
 
@@ -941,10 +941,10 @@ class VMUtils(baseutils.BaseUtilsVirt):
                     try:
                         callback(vm_name, vm_power_state)
                     except Exception:
-                        err_msg = _LE("Executing VM power state change event "
-                                      "callback failed. "
-                                      "VM name: %(vm_name)s, "
-                                      "VM power state: %(vm_power_state)s.")
+                        err_msg = ("Executing VM power state change "
+                                   "event callback failed. "
+                                   "VM name: %(vm_name)s, "
+                                   "VM power state: %(vm_power_state)s.")
                         LOG.exception(err_msg,
                                       dict(vm_name=vm_name,
                                            vm_power_state=vm_power_state))
@@ -952,8 +952,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
                     pass
                 except Exception:
                     LOG.exception(
-                        _LE("The VM power state change event listener "
-                            "encountered an unexpected exception."))
+                        "The VM power state change event listener "
+                        "encountered an unexpected exception.")
                     time.sleep(event_timeout / 1000)
 
         return _handle_events if get_handler else listener

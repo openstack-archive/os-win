@@ -19,7 +19,6 @@ import sys
 
 from oslo_log import log as logging
 
-from os_win._i18n import _LE
 from os_win import _utils
 from os_win import exceptions
 
@@ -134,5 +133,5 @@ class Win32Utils(object):
         try:
             self._run_and_check_output(kernel32.LocalFree, handle)
         except exceptions.Win32Exception:
-            LOG.exception(_LE("Could not deallocate memory. "
-                              "There could be a memory leak."))
+            LOG.exception("Could not deallocate memory. "
+                          "There could be a memory leak.")

@@ -21,7 +21,7 @@ import textwrap
 from oslo_log import log as logging
 import six
 
-from os_win._i18n import _, _LW
+from os_win._i18n import _
 from os_win import _utils
 import os_win.conf
 from os_win import exceptions
@@ -147,18 +147,18 @@ class FCUtils(object):
             try:
                 adapter_name = self._get_adapter_name(adapter_index)
             except Exception as exc:
-                msg = _LW("Could not retrieve FC HBA adapter name for "
-                          "adapter number: %(adapter_index)s. "
-                          "Exception: %(exc)s")
+                msg = ("Could not retrieve FC HBA adapter name for "
+                       "adapter number: %(adapter_index)s. "
+                       "Exception: %(exc)s")
                 LOG.warning(msg, dict(adapter_index=adapter_index, exc=exc))
                 continue
 
             try:
                 hba_ports += self._get_fc_hba_adapter_ports(adapter_name)
             except Exception as exc:
-                msg = _LW("Could not retrieve FC HBA ports for "
-                          "adapter: %(adapter_name)s. "
-                          "Exception: %(exc)s")
+                msg = ("Could not retrieve FC HBA ports for "
+                       "adapter: %(adapter_name)s. "
+                       "Exception: %(exc)s")
                 LOG.warning(msg, dict(adapter_name=adapter_name, exc=exc))
 
         return hba_ports

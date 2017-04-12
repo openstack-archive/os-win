@@ -21,7 +21,7 @@ import sys
 
 from oslo_log import log as logging
 
-from os_win._i18n import _, _LE
+from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -95,8 +95,8 @@ class DiskUtils(baseutils.BaseUtils):
                 kernel32_lib_func=True)
             return total_bytes.value, free_bytes.value
         except exceptions.Win32Exception as exc:
-            LOG.error(_LE("Could not get disk %(path)s capacity info. "
-                          "Exception: %(exc)s"),
+            LOG.error("Could not get disk %(path)s capacity info. "
+                      "Exception: %(exc)s",
                       dict(path=path,
                            exc=exc))
             if ignore_errors:
