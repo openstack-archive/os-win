@@ -158,6 +158,22 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.switch_port_name)
         self.assertEqual(mock.sentinel.mac_address, actual_mac_address)
 
+    @ddt.data([], [mock.sentinel.nic_sd])
+    def test_get_vnic_settings(self, nic_sds):
+        mock_nic_sd = self.netutils._conn.Msvm_SyntheticEthernetPortSettingData
+        mock_nic_sd.return_value = nic_sds
+
+        if not nic_sds:
+            self.assertRaises(exceptions.HyperVvNicNotFound,
+                              self.netutils._get_vnic_settings,
+                              mock.sentinel.vnic_name)
+        else:
+            nic_sd = self.netutils._get_vnic_settings(mock.sentinel.vnic_name)
+            self.assertEqual(mock.sentinel.nic_sd, nic_sd)
+
+        mock_nic_sd.assert_called_once_with(
+            ElementName=mock.sentinel.vnic_name)
+
     @mock.patch.object(networkutils, 'patcher')
     @mock.patch.object(networkutils.tpool, 'execute')
     @mock.patch.object(networkutils.NetworkUtils, '_get_event_wql_query')

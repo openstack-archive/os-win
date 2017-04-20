@@ -91,6 +91,10 @@ class HyperVPortNotFoundException(NotFound, HyperVException):
     msg_fmt = _("Switch port not found: %(port_name)s")
 
 
+class HyperVvNicNotFound(NotFound, HyperVException):
+    msg_fmt = _("vNic not found: %(vnic_name)s")
+
+
 class Invalid(OSWinException):
     pass
 
