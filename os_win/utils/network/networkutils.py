@@ -233,8 +233,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         vnic_settings = self._conn.Msvm_SyntheticEthernetPortSettingData(
             ElementName=vnic_name)
         if not vnic_settings:
-            raise exceptions.HyperVException(
-                message=_('Vnic not found: %s') % vnic_name)
+            raise exceptions.HyperVvNicNotFound(vnic_name=vnic_name)
         return vnic_settings[0]
 
     def get_vnic_event_listener(self, event_type):
