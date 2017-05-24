@@ -23,6 +23,7 @@ from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
 from os_win.utils.io import ioutils
+from os_win.utils.winapi import constants as w_const
 
 threading = patcher.original('threading')
 time = patcher.original('time')
@@ -136,10 +137,10 @@ class NamedPipeHandler(object):
 
         self._pipe_handle = self._ioutils.open(
             self._pipe_name,
-            desired_access=(ioutils.GENERIC_READ | ioutils.GENERIC_WRITE),
-            share_mode=(ioutils.FILE_SHARE_READ | ioutils.FILE_SHARE_WRITE),
-            creation_disposition=ioutils.OPEN_EXISTING,
-            flags_and_attributes=ioutils.FILE_FLAG_OVERLAPPED)
+            desired_access=(w_const.GENERIC_READ | w_const.GENERIC_WRITE),
+            share_mode=(w_const.FILE_SHARE_READ | w_const.FILE_SHARE_WRITE),
+            creation_disposition=w_const.OPEN_EXISTING,
+            flags_and_attributes=w_const.FILE_FLAG_OVERLAPPED)
 
     def _close_pipe(self):
         if self._pipe_handle:

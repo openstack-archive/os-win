@@ -15,7 +15,6 @@
 
 import contextlib
 import ctypes
-import sys
 import textwrap
 
 from oslo_log import log as logging
@@ -25,13 +24,14 @@ from os_win._i18n import _
 from os_win import _utils
 import os_win.conf
 from os_win import exceptions
-from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils import win32utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi.libs import hbaapi as fc_struct
 
 CONF = os_win.conf.CONF
 
-if sys.platform == 'win32':
-    hbaapi = ctypes.cdll.LoadLibrary(CONF.os_win.hbaapi_lib_path)
+hbaapi = w_lib.get_shared_lib_handle(w_lib.HBAAPI)
 
 LOG = logging.getLogger(__name__)
 
@@ -50,40 +50,51 @@ class FCUtils(object):
     def get_fc_hba_count(self):
         return hbaapi.HBA_GetNumberOfAdapters()
 
-    def _open_adapter(self, adapter_name=None, adapter_wwn=None):
-        if adapter_name:
-            func = hbaapi.HBA_OpenAdapter
-            arg = ctypes.c_char_p(six.b(adapter_name))
-        elif adapter_wwn:
-            func = hbaapi.HBA_OpenAdapterByWWN
-            arg = fc_struct.HBA_WWN(*adapter_wwn)
-        else:
-            err_msg = _("Could not open HBA adapter. "
-                        "No HBA name or WWN was specified")
-            raise exceptions.FCException(err_msg)
+    def _open_adapter_by_name(self, adapter_name):
+        handle = self._run_and_check_output(
+            hbaapi.HBA_OpenAdapter,
+            ctypes.c_char_p(six.b(adapter_name)),
+            ret_val_is_err_code=False,
+            error_on_nonzero_ret_val=False,
+            error_ret_vals=[0])
+        return handle
 
-        handle = self._run_and_check_output(func, arg,
-                                            ret_val_is_err_code=False,
-                                            error_on_nonzero_ret_val=False,
-                                            error_ret_vals=[0])
+    def _open_adapter_by_wwn(self, adapter_wwn):
+        handle = fc_struct.HBA_HANDLE()
+        hba_wwn = fc_struct.HBA_WWN()
+        hba_wwn.wwn[:] = adapter_wwn
+
+        self._run_and_check_output(
+            hbaapi.HBA_OpenAdapterByWWN,
+            ctypes.byref(handle),
+            hba_wwn)
+
         return handle
 
     def _close_adapter(self, hba_handle):
         hbaapi.HBA_CloseAdapter(hba_handle)
 
     @contextlib.contextmanager
-    def _get_hba_handle(self, *args, **kwargs):
-        hba_handle = self._open_adapter(*args, **kwargs)
+    def _get_hba_handle(self, adapter_name=None, adapter_wwn=None):
+        if adapter_name:
+            hba_handle = self._open_adapter_by_name(adapter_name)
+        elif adapter_wwn:
+            hba_handle = self._open_adapter_by_wwn(adapter_wwn)
+        else:
+            err_msg = _("Could not open HBA adapter. "
+                        "No HBA name or WWN was specified")
+            raise exceptions.FCException(err_msg)
+
         try:
             yield hba_handle
         finally:
             self._close_adapter(hba_handle)
 
     def _get_adapter_name(self, adapter_index):
-        buff = (ctypes.c_char * 256)()
+        buff = (ctypes.c_char * w_const.MAX_ISCSI_HBANAME_LEN)()
         self._run_and_check_output(hbaapi.HBA_GetAdapterName,
                                    ctypes.c_uint32(adapter_index),
-                                   ctypes.byref(buff))
+                                   buff)
 
         return buff.value.decode('utf-8')
 
@@ -130,8 +141,8 @@ class FCUtils(object):
                 port_attributes = self._get_adapter_port_attributes(
                     hba_handle,
                     port_index)
-                wwnn = self._wwn_array_to_hex_str(port_attributes.NodeWWN)
-                wwpn = self._wwn_array_to_hex_str(port_attributes.PortWWN)
+                wwnn = self._wwn_array_to_hex_str(port_attributes.NodeWWN.wwn)
+                wwpn = self._wwn_array_to_hex_str(port_attributes.PortWWN.wwn)
 
                 hba_port_info = dict(node_name=wwnn,
                                      port_name=wwpn)
@@ -176,8 +187,8 @@ class FCUtils(object):
         with self._get_hba_handle(adapter_wwn=node_wwn) as hba_handle:
             fcp_mappings = self._get_target_mapping(hba_handle)
             for entry in fcp_mappings.Entries:
-                wwnn = self._wwn_array_to_hex_str(entry.FcpId.NodeWWN)
-                wwpn = self._wwn_array_to_hex_str(entry.FcpId.PortWWN)
+                wwnn = self._wwn_array_to_hex_str(entry.FcpId.NodeWWN.wwn)
+                wwpn = self._wwn_array_to_hex_str(entry.FcpId.PortWWN.wwn)
                 mapping = dict(node_name=wwnn,
                                port_name=wwpn,
                                device_name=entry.ScsiId.OSDeviceName,

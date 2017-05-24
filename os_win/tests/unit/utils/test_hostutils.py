@@ -51,10 +51,10 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
 
         super(HostUtilsTestCase, self).setUp()
 
-    @mock.patch('os_win.utils.hostutils.ctypes')
-    def test_get_host_tick_count64(self, mock_ctypes):
+    @mock.patch('os_win.utils.hostutils.kernel32')
+    def test_get_host_tick_count64(self, mock_kernel32):
         tick_count64 = "100"
-        mock_ctypes.windll.kernel32.GetTickCount64.return_value = tick_count64
+        mock_kernel32.GetTickCount64.return_value = tick_count64
         response = self._hostutils.get_host_tick_count64()
         self.assertEqual(tick_count64, response)
 

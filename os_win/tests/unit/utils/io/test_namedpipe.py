@@ -21,8 +21,8 @@ from six.moves import builtins
 
 from os_win import constants
 from os_win import exceptions
-from os_win.utils.io import ioutils
 from os_win.utils.io import namedpipe
+from os_win.utils.winapi import constants as w_const
 
 
 class NamedPipeTestCase(base.BaseTestCase):
@@ -180,10 +180,10 @@ class NamedPipeTestCase(base.BaseTestCase):
             mock.sentinel.pipe_name)
         self._ioutils.open.assert_called_once_with(
             mock.sentinel.pipe_name,
-            desired_access=(ioutils.GENERIC_READ | ioutils.GENERIC_WRITE),
-            share_mode=(ioutils.FILE_SHARE_READ | ioutils.FILE_SHARE_WRITE),
-            creation_disposition=ioutils.OPEN_EXISTING,
-            flags_and_attributes=ioutils.FILE_FLAG_OVERLAPPED)
+            desired_access=(w_const.GENERIC_READ | w_const.GENERIC_WRITE),
+            share_mode=(w_const.FILE_SHARE_READ | w_const.FILE_SHARE_WRITE),
+            creation_disposition=w_const.OPEN_EXISTING,
+            flags_and_attributes=w_const.FILE_FLAG_OVERLAPPED)
 
         self.assertEqual(self._ioutils.open.return_value,
                          self._handler._pipe_handle)

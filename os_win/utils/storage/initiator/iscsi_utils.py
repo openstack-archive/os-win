@@ -18,28 +18,32 @@ import ctypes
 import functools
 import inspect
 import socket
-import sys
 import time
 
 from oslo_log import log as logging
+import six
 
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils.storage import diskutils
-from os_win.utils.storage.initiator import iscsidsc_structures as iscsi_struct
-from os_win.utils.storage.initiator import iscsierr
 from os_win.utils import win32utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.errmsg import iscsierr
+from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi.libs import iscsidsc as iscsi_struct
 
-if sys.platform == 'win32':
-    iscsidsc = ctypes.windll.iscsidsc
+iscsidsc = w_lib.get_shared_lib_handle(w_lib.ISCSIDSC)
 
 LOG = logging.getLogger(__name__)
 
-ERROR_INSUFFICIENT_BUFFER = 0x7a
+
+def _get_buff(size, item_type):
+    buff = (ctypes.c_ubyte * size)()
+    return ctypes.cast(buff, ctypes.POINTER(item_type))
 
 
-def ensure_buff_and_retrieve_items(struct_type=None,
+def ensure_buff_and_retrieve_items(struct_type,
                                    func_requests_buff_sz=True,
                                    parse_output=True):
     # The iscsidsc.dll functions retrieving data accept a buffer, which will
@@ -47,12 +51,17 @@ def ensure_buff_and_retrieve_items(struct_type=None,
     # the error code will show it. In this case, the decorator will adjust the
     # buffer size based on the buffer size or the element count provided by
     # the function, attempting to call it again.
+    #
+    # We need to provide a buffer large enough to store the retrieved data.
+    # This may be more than the size of the retrieved structures as those
+    # may contain pointers. We're also casting the buffer to the appropriate
+    # type as function parameters are validated.
     def wrapper(f):
         @functools.wraps(f)
         def inner(*args, **kwargs):
             call_args = inspect.getcallargs(f, *args, **kwargs)
             call_args['element_count'] = ctypes.c_ulong(0)
-            call_args['buff'] = (ctypes.c_ubyte * 0)()
+            call_args['buff'] = _get_buff(0, struct_type)
             call_args['buff_size'] = ctypes.c_ulong(0)
 
             while True:
@@ -66,13 +75,14 @@ def ensure_buff_and_retrieve_items(struct_type=None,
                     else:
                         return ret_val
                 except exceptions.Win32Exception as ex:
-                    if (ex.error_code & 0xFFFF) == ERROR_INSUFFICIENT_BUFFER:
+                    if (ex.error_code & 0xFFFF ==
+                            w_const.ERROR_INSUFFICIENT_BUFFER):
                         if func_requests_buff_sz:
                             buff_size = call_args['buff_size'].value
                         else:
                             buff_size = (ctypes.sizeof(struct_type) *
                                          call_args['element_count'].value)
-                        call_args['buff'] = (ctypes.c_ubyte * buff_size)()
+                        call_args['buff'] = _get_buff(buff_size, struct_type)
                     else:
                         raise
         return inner
@@ -93,6 +103,7 @@ retry_decorator = functools.partial(
 class ISCSIInitiatorUtils(object):
     _DEFAULT_RESCAN_ATTEMPTS = 3
     _MS_IQN_PREFIX = "iqn.1991-05.com.microsoft"
+    _DEFAULT_ISCSI_PORT = 3260
 
     def __init__(self):
         self._win32utils = win32utils.Win32Utils()
@@ -110,7 +121,7 @@ class ISCSIInitiatorUtils(object):
         self._run_and_check_output(
             iscsidsc.ReportIScsiPersistentLoginsW,
             ctypes.byref(element_count),
-            ctypes.byref(buff),
+            buff,
             ctypes.byref(buff_size))
 
     @ensure_buff_and_retrieve_items(
@@ -124,15 +135,15 @@ class ISCSIInitiatorUtils(object):
             iscsidsc.ReportIScsiTargetsW,
             forced_update,
             ctypes.byref(element_count),
-            ctypes.byref(buff))
+            buff)
         return self._parse_string_list(buff, element_count.value)
 
     def get_iscsi_initiator(self):
         """Returns the initiator node name."""
         try:
-            buff = (ctypes.c_wchar * (iscsi_struct.MAX_ISCSI_NAME_LEN + 1))()
+            buff = (ctypes.c_wchar * (w_const.MAX_ISCSI_NAME_LEN + 1))()
             self._run_and_check_output(iscsidsc.GetIScsiInitiatorNodeNameW,
-                                       ctypes.byref(buff))
+                                       buff)
             return buff.value
         except exceptions.ISCSIInitiatorAPIException as ex:
             LOG.info("The ISCSI initiator node name can't be found. "
@@ -149,7 +160,7 @@ class ISCSIInitiatorUtils(object):
         self._run_and_check_output(
             iscsidsc.ReportIScsiInitiatorListW,
             ctypes.byref(element_count),
-            ctypes.byref(buff))
+            buff)
         return self._parse_string_list(buff, element_count.value)
 
     @staticmethod
@@ -160,7 +171,7 @@ class ISCSIInitiatorUtils(object):
         str_list = str_list.split('\x00') if str_list else []
         return str_list
 
-    @retry_decorator(error_codes=iscsi_struct.ERROR_INSUFFICIENT_BUFFER)
+    @retry_decorator(error_codes=w_const.ERROR_INSUFFICIENT_BUFFER)
     def _login_iscsi_target(self, target_name, portal=None, login_opts=None,
                             is_persistent=True, initiator_name=None):
         session_id = iscsi_struct.ISCSI_UNIQUE_SESSION_ID()
@@ -177,10 +188,9 @@ class ISCSIInitiatorUtils(object):
             ctypes.c_wchar_p(target_name),
             False,  # IsInformationalSession
             initiator_name_ref,
-            ctypes.c_ulong(iscsi_struct.ISCSI_ANY_INITIATOR_PORT),
+            ctypes.c_ulong(w_const.ISCSI_ANY_INITIATOR_PORT),
             portal_ref,
-            iscsi_struct.ISCSI_SECURITY_FLAGS(
-                iscsi_struct.ISCSI_DEFAULT_SECURITY_FLAGS),
+            iscsi_struct.ISCSI_SECURITY_FLAGS(),
             None,  # Security flags / mappings (using default / auto)
             login_opts_ref,
             ctypes.c_ulong(0),
@@ -188,7 +198,7 @@ class ISCSIInitiatorUtils(object):
             is_persistent,
             ctypes.byref(session_id),
             ctypes.byref(connection_id),
-            ignored_error_codes=[iscsierr.ISDSC_TARGET_ALREADY_LOGGED_IN])
+            ignored_error_codes=[w_const.ISDSC_TARGET_ALREADY_LOGGED_IN])
         return session_id, connection_id
 
     @ensure_buff_and_retrieve_items(
@@ -199,7 +209,7 @@ class ISCSIInitiatorUtils(object):
             iscsidsc.GetIScsiSessionListW,
             ctypes.byref(buff_size),
             ctypes.byref(element_count),
-            ctypes.byref(buff))
+            buff)
 
     def _get_iscsi_target_sessions(self, target_name, connected_only=True):
         sessions = self._get_iscsi_sessions()
@@ -208,8 +218,8 @@ class ISCSIInitiatorUtils(object):
                 and session.TargetNodeName.upper() == target_name.upper()
                 and (session.ConnectionCount > 0 or not connected_only)]
 
-    @retry_decorator(error_codes=(iscsierr.ISDSC_SESSION_BUSY,
-                                  iscsierr.ISDSC_DEVICE_BUSY_ON_SESSION))
+    @retry_decorator(error_codes=(w_const.ISDSC_SESSION_BUSY,
+                                  w_const.ISDSC_DEVICE_BUSY_ON_SESSION))
     @ensure_buff_and_retrieve_items(
         struct_type=iscsi_struct.ISCSI_DEVICE_ON_SESSION,
         func_requests_buff_sz=False)
@@ -220,13 +230,13 @@ class ISCSIInitiatorUtils(object):
             iscsidsc.GetDevicesForIScsiSessionW,
             ctypes.byref(session_id),
             ctypes.byref(element_count),
-            ctypes.byref(buff))
+            buff)
 
     def _get_iscsi_session_disk_luns(self, session_id):
         devices = self._get_iscsi_session_devices(session_id)
         luns = [device.ScsiAddress.Lun for device in devices
                 if (device.StorageDeviceNumber.DeviceType ==
-                    iscsi_struct.FILE_DEVICE_DISK)]
+                    w_const.FILE_DEVICE_DISK)]
         return luns
 
     def _get_iscsi_device_from_session(self, session_id, target_lun):
@@ -272,7 +282,7 @@ class ISCSIInitiatorUtils(object):
     def get_target_lun_count(self, target_name):
         return len(self.get_target_luns(target_name))
 
-    @retry_decorator(error_codes=iscsierr.ISDSC_SESSION_BUSY)
+    @retry_decorator(error_codes=w_const.ISDSC_SESSION_BUSY)
     def _logout_iscsi_target(self, session_id):
         self._run_and_check_output(
             iscsidsc.LogoutIScsiTarget,
@@ -289,21 +299,37 @@ class ISCSIInitiatorUtils(object):
                                    None)  # Portal group
 
     def _remove_static_target(self, target_name):
-        ignored_error_codes = [iscsierr.ISDSC_TARGET_NOT_FOUND]
+        ignored_error_codes = [w_const.ISDSC_TARGET_NOT_FOUND]
         self._run_and_check_output(iscsidsc.RemoveIScsiStaticTargetW,
                                    ctypes.c_wchar_p(target_name),
                                    ignored_error_codes=ignored_error_codes)
 
-    def _get_login_opts(self, auth_username, auth_password, auth_type,
-                        login_flags=0):
+    def _get_login_opts(self, auth_username=None, auth_password=None,
+                        auth_type=None, login_flags=0):
         if auth_type is None:
             auth_type = (constants.ISCSI_CHAP_AUTH_TYPE
                          if auth_username and auth_password
                          else constants.ISCSI_NO_AUTH_TYPE)
-        login_opts = iscsi_struct.ISCSI_LOGIN_OPTIONS(Username=auth_username,
-                                                      Password=auth_password,
-                                                      AuthType=auth_type,
-                                                      LoginFlags=login_flags)
+
+        login_opts = iscsi_struct.ISCSI_LOGIN_OPTIONS()
+
+        info_bitmap = 0
+        if auth_username:
+            login_opts.Username = six.b(auth_username)
+            login_opts.UsernameLength = len(auth_username)
+            info_bitmap |= w_const.ISCSI_LOGIN_OPTIONS_USERNAME
+
+        if auth_password:
+            login_opts.Password = six.b(auth_password)
+            login_opts.PasswordLength = len(auth_password)
+            info_bitmap |= w_const.ISCSI_LOGIN_OPTIONS_PASSWORD
+
+        login_opts.AuthType = auth_type
+        info_bitmap |= w_const.ISCSI_LOGIN_OPTIONS_AUTH_TYPE
+
+        login_opts.InformationSpecified = info_bitmap
+        login_opts.LoginFlags = login_flags
+
         return login_opts
 
     def _session_on_path_exists(self, target_sessions, portal_addr,
@@ -354,7 +380,7 @@ class ISCSIInitiatorUtils(object):
                              rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS):
         portal_addr, portal_port = _utils.parse_server_string(target_portal)
         portal_port = (int(portal_port)
-                       if portal_port else iscsi_struct.DEFAULT_ISCSI_PORT)
+                       if portal_port else self._DEFAULT_ISCSI_PORT)
 
         known_targets = self.get_targets()
         if target_iqn not in known_targets:
@@ -370,7 +396,7 @@ class ISCSIInitiatorUtils(object):
             # If the multipath flag is set, multiple sessions to the same
             # target may be estabilished. MPIO must be enabled and configured
             # to claim iSCSI disks, otherwise data corruption can occur.
-            login_flags = (iscsi_struct.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
+            login_flags = (w_const.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
                            if mpio_enabled else 0)
             login_opts = self._get_login_opts(auth_username,
                                               auth_password,
@@ -432,8 +458,8 @@ class ISCSIInitiatorUtils(object):
         raise exceptions.ISCSILunNotAvailable(target_lun=target_lun,
                                               target_iqn=target_iqn)
 
-    @retry_decorator(error_codes=(iscsierr.ISDSC_SESSION_BUSY,
-                                  iscsierr.ISDSC_DEVICE_BUSY_ON_SESSION))
+    @retry_decorator(error_codes=(w_const.ISDSC_SESSION_BUSY,
+                                  w_const.ISDSC_DEVICE_BUSY_ON_SESSION))
     def logout_storage_target(self, target_iqn):
         LOG.debug("Logging out iSCSI target %(target_iqn)s",
                   dict(target_iqn=target_iqn))

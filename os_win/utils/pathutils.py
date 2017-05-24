@@ -29,18 +29,17 @@ from os_win import _utils
 from os_win import exceptions
 from os_win.utils import _acl_utils
 from os_win.utils import win32utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi.libs import advapi32 as advapi32_def
+from os_win.utils.winapi import wintypes
 
-if sys.platform == 'win32':
-    from ctypes import wintypes
-    kernel32 = ctypes.windll.kernel32
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 
-ERROR_DIR_IS_NOT_EMPTY = 145
-
 
 class PathUtils(object):
-    _FILE_ATTRIBUTE_REPARSE_POINT = 0x0400
 
     def __init__(self):
         self._win32_utils = win32utils.Win32Utils()
@@ -126,7 +125,7 @@ class PathUtils(object):
                 self.rename(src, os.path.join(dest_dir, fname))
 
     @_utils.retry_decorator(exceptions=exceptions.OSWinException,
-                            error_codes=[ERROR_DIR_IS_NOT_EMPTY])
+                            error_codes=[w_const.ERROR_DIR_IS_NOT_EMPTY])
     def rmtree(self, path):
         try:
             shutil.rmtree(path)
@@ -152,11 +151,12 @@ class PathUtils(object):
 
         file_attr = self._win32_utils.run_and_check_output(
             kernel32.GetFileAttributesW,
-            six.text_type(path),
+            path,
+            error_ret_vals=[w_const.INVALID_FILE_ATTRIBUTES],
             kernel32_lib_func=True)
 
         return bool(os.path.isdir(path) and (
-            file_attr & self._FILE_ATTRIBUTE_REPARSE_POINT))
+            file_attr & w_const.FILE_ATTRIBUTE_REPARSE_POINT))
 
     def create_sym_link(self, link, target, target_is_dir=True):
         """If target_is_dir is True, a junction will be created.
@@ -164,15 +164,7 @@ class PathUtils(object):
         NOTE: Juctions only work on same filesystem.
         """
 
-        create_symlink = kernel32.CreateSymbolicLinkW
-        create_symlink.argtypes = (
-            ctypes.c_wchar_p,
-            ctypes.c_wchar_p,
-            ctypes.c_ulong,
-        )
-        create_symlink.restype = ctypes.c_ubyte
-
-        self._win32_utils.run_and_check_output(create_symlink,
+        self._win32_utils.run_and_check_output(kernel32.CreateSymbolicLinkW,
                                                link,
                                                target,
                                                target_is_dir,
@@ -211,15 +203,15 @@ class PathUtils(object):
         try:
             sec_info = self._acl_utils.get_named_security_info(
                 obj_name=path,
-                obj_type=_acl_utils.SE_FILE_OBJECT,
-                security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+                obj_type=w_const.SE_FILE_OBJECT,
+                security_info_flags=w_const.DACL_SECURITY_INFORMATION)
             p_to_free.append(sec_info['pp_sec_desc'].contents)
 
-            access = _acl_utils.EXPLICIT_ACCESS()
+            access = advapi32_def.EXPLICIT_ACCESS()
             access.grfAccessPermissions = access_rights
             access.grfAccessMode = access_mode
             access.grfInheritance = inheritance_flags
-            access.Trustee.TrusteeForm = _acl_utils.TRUSTEE_IS_NAME
+            access.Trustee.TrusteeForm = w_const.TRUSTEE_IS_NAME
             access.Trustee.pstrName = ctypes.c_wchar_p(trustee_name)
 
             pp_new_dacl = self._acl_utils.set_entries_in_acl(
@@ -230,8 +222,8 @@ class PathUtils(object):
 
             self._acl_utils.set_named_security_info(
                 obj_name=path,
-                obj_type=_acl_utils.SE_FILE_OBJECT,
-                security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+                obj_type=w_const.SE_FILE_OBJECT,
+                security_info_flags=w_const.DACL_SECURITY_INFORMATION,
                 p_dacl=pp_new_dacl.contents)
         finally:
             for p in p_to_free:
@@ -241,16 +233,16 @@ class PathUtils(object):
         p_to_free = []
 
         try:
-            sec_info_flags = _acl_utils.DACL_SECURITY_INFORMATION
+            sec_info_flags = w_const.DACL_SECURITY_INFORMATION
             sec_info = self._acl_utils.get_named_security_info(
                 obj_name=source_path,
-                obj_type=_acl_utils.SE_FILE_OBJECT,
+                obj_type=w_const.SE_FILE_OBJECT,
                 security_info_flags=sec_info_flags)
             p_to_free.append(sec_info['pp_sec_desc'].contents)
 
             self._acl_utils.set_named_security_info(
                 obj_name=dest_path,
-                obj_type=_acl_utils.SE_FILE_OBJECT,
+                obj_type=w_const.SE_FILE_OBJECT,
                 security_info_flags=sec_info_flags,
                 p_dacl=sec_info['pp_dacl'].contents)
         finally:

@@ -19,14 +19,16 @@ import ctypes
 
 import ddt
 import mock
+import six
 
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils.storage.initiator import iscsi_utils
-from os_win.utils.storage.initiator import iscsidsc_structures as iscsi_struct
-from os_win.utils.storage.initiator import iscsierr
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.errmsg import iscsierr
+from os_win.utils.winapi.libs import iscsidsc as iscsi_struct
 
 
 @ddt.ddt
@@ -95,7 +97,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
                                     parse_output=False):
         insufficient_buff_exc = exceptions.Win32Exception(
             message='fake_err_msg',
-            error_code=iscsi_utils.ERROR_INSUFFICIENT_BUFFER)
+            error_code=w_const.ERROR_INSUFFICIENT_BUFFER)
         func_requests_buff_sz = required_buff_sz is not None
         struct_type = ctypes.c_uint
 
@@ -119,19 +121,13 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         # We expect our decorated method to be called exactly two times.
         first_call_args_dict = func_side_effect.call_args_list[0][1]
         self.assertIsInstance(first_call_args_dict['buff'],
-                              ctypes.c_ubyte * 0)
+                              ctypes.POINTER(struct_type))
         self.assertEqual(first_call_args_dict['buff_size_val'], 0)
         self.assertEqual(first_call_args_dict['element_count_val'], 0)
 
-        if required_buff_sz:
-            expected_buff_sz = required_buff_sz
-        else:
-            expected_buff_sz = ctypes.sizeof(
-                struct_type) * returned_element_count
-
         second_call_args_dict = func_side_effect.call_args_list[1][1]
         self.assertIsInstance(second_call_args_dict['buff'],
-                              ctypes.c_ubyte * expected_buff_sz)
+                              ctypes.POINTER(struct_type))
         self.assertEqual(second_call_args_dict['buff_size_val'],
                          required_buff_sz or 0)
         self.assertEqual(second_call_args_dict['element_count_val'],
@@ -151,7 +147,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         func_side_effect = mock.Mock(side_effect=fake_exc)
         fake_func = self._get_fake_iscsi_utils_getter_func(
             func_side_effect=func_side_effect,
-            decorator_args={})
+            decorator_args={'struct_type': ctypes.c_ubyte})
 
         self.assertRaises(exceptions.Win32Exception, fake_func,
                           self._initiator)
@@ -199,7 +195,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         self._mock_run.assert_called_once_with(
             self._iscsidsc.ReportIScsiPersistentLoginsW,
             self._ctypes.byref(mock.sentinel.element_count),
-            self._ctypes.byref(mock.sentinel.buff),
+            mock.sentinel.buff,
             self._ctypes.byref(mock.sentinel.buff_size))
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
@@ -223,7 +219,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
             self._iscsidsc.ReportIScsiTargetsW,
             mock.sentinel.forced_update,
             self._ctypes.byref(mock_el_count),
-            self._ctypes.byref(mock.sentinel.buff))
+            mock.sentinel.buff)
         mock_parse_string_list.assert_called_once_with(
             mock.sentinel.buff, mock.sentinel.element_count)
 
@@ -246,7 +242,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         self._mock_run.assert_called_once_with(
             self._iscsidsc.ReportIScsiInitiatorListW,
             self._ctypes.byref(mock_el_count),
-            self._ctypes.byref(mock.sentinel.buff))
+            mock.sentinel.buff)
         mock_parse_string_list.assert_called_once_with(
             mock.sentinel.buff, mock.sentinel.element_count)
 
@@ -270,14 +266,14 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._ctypes.c_wchar = mock.MagicMock()
         fake_buff = (self._ctypes.c_wchar * (
-            iscsi_struct.MAX_ISCSI_NAME_LEN + 1))()
+            w_const.MAX_ISCSI_NAME_LEN + 1))()
         fake_buff.value = mock.sentinel.buff_value
 
         resulted_iscsi_initiator = self._initiator.get_iscsi_initiator()
 
         self._mock_run.assert_called_once_with(
             self._iscsidsc.GetIScsiInitiatorNodeNameW,
-            self._ctypes.byref(fake_buff))
+            fake_buff)
         self.assertEqual(mock.sentinel.buff_value,
                          resulted_iscsi_initiator)
 
@@ -315,11 +311,10 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(fake_target_name, args_list[1].value)
         self.assertIsInstance(args_list[4], ctypes.c_ulong)
         self.assertEqual(
-            ctypes.c_ulong(iscsi_struct.ISCSI_ANY_INITIATOR_PORT).value,
+            ctypes.c_ulong(w_const.ISCSI_ANY_INITIATOR_PORT).value,
             args_list[4].value)
         self.assertIsInstance(args_list[6], ctypes.c_ulonglong)
-        self.assertEqual(iscsi_struct.ISCSI_DEFAULT_SECURITY_FLAGS,
-                         args_list[6].value)
+        self.assertEqual(0, args_list[6].value)
         self.assertIsInstance(args_list[9], ctypes.c_ulong)
         self.assertEqual(0, args_list[9].value)
 
@@ -348,7 +343,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
             self._iscsidsc.GetIScsiSessionListW,
             self._ctypes.byref(mock.sentinel.buff_size),
             self._ctypes.byref(mock.sentinel.element_count),
-            self._ctypes.byref(mock.sentinel.buff))
+            mock.sentinel.buff)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_sessions')
@@ -385,14 +380,13 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
             self._iscsidsc.GetDevicesForIScsiSessionW,
             self._ctypes.byref(mock.sentinel.session_id),
             self._ctypes.byref(mock.sentinel.element_count),
-            self._ctypes.byref(mock.sentinel.buff))
+            mock.sentinel.buff)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_session_devices')
     def test_get_iscsi_session_luns(self, mock_get_iscsi_session_devices):
         fake_device = mock.Mock()
-        fake_device.StorageDeviceNumber.DeviceType = (
-            iscsi_struct.FILE_DEVICE_DISK)
+        fake_device.StorageDeviceNumber.DeviceType = w_const.FILE_DEVICE_DISK
         mock_get_iscsi_session_devices.return_value = [fake_device,
                                                        mock.Mock()]
 
@@ -533,45 +527,44 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._initiator._remove_static_target(mock.sentinel.target_name)
 
-        expected_ignored_err_codes = [iscsierr.ISDSC_TARGET_NOT_FOUND]
+        expected_ignored_err_codes = [w_const.ISDSC_TARGET_NOT_FOUND]
         self._mock_run.assert_called_once_with(
             self._iscsidsc.RemoveIScsiStaticTargetW,
             self._ctypes.c_wchar_p(mock.sentinel.target_name),
             ignored_error_codes=expected_ignored_err_codes)
 
-    @mock.patch.object(iscsi_struct, 'ISCSI_LOGIN_OPTIONS')
-    def _test_get_login_opts(self, mock_cls_ISCSI_LOGIN_OPTIONS,
-                             auth_type=None, creds_specified=False):
-        auth_user = mock.sentinel.auth_user if creds_specified else None
-        auth_pwd = mock.sentinel.auth_pwd if creds_specified else None
+    def test_get_login_opts(self):
+        fake_username = 'fake_chap_username'
+        fake_password = 'fake_chap_secret'
+        auth_type = constants.ISCSI_CHAP_AUTH_TYPE
+        login_flags = w_const.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
 
-        if not auth_type:
-            expected_auth_type = (constants.ISCSI_CHAP_AUTH_TYPE
-                                  if creds_specified
-                                  else constants.ISCSI_NO_AUTH_TYPE)
-        else:
-            expected_auth_type = auth_type
+        login_opts = self._initiator._get_login_opts(
+            auth_username=fake_username,
+            auth_password=fake_password,
+            auth_type=auth_type,
+            login_flags=login_flags)
 
-        resulted_login_opts = self._initiator._get_login_opts(
-            auth_user, auth_pwd, auth_type,
-            mock.sentinel.login_flags)
+        self.assertEqual(len(fake_username), login_opts.UsernameLength)
+        self.assertEqual(len(fake_password), login_opts.PasswordLength)
 
-        expected_login_opts = mock_cls_ISCSI_LOGIN_OPTIONS.return_value
-        mock_cls_ISCSI_LOGIN_OPTIONS.assert_called_once_with(
-            Username=auth_user,
-            Password=auth_pwd,
-            AuthType=expected_auth_type,
-            LoginFlags=mock.sentinel.login_flags)
-        self.assertEqual(expected_login_opts, resulted_login_opts)
+        username_struct_contents = ctypes.cast(
+            login_opts.Username,
+            ctypes.POINTER(ctypes.c_char * len(fake_username))).contents.value
+        pwd_struct_contents = ctypes.cast(
+            login_opts.Password,
+            ctypes.POINTER(ctypes.c_char * len(fake_password))).contents.value
 
-    def test_get_login_opts_without_creds_and_explicit_auth_type(self):
-        self._test_get_login_opts()
+        self.assertEqual(six.b(fake_username), username_struct_contents)
+        self.assertEqual(six.b(fake_password), pwd_struct_contents)
 
-    def test_get_login_opts_with_creds_and_without_explicit_auth_type(self):
-        self._test_get_login_opts(creds_specified=True)
-
-    def test_get_login_opts_with_explicit_auth_type(self):
-        self._test_get_login_opts(auth_type=mock.sentinel.auth_type)
+        expected_info_bitmap = (w_const.ISCSI_LOGIN_OPTIONS_USERNAME |
+                                w_const.ISCSI_LOGIN_OPTIONS_PASSWORD |
+                                w_const.ISCSI_LOGIN_OPTIONS_AUTH_TYPE)
+        self.assertEqual(expected_info_bitmap,
+                         login_opts.InformationSpecified)
+        self.assertEqual(login_flags,
+                         login_opts.LoginFlags)
 
     @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils,
                        '_get_iscsi_session_devices')
@@ -687,7 +680,7 @@ class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
 
         if login_required:
             expected_login_flags = (
-                iscsi_struct.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
+                w_const.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
                 if mpio_enabled else 0)
             mock_get_login_opts.assert_called_once_with(
                 mock.sentinel.auth_username,

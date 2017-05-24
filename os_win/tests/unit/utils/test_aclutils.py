@@ -18,6 +18,7 @@ import mock
 
 from os_win.tests.unit import test_base
 from os_win.utils import _acl_utils
+from os_win.utils.winapi import constants as w_const
 
 
 @ddt.ddt
@@ -38,7 +39,7 @@ class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock.patch.multiple(_acl_utils,
                             ctypes=self._ctypes,
-                            advapi=mock.DEFAULT,
+                            advapi32=mock.DEFAULT,
                             kernel32=mock.DEFAULT,
                             create=True).start()
 
@@ -52,12 +53,12 @@ class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
 
     @ddt.data(
         {'security_info_flags':
-            (_acl_utils.OWNER_SECURITY_INFORMATION |
-             _acl_utils.GROUP_SECURITY_INFORMATION |
-             _acl_utils.DACL_SECURITY_INFORMATION),
+            (w_const.OWNER_SECURITY_INFORMATION |
+             w_const.GROUP_SECURITY_INFORMATION |
+             w_const.DACL_SECURITY_INFORMATION),
          'expected_info': ['pp_sid_owner', 'pp_sid_group',
                            'pp_dacl', 'pp_sec_desc']},
-        {'security_info_flags': _acl_utils.SACL_SECURITY_INFORMATION,
+        {'security_info_flags': w_const.SACL_SECURITY_INFORMATION,
          'expected_info': ['pp_sacl', 'pp_sec_desc']})
     @ddt.unpack
     @mock.patch.object(_acl_utils.ACLUtils, '_get_void_pp')
@@ -75,10 +76,10 @@ class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
                              mock_get_void_pp.return_value)
 
         self._mock_run.assert_called_once_with(
-            _acl_utils.advapi.GetNamedSecurityInfoW,
+            _acl_utils.advapi32.GetNamedSecurityInfoW,
             self._ctypes.c_wchar_p(mock.sentinel.obj_name),
-            self._ctypes.c_uint(mock.sentinel.obj_type),
-            self._ctypes.c_uint(security_info_flags),
+            mock.sentinel.obj_type,
+            security_info_flags,
             sec_info.get('pp_sid_owner'),
             sec_info.get('pp_sid_group'),
             sec_info.get('pp_dacl'),
@@ -96,8 +97,8 @@ class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(new_acl, returned_acl)
         self._mock_run.assert_called_once_with(
-            _acl_utils.advapi.SetEntriesInAclW,
-            self._ctypes.c_ulong(mock.sentinel.entry_count),
+            _acl_utils.advapi32.SetEntriesInAclW,
+            mock.sentinel.entry_count,
             mock.sentinel.entry_list,
             mock.sentinel.old_acl,
             new_acl)
@@ -114,10 +115,10 @@ class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.p_sacl)
 
         self._mock_run.assert_called_once_with(
-            _acl_utils.advapi.SetNamedSecurityInfoW,
+            _acl_utils.advapi32.SetNamedSecurityInfoW,
             self._ctypes.c_wchar_p(mock.sentinel.obj_name),
-            self._ctypes.c_uint(mock.sentinel.obj_type),
-            self._ctypes.c_uint(mock.sentinel.security_info_flags),
+            mock.sentinel.obj_type,
+            mock.sentinel.security_info_flags,
             mock.sentinel.p_sid_owner,
             mock.sentinel.p_sid_group,
             mock.sentinel.p_dacl,

@@ -22,8 +22,10 @@ from six.moves import queue
 from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
-from os_win.utils.compute import _clusapi_utils
 from os_win.utils.compute import clusterutils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.libs import clusapi as clusapi_def
+from os_win.utils.winapi import wintypes
 
 
 @ddt.ddt
@@ -295,7 +297,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             constants.CLUSTER_GROUP_ONLINE,
             mock.sentinel.timeout)
 
-    @mock.patch.object(_clusapi_utils, 'DWORD')
+    @mock.patch.object(wintypes, 'DWORD')
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_wait_for_cluster_group_migration')
     @mock.patch.object(clusterutils.ClusterUtils,
@@ -327,10 +329,10 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._clusapi.get_property_list_entry.assert_has_calls(
             [mock.call(prop_name,
-                       _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
+                       w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
                        mock_dword.return_value)
-             for prop_name in (_clusapi_utils.CLUSPROP_NAME_VM,
-                               _clusapi_utils.CLUSPROP_NAME_VM_CONFIG)])
+             for prop_name in (w_const.CLUS_RESTYPE_NAME_VM,
+                               w_const.CLUS_RESTYPE_NAME_VM_CONFIG)])
 
         expected_prop_entries = [
             self._clusapi.get_property_list_entry.return_value] * 2
@@ -338,9 +340,9 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             expected_prop_entries)
 
         expected_migrate_flags = (
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
+            w_const.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
+            w_const.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
+            w_const.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
 
         exp_clus_h = self._clusapi.open_cluster.return_value
         exp_clus_node_h = self._clusapi.open_cluster_node.return_value
@@ -505,18 +507,18 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
               {'cancel_exception': test_base.TestingException()},
               {'cancel_exception':
                   exceptions.Win32Exception(
-                      error_code=_clusapi_utils.INVALID_HANDLE_VALUE,
+                      error_code=w_const.INVALID_HANDLE_VALUE,
                       func_name=mock.sentinel.func_name,
                       error_message=mock.sentinel.error_message)},
               {'cancel_exception':
                   exceptions.Win32Exception(
-                      error_code=_clusapi_utils.ERROR_INVALID_STATE,
+                      error_code=w_const.ERROR_INVALID_STATE,
                       func_name=mock.sentinel.func_name,
                       error_message=mock.sentinel.error_message),
                'invalid_state_for_cancel': True},
               {'cancel_exception':
                   exceptions.Win32Exception(
-                      error_code=_clusapi_utils.ERROR_INVALID_STATE,
+                      error_code=w_const.ERROR_INVALID_STATE,
                       func_name=mock.sentinel.func_name,
                       error_message=mock.sentinel.error_message),
                'invalid_state_for_cancel': True,
@@ -589,7 +591,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertTrue(
             self._clusterutils._is_migration_pending(
                 group_state=constants.CLUSTER_GROUP_ONLINE,
-                group_status_info=_clusapi_utils.
+                group_status_info=w_const.
                     CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE | 1,  # noqa
                 expected_state=constants.CLUSTER_GROUP_ONLINE))
         self.assertFalse(
@@ -726,7 +728,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.group_handle)
         self._clusapi.cluster_group_control.assert_called_once_with(
             mock.sentinel.group_handle,
-            _clusapi_utils.CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES)
+            w_const.CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES)
         self._clusapi.get_cluster_group_status_info.assert_called_once_with(
             mock_byref(mock.sentinel.buff), mock.sentinel.buff_sz)
 
@@ -838,7 +840,7 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
                        mock.sentinel.notif_key_dw_2)])
 
     @mock.patch.object(clusterutils._ClusterEventListener, '_add_filter')
-    @mock.patch.object(_clusapi_utils, 'NOTIFY_FILTER_AND_TYPE')
+    @mock.patch.object(clusapi_def, 'NOTIFY_FILTER_AND_TYPE')
     def test_setup_notif_port(self, mock_filter_struct_cls, mock_add_filter):
         notif_filter = dict(object_type=mock.sentinel.object_type,
                             filter_flags=mock.sentinel.filter_flags,

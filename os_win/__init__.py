@@ -19,6 +19,8 @@ import sys
 from eventlet import patcher
 import pbr.version
 
+from os_win.utils.winapi import libs as w_libs
+
 
 __version__ = pbr.version.VersionInfo(
     'os_win').version_string()
@@ -27,3 +29,7 @@ if sys.platform == 'win32':
     import wmi
     # We need to make sure that WMI uses the unpatched threading module.
     wmi.threading = patcher.original('threading')
+
+    # The following will set the argument and return value types for the
+    # foreign functions used throughout os_win using ctypes.
+    w_libs.register()

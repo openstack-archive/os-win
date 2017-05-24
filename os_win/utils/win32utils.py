@@ -15,21 +15,17 @@
 #    under the License.
 
 import ctypes
-import sys
 
 from oslo_log import log as logging
 
 from os_win import _utils
 from os_win import exceptions
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import libs as w_lib
 
-if sys.platform == 'win32':
-    kernel32 = ctypes.windll.kernel32
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
-
-FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
-FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
-FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
 
 
 class Win32Utils(object):
@@ -99,8 +95,9 @@ class Win32Utils(object):
         message_buffer = ctypes.c_char_p()
 
         kernel32.FormatMessageA(
-            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
+            w_const.FORMAT_MESSAGE_FROM_SYSTEM |
+            w_const.FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            w_const.FORMAT_MESSAGE_IGNORE_INSERTS,
             None, error_code, 0, ctypes.byref(message_buffer), 0, None)
 
         error_message = message_buffer.value
@@ -135,3 +132,6 @@ class Win32Utils(object):
         except exceptions.Win32Exception:
             LOG.exception("Could not deallocate memory. "
                           "There could be a memory leak.")
+
+    def close_handle(self, handle):
+        kernel32.CloseHandle(handle)

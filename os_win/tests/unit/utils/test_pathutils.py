@@ -21,8 +21,9 @@ import mock
 from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
-from os_win.utils import _acl_utils
 from os_win.utils import pathutils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.libs import advapi32 as advapi32_def
 
 
 class PathUtilsTestCase(test_base.OsWinBaseTestCase):
@@ -99,7 +100,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(pathutils.shutil, 'rmtree')
     def test_rmtree(self, mock_rmtree, mock_sleep):
         exc = exceptions.WindowsError()
-        exc.winerror = pathutils.ERROR_DIR_IS_NOT_EMPTY
+        exc.winerror = w_const.ERROR_DIR_IS_NOT_EMPTY
         mock_rmtree.side_effect = [exc] * 5 + [None]
 
         self._pathutils.rmtree(mock.sentinel.FAKE_PATH)
@@ -118,7 +119,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_rmtree_exceeded(self):
         exc = exceptions.WindowsError()
-        exc.winerror = pathutils.ERROR_DIR_IS_NOT_EMPTY
+        exc.winerror = w_const.ERROR_DIR_IS_NOT_EMPTY
         self._check_rmtree(side_effect=[exc] * 6)
 
     @mock.patch.object(pathutils.PathUtils, 'makedirs')
@@ -164,6 +165,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
             self._mock_run.assert_called_once_with(
                 pathutils.kernel32.GetFileAttributesW,
                 fake_path,
+                error_ret_vals=[w_const.INVALID_FILE_ATTRIBUTES],
                 kernel32_lib_func=True)
 
         self.assertEqual(is_symlink, ret_value)
@@ -287,23 +289,23 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._acl_utils.get_named_security_info.assert_called_once_with(
             obj_name=mock.sentinel.path,
-            obj_type=_acl_utils.SE_FILE_OBJECT,
-            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+            obj_type=w_const.SE_FILE_OBJECT,
+            security_info_flags=w_const.DACL_SECURITY_INFORMATION)
         self._acl_utils.set_entries_in_acl.assert_called_once_with(
             entry_count=1,
             p_explicit_entry_list=mock.ANY,
             p_old_acl=mock_sec_info['pp_dacl'].contents)
         self._acl_utils.set_named_security_info.assert_called_once_with(
             obj_name=mock.sentinel.path,
-            obj_type=_acl_utils.SE_FILE_OBJECT,
-            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+            obj_type=w_const.SE_FILE_OBJECT,
+            security_info_flags=w_const.DACL_SECURITY_INFORMATION,
             p_dacl=pp_new_dacl.contents)
 
         p_access = self._acl_utils.set_entries_in_acl.call_args_list[0][1][
             'p_explicit_entry_list']
         access = ctypes.cast(
             p_access,
-            ctypes.POINTER(_acl_utils.EXPLICIT_ACCESS)).contents
+            ctypes.POINTER(advapi32_def.EXPLICIT_ACCESS)).contents
 
         self.assertEqual(constants.ACE_GENERIC_READ,
                          access.grfAccessPermissions)
@@ -311,7 +313,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
                          access.grfAccessMode)
         self.assertEqual(constants.ACE_OBJECT_INHERIT,
                          access.grfInheritance)
-        self.assertEqual(_acl_utils.TRUSTEE_IS_NAME,
+        self.assertEqual(w_const.TRUSTEE_IS_NAME,
                          access.Trustee.TrusteeForm)
         self.assertEqual(fake_trustee,
                          access.Trustee.pstrName)
@@ -336,12 +338,12 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._acl_utils.get_named_security_info.assert_called_once_with(
             obj_name=mock.sentinel.src,
-            obj_type=_acl_utils.SE_FILE_OBJECT,
-            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION)
+            obj_type=w_const.SE_FILE_OBJECT,
+            security_info_flags=w_const.DACL_SECURITY_INFORMATION)
         self._acl_utils.set_named_security_info.assert_called_once_with(
             obj_name=mock.sentinel.dest,
-            obj_type=_acl_utils.SE_FILE_OBJECT,
-            security_info_flags=_acl_utils.DACL_SECURITY_INFORMATION,
+            obj_type=w_const.SE_FILE_OBJECT,
+            security_info_flags=w_const.DACL_SECURITY_INFORMATION,
             p_dacl=mock_sec_info['pp_dacl'].contents)
 
         self._pathutils._win32_utils.local_free.assert_called_once_with(

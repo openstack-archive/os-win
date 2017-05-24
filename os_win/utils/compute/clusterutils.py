@@ -35,6 +35,9 @@ from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
 from os_win.utils.compute import _clusapi_utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.libs import clusapi as clusapi_def
+from os_win.utils.winapi import wintypes
 
 LOG = logging.getLogger(__name__)
 
@@ -194,21 +197,21 @@ class ClusterUtils(baseutils.BaseUtils):
 
     def _migrate_vm(self, vm_name, new_host, migration_type,
                     exp_state_after_migr, timeout):
-        syntax = _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
-        migr_type = _clusapi_utils.DWORD(migration_type)
+        syntax = w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
+        migr_type = wintypes.DWORD(migration_type)
 
         prop_entries = [
             self._clusapi_utils.get_property_list_entry(
-                _clusapi_utils.CLUSPROP_NAME_VM, syntax, migr_type),
+                w_const.CLUS_RESTYPE_NAME_VM, syntax, migr_type),
             self._clusapi_utils.get_property_list_entry(
-                _clusapi_utils.CLUSPROP_NAME_VM_CONFIG, syntax, migr_type)
+                w_const.CLUS_RESTYPE_NAME_VM_CONFIG, syntax, migr_type)
         ]
         prop_list = self._clusapi_utils.get_property_list(prop_entries)
 
         flags = (
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
-            _clusapi_utils.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
+            w_const.CLUSAPI_GROUP_MOVE_RETURN_TO_SOURCE_NODE_ON_ERROR |
+            w_const.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
+            w_const.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
 
         cluster_handle = None
         group_handle = None
@@ -319,7 +322,7 @@ class ClusterUtils(baseutils.BaseUtils):
                 group_state_info['status_info'],
                 expected_state)
 
-            if (ex.error_code == _clusapi_utils.ERROR_INVALID_STATE and
+            if (ex.error_code == w_const.ERROR_INVALID_STATE and
                     not migration_pending):
                 LOG.debug('Ignoring group migration cancel error. '
                           'No migration is pending.')
@@ -343,7 +346,7 @@ class ClusterUtils(baseutils.BaseUtils):
     def _is_migration_queued(self, group_status_info):
         return bool(
             group_status_info &
-            _clusapi_utils.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE)
+            w_const.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE)
 
     def _is_migration_pending(self, group_state, group_status_info,
                               expected_state):
@@ -431,7 +434,7 @@ class ClusterUtils(baseutils.BaseUtils):
 
         buff, buff_sz = self._clusapi_utils.cluster_group_control(
             group_handle,
-            _clusapi_utils.CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES)
+            w_const.CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES)
         status_info = self._clusapi_utils.get_cluster_group_status_info(
             ctypes.byref(buff), buff_sz)
 
@@ -528,7 +531,7 @@ class _ClusterEventListener(object):
     def _get_notif_key_dw(self, notif_key):
         notif_key_dw = self._notif_keys.get(notif_key)
         if notif_key_dw is None:
-            notif_key_dw = _clusapi_utils.DWORD(notif_key)
+            notif_key_dw = wintypes.DWORD(notif_key)
             # We have to make sure those addresses are preserved.
             self._notif_keys[notif_key] = notif_key_dw
         return notif_key_dw
@@ -543,7 +546,7 @@ class _ClusterEventListener(object):
 
     def _setup_notif_port(self):
         for notif_filter in self._notif_filters_list:
-            filter_struct = _clusapi_utils.NOTIFY_FILTER_AND_TYPE(
+            filter_struct = clusapi_def.NOTIFY_FILTER_AND_TYPE(
                 dwObjectType=notif_filter['object_type'],
                 FilterFlags=notif_filter['filter_flags'])
             notif_key = notif_filter.get('notif_key', 0)
@@ -617,12 +620,11 @@ class _ClusterGroupStateChangeListener(_ClusterEventListener):
     _NOTIF_KEY_GROUP_COMMON_PROP = 1
 
     _notif_filters_list = [
-        dict(object_type=_clusapi_utils.CLUSTER_OBJECT_TYPE_GROUP,
-             filter_flags=_clusapi_utils.CLUSTER_CHANGE_GROUP_STATE_V2,
+        dict(object_type=w_const.CLUSTER_OBJECT_TYPE_GROUP,
+             filter_flags=w_const.CLUSTER_CHANGE_GROUP_STATE_V2,
              notif_key=_NOTIF_KEY_GROUP_STATE),
-        dict(object_type=_clusapi_utils.CLUSTER_OBJECT_TYPE_GROUP,
-             filter_flags=_clusapi_utils.
-                CLUSTER_CHANGE_GROUP_COMMON_PROPERTY_V2,  # noqa
+        dict(object_type=w_const.CLUSTER_OBJECT_TYPE_GROUP,
+             filter_flags=w_const.CLUSTER_CHANGE_GROUP_COMMON_PROPERTY_V2,
              notif_key=_NOTIF_KEY_GROUP_COMMON_PROP)]
 
     def __init__(self, cluster_handle, group_name=None):
@@ -642,10 +644,9 @@ class _ClusterGroupStateChangeListener(_ClusterEventListener):
 
         notif_key = event['notif_key']
         if notif_key == self._NOTIF_KEY_GROUP_STATE:
-            if event['buff_sz'] != ctypes.sizeof(_clusapi_utils.DWORD):
+            if event['buff_sz'] != ctypes.sizeof(wintypes.DWORD):
                 raise exceptions.ClusterPropertyRetrieveFailed()
-            state_p = ctypes.cast(event['buff'],
-                                  ctypes.POINTER(_clusapi_utils.DWORD))
+            state_p = ctypes.cast(event['buff'], wintypes.PDWORD)
             state = state_p.contents.value
             processed_event['state'] = state
             return processed_event

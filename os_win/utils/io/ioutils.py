@@ -26,6 +26,11 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import win32utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi import wintypes
+
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 
@@ -34,55 +39,6 @@ if sys.version_info > (3, 0):
     Queue = patcher.original('queue')
 else:
     Queue = patcher.original('Queue')
-
-if sys.platform == 'win32':
-    from ctypes import wintypes
-
-    kernel32 = ctypes.windll.kernel32
-
-    class OVERLAPPED(ctypes.Structure):
-        _fields_ = [
-            ('Internal', wintypes.ULONG),
-            ('InternalHigh', wintypes.ULONG),
-            ('Offset', wintypes.DWORD),
-            ('OffsetHigh', wintypes.DWORD),
-            ('hEvent', wintypes.HANDLE)
-        ]
-
-        def __init__(self):
-            self.Offset = 0
-            self.OffsetHigh = 0
-
-    LPOVERLAPPED = ctypes.POINTER(OVERLAPPED)
-    LPOVERLAPPED_COMPLETION_ROUTINE = ctypes.WINFUNCTYPE(
-        None, wintypes.DWORD, wintypes.DWORD, LPOVERLAPPED)
-
-    kernel32.ReadFileEx.argtypes = [
-        wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
-        LPOVERLAPPED, LPOVERLAPPED_COMPLETION_ROUTINE]
-    kernel32.WriteFileEx.argtypes = [
-        wintypes.HANDLE, wintypes.LPCVOID, wintypes.DWORD,
-        LPOVERLAPPED, LPOVERLAPPED_COMPLETION_ROUTINE]
-
-
-FILE_FLAG_OVERLAPPED = 0x40000000
-FILE_SHARE_READ = 1
-FILE_SHARE_WRITE = 2
-GENERIC_READ = 0x80000000
-GENERIC_WRITE = 0x40000000
-OPEN_EXISTING = 3
-
-FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
-FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
-FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
-
-INVALID_HANDLE_VALUE = -1
-WAIT_FAILED = 0xFFFFFFFF
-WAIT_FINISHED = 0
-ERROR_INVALID_HANDLE = 6
-ERROR_PIPE_BUSY = 231
-ERROR_PIPE_NOT_CONNECTED = 233
-ERROR_NOT_FOUND = 1168
 
 WAIT_PIPE_DEFAULT_TIMEOUT = 5  # seconds
 WAIT_IO_COMPLETION_TIMEOUT = 2 * units.k
@@ -115,7 +71,7 @@ class IOUtils(object):
 
     def open(self, path, desired_access=None, share_mode=None,
              creation_disposition=None, flags_and_attributes=None):
-        error_ret_vals = [INVALID_HANDLE_VALUE]
+        error_ret_vals = [w_const.INVALID_HANDLE_VALUE]
         handle = self._run_and_check_output(kernel32.CreateFileW,
                                             ctypes.c_wchar_p(path),
                                             desired_access,
@@ -139,9 +95,9 @@ class IOUtils(object):
         """
         # Ignore errors thrown when there are no requests
         # to be canceled.
-        ignored_error_codes = [ERROR_NOT_FOUND]
+        ignored_error_codes = [w_const.ERROR_NOT_FOUND]
         if ignore_invalid_handle:
-            ignored_error_codes.append(ERROR_INVALID_HANDLE)
+            ignored_error_codes.append(w_const.ERROR_INVALID_HANDLE)
         lp_overlapped = (ctypes.byref(overlapped_structure)
                          if overlapped_structure else None)
 
@@ -154,7 +110,7 @@ class IOUtils(object):
         # In order to cancel this, we simply set the event.
         self._run_and_check_output(kernel32.WaitForSingleObjectEx,
                                    event, WAIT_INFINITE_TIMEOUT,
-                                   True, error_ret_vals=[WAIT_FAILED])
+                                   True, error_ret_vals=[w_const.WAIT_FAILED])
 
     def set_event(self, event):
         self._run_and_check_output(kernel32.SetEvent, event)
@@ -172,20 +128,21 @@ class IOUtils(object):
     def get_completion_routine(self, callback=None):
         def _completion_routine(error_code, num_bytes, lpOverLapped):
             """Sets the completion event and executes callback, if passed."""
-            overlapped = ctypes.cast(lpOverLapped, LPOVERLAPPED).contents
+            overlapped = ctypes.cast(lpOverLapped,
+                                     wintypes.LPOVERLAPPED).contents
             self.set_event(overlapped.hEvent)
 
             if callback:
                 callback(num_bytes)
 
-        return LPOVERLAPPED_COMPLETION_ROUTINE(_completion_routine)
+        return wintypes.LPOVERLAPPED_COMPLETION_ROUTINE(_completion_routine)
 
     def get_new_overlapped_structure(self):
         """Structure used for asyncronous IO operations."""
         # Event used for signaling IO completion
         hEvent = self._create_event()
 
-        overlapped_structure = OVERLAPPED()
+        overlapped_structure = wintypes.OVERLAPPED()
         overlapped_structure.hEvent = hEvent
         return overlapped_structure
 

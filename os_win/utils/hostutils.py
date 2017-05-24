@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ctypes
 import socket
 
 from oslo_log import log as logging
@@ -23,6 +22,9 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
+from os_win.utils.winapi import libs as w_lib
+
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class HostUtils(baseutils.BaseUtilsVirt):
 
     def is_cpu_feature_present(self, feature_key):
         """Checks if the host's CPUs have the given feature."""
-        return ctypes.windll.kernel32.IsProcessorFeaturePresent(feature_key)
+        return kernel32.IsProcessorFeaturePresent(feature_key)
 
     def get_memory_info(self):
         """Returns a tuple with total visible memory and free physical memory.
@@ -129,7 +131,7 @@ class HostUtils(baseutils.BaseUtilsVirt):
 
     def get_host_tick_count64(self):
         """Returns host uptime in miliseconds."""
-        return ctypes.windll.kernel32.GetTickCount64()
+        return kernel32.GetTickCount64()
 
     def host_power_action(self, action):
         win32_os = self._conn_cimv2.Win32_OperatingSystem()[0]
