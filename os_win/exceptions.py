@@ -36,7 +36,7 @@ else:
 
     class x_wmi(Exception):
         def __init__(self, info='', com_error=None):
-            super(x_wmi, self).__init__()
+            super(x_wmi, self).__init__(info)
             self.info = info
             self.com_error = com_error
 
