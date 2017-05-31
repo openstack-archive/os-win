@@ -187,7 +187,7 @@ class Win32UtilsTestCase(base.BaseTestCase):
         ret_val = self._win32_utils.hresult_to_err_code(fake_file_exists_hres)
         self.assertEqual(file_exists_err_code, ret_val)
 
-    @mock.patch.object(win32utils.Win32Utils, 'get_com_error_hresult')
+    @mock.patch.object(win32utils._utils, 'get_com_error_hresult')
     @mock.patch.object(win32utils.Win32Utils, 'hresult_to_err_code')
     def test_get_com_err_code(self, mock_hres_to_err_code, mock_get_hresult):
         ret_val = self._win32_utils.get_com_err_code(mock.sentinel.com_err)
@@ -196,21 +196,6 @@ class Win32UtilsTestCase(base.BaseTestCase):
         mock_get_hresult.assert_called_once_with(mock.sentinel.com_err)
         mock_hres_to_err_code.assert_called_once_with(
             mock_get_hresult.return_value)
-
-    def test_get_com_error_hresult(self):
-        self._ctypes_patcher.stop()
-        fake_hres = -5
-        expected_hres = (1 << 32) + fake_hres
-        mock_excepinfo = [None] * 5 + [fake_hres]
-        mock_com_err = mock.Mock(excepinfo=mock_excepinfo)
-
-        ret_val = self._win32_utils.get_com_error_hresult(mock_com_err)
-
-        self.assertEqual(expected_hres, ret_val)
-
-    def get_com_error_hresult_missing_excepinfo(self):
-        ret_val = self._win32_utils.get_com_error_hresult(None)
-        self.assertIsNone(ret_val)
 
     @ddt.data(0, 1)
     @mock.patch.object(win32utils.LOG, 'exception')

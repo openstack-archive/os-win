@@ -226,3 +226,45 @@ class UtilsTestCase(base.BaseTestCase):
                                                  kwarg=mock.sentinel.kwarg)
         else:
             self.assertFalse(mock_execute.called)
+
+    def test_get_com_error_hresult(self):
+        fake_hres = -5
+        expected_hres = (1 << 32) + fake_hres
+        mock_excepinfo = [None] * 5 + [fake_hres]
+        mock_com_err = mock.Mock(excepinfo=mock_excepinfo)
+
+        ret_val = _utils.get_com_error_hresult(mock_com_err)
+
+        self.assertEqual(expected_hres, ret_val)
+
+    def get_com_error_hresult_missing_excepinfo(self):
+        ret_val = _utils.get_com_error_hresult(None)
+        self.assertIsNone(ret_val)
+
+    @ddt.data(_utils._WBEM_E_NOT_FOUND, mock.sentinel.wbem_error)
+    @mock.patch.object(_utils, 'get_com_error_hresult')
+    def test_is_not_found_exc(self, hresult, mock_get_com_error_hresult):
+        mock_get_com_error_hresult.return_value = hresult
+        exc = mock.MagicMock()
+
+        result = _utils._is_not_found_exc(exc)
+
+        expected = hresult == _utils._WBEM_E_NOT_FOUND
+        self.assertEqual(expected, result)
+        mock_get_com_error_hresult.assert_called_once_with(exc.com_error)
+
+    @mock.patch.object(_utils, 'get_com_error_hresult')
+    def test_not_found_decorator(self, mock_get_com_error_hresult):
+        mock_get_com_error_hresult.side_effect = lambda x: x
+
+        @_utils.not_found_decorator
+        def f(to_call):
+            to_call()
+
+        to_call = mock.Mock()
+        to_call.side_effect = exceptions.x_wmi(
+            'expected error', com_error=_utils._WBEM_E_NOT_FOUND)
+        self.assertRaises(exceptions.NotFound, f, to_call)
+
+        to_call.side_effect = exceptions.x_wmi()
+        self.assertRaises(exceptions.x_wmi, f, to_call)

@@ -110,7 +110,7 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         self.jobutils._conn.Msvm_AffectedJobElement.assert_called_once_with(
             AffectedElement=mock_affected_element.path_.return_value)
 
-    @mock.patch.object(jobutils.JobUtils, '_is_not_found_exc')
+    @mock.patch.object(jobutils._utils, '_is_not_found_exc')
     def test_get_pending_jobs_ignored(self, mock_is_not_found_exc):
         mock_not_found_mapping = mock.MagicMock()
         type(mock_not_found_mapping).AffectingElement = mock.PropertyMock(
@@ -122,7 +122,7 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.MagicMock())
         self.assertEqual([], pending_jobs)
 
-    @mock.patch.object(jobutils.JobUtils, '_is_not_found_exc')
+    @mock.patch.object(jobutils._utils, '_is_not_found_exc')
     def test_get_pending_jobs_reraised(self, mock_is_not_found_exc):
         mock_is_not_found_exc.return_value = False
         mock_not_found_mapping = mock.MagicMock()
@@ -134,18 +134,6 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.x_wmi,
                           self.jobutils._get_pending_jobs_affecting_element,
                           mock.MagicMock())
-
-    @ddt.data(jobutils.JobUtils._WBEM_E_NOT_FOUND, mock.sentinel.wbem_error)
-    @mock.patch.object(jobutils.win32utils.Win32Utils, 'get_com_error_hresult')
-    def test_is_not_found_exc(self, hresult, mock_get_com_error_hresult):
-        mock_get_com_error_hresult.return_value = hresult
-        exc = mock.MagicMock()
-
-        result = self.jobutils._is_not_found_exc(exc)
-
-        expected = hresult == self.jobutils._WBEM_E_NOT_FOUND
-        self.assertEqual(expected, result)
-        mock_get_com_error_hresult.assert_called_once_with(exc.com_error)
 
     @ddt.data(True, False)
     @mock.patch.object(jobutils.JobUtils,
@@ -161,7 +149,7 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
             pending_jobs if not jobs_ended else [])
 
         mock_job1.RequestStateChange.side_effect = (
-            test_base.FakeWMIExc(hresult=jobutils.JobUtils._WBEM_E_NOT_FOUND))
+            test_base.FakeWMIExc(hresult=jobutils._utils._WBEM_E_NOT_FOUND))
         mock_job2.RequestStateChange.side_effect = (
             test_base.FakeWMIExc(hresult=mock.sentinel.hresult))
 
@@ -301,3 +289,20 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         self.jobutils.check_ret_val = mock.MagicMock()
 
         return mock_res_setting_data
+
+    @mock.patch.object(jobutils.JobUtils, 'check_ret_val')
+    def test_remove_multiple_virt_resources_not_found(self, mock_check_ret):
+        excepinfo = [None] * 5 + [jobutils._utils._WBEM_E_NOT_FOUND]
+        mock_check_ret.side_effect = exceptions.x_wmi(
+            'expected error', com_error=mock.Mock(excepinfo=excepinfo))
+        vsms_method = self.jobutils._vs_man_svc.RemoveResourceSettings
+        vsms_method.return_value = (mock.sentinel.job, mock.sentinel.ret_val)
+        mock_virt_res = mock.Mock()
+
+        self.assertRaises(exceptions.NotFound,
+                          self.jobutils.remove_virt_resource, mock_virt_res)
+
+        vsms_method.assert_called_once_with(
+            ResourceSettings=[mock_virt_res.path_.return_value])
+        mock_check_ret.assert_called_once_with(mock.sentinel.ret_val,
+                                               mock.sentinel.job)

@@ -27,7 +27,6 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
-from os_win.utils import win32utils
 
 LOG = logging.getLogger(__name__)
 
@@ -38,7 +37,6 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     _DEFAULT_JOB_TERMINATE_TIMEOUT = 15  # seconds
     _KILL_JOB_STATE_CHANGE_REQUEST = 5
-    _WBEM_E_NOT_FOUND = 0x80041002
 
     _completed_job_states = [constants.JOB_STATE_COMPLETED,
                              constants.JOB_STATE_TERMINATED,
@@ -130,14 +128,10 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
             except exceptions.x_wmi as ex:
                 # NOTE(claudiub): we can ignore "Not found" type exceptions.
-                if not self._is_not_found_exc(ex):
+                if not _utils._is_not_found_exc(ex):
                     raise
 
         return pending_jobs
-
-    def _is_not_found_exc(self, exc):
-        hresult = win32utils.Win32Utils.get_com_error_hresult(exc.com_error)
-        return hresult == self._WBEM_E_NOT_FOUND
 
     def _stop_jobs(self, element):
         pending_jobs = self._get_pending_jobs_affecting_element(
@@ -156,7 +150,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
             except exceptions.x_wmi as ex:
                 # The job may had been completed right before we've
                 # attempted to kill it.
-                if not self._is_not_found_exc(ex):
+                if not _utils._is_not_found_exc(ex):
                     LOG.debug("Failed to stop job. Exception: %s", ex)
 
         pending_jobs = self._get_pending_jobs_affecting_element(element)
@@ -191,6 +185,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
         _stop_jobs_with_timeout()
 
+    @_utils.not_found_decorator
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_virt_resource(self, virt_resource, parent):
         (job_path, new_resources,
@@ -201,6 +196,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     # modify_virt_resource can fail, especially while setting up the VM's
     # serial port connection. Retrying the operation will yield success.
+    @_utils.not_found_decorator
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def modify_virt_resource(self, virt_resource):
         (job_path, out_set_data,
@@ -211,6 +207,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def remove_virt_resource(self, virt_resource):
         self.remove_multiple_virt_resources([virt_resource])
 
+    @_utils.not_found_decorator
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def remove_multiple_virt_resources(self, virt_resources):
         (job, ret_val) = self._vs_man_svc.RemoveResourceSettings(
@@ -220,6 +217,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def add_virt_feature(self, virt_feature, parent):
         self.add_multiple_virt_features([virt_feature], parent)
 
+    @_utils.not_found_decorator
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_multiple_virt_features(self, virt_features, parent):
         (job_path, out_set_data,
@@ -230,6 +228,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def remove_virt_feature(self, virt_feature):
         self.remove_multiple_virt_features([virt_feature])
 
+    @_utils.not_found_decorator
     def remove_multiple_virt_features(self, virt_features):
         (job_path, ret_val) = self._vs_man_svc.RemoveFeatureSettings(
             FeatureSettings=[f.path_() for f in virt_features])

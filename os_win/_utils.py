@@ -14,6 +14,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
 import time
 import types
 
@@ -27,11 +28,15 @@ from oslo_utils import excutils
 from oslo_utils import reflection
 import six
 
+from os_win import exceptions
+
 
 LOG = logging.getLogger(__name__)
 
 socket = eventlet.import_patched('socket')
 synchronized = lockutils.synchronized_with_prefix('oswin-')
+
+_WBEM_E_NOT_FOUND = 0x80041002
 
 
 def execute(*cmd, **kwargs):
@@ -208,3 +213,31 @@ def avoid_blocking_call_decorator(f):
     def wrapper(*args, **kwargs):
         return avoid_blocking_call(f, *args, **kwargs)
     return wrapper
+
+
+def get_com_error_hresult(com_error):
+    try:
+        return ctypes.c_uint(com_error.excepinfo[5]).value
+    except Exception:
+        LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
+
+
+def _is_not_found_exc(exc):
+    hresult = get_com_error_hresult(exc.com_error)
+    return hresult == _WBEM_E_NOT_FOUND
+
+
+def not_found_decorator(func):
+    """Wraps x_wmi: Not Found exceptions as os_win.exceptions.NotFound."""
+
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except exceptions.x_wmi as ex:
+            if _is_not_found_exc(ex):
+                LOG.debug('x_wmi: Not Found exception raised while '
+                          'running %s', func.__name__)
+                raise exceptions.NotFound(six.text_type(ex))
+            raise
+
+    return inner
