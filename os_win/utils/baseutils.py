@@ -91,10 +91,16 @@ class BaseUtilsVirt(BaseUtils):
 
     @property
     def _vs_man_svc(self):
-        if not self._vs_man_svc_attr:
-            self._vs_man_svc_attr = (
-                self._compat_conn.Msvm_VirtualSystemManagementService()[0])
-        return self._vs_man_svc_attr
+        if self._vs_man_svc_attr:
+            return self._vs_man_svc_attr
+
+        vs_man_svc = self._compat_conn.Msvm_VirtualSystemManagementService()[0]
+        if BaseUtilsVirt._os_version >= [6, 3]:
+            # NOTE(claudiub): caching this property on Windows / Hyper-V Server
+            # 2012 (using the old WMI) can lead to memory leaks. PyMI doesn't
+            # have those issues, so we can safely cache it.
+            self._vs_man_svc_attr = vs_man_svc
+        return vs_man_svc
 
     def _get_wmi_compat_conn(self, moniker, **kwargs):
         # old WMI should be used on Windows / Hyper-V Server 2012 whenever

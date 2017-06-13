@@ -34,7 +34,6 @@ class MigrationUtilsTestCase(test_base.OsWinBaseTestCase):
         self._migrationutils = migrationutils.MigrationUtils()
         self._migrationutils._vmutils = mock.MagicMock()
         self._migrationutils._conn_attr = mock.MagicMock()
-        self._migrationutils._compat_conn_attr = mock.MagicMock()
         self._migrationutils._jobutils = mock.MagicMock()
 
     def test_get_export_setting_data(self):

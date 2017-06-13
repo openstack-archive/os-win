@@ -95,10 +95,12 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
             mock_os]
         expected = self.utils._conn.Msvm_VirtualSystemManagementService()[0]
         self.assertEqual(expected, self.utils._vs_man_svc)
+        self.assertEqual(expected, self.utils._vs_man_svc_attr)
 
     @mock.patch.object(baseutils, 'imp')
     @mock.patch.object(baseutils, 'wmi', create=True)
     def test_vs_man_svc_2012(self, mock_wmi, mock_imp):
+        baseutils.BaseUtilsVirt._old_wmi = None
         mock_os = mock.MagicMock(Version='6.2.0')
         mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
             mock_os]
@@ -108,6 +110,7 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
 
         expected = old_conn.Msvm_VirtualSystemManagementService()[0]
         self.assertEqual(expected, self.utils._vs_man_svc)
+        self.assertIsNone(self.utils._vs_man_svc_attr)
         mock_imp.load_source.assert_called_once_with(
             'old_wmi', '%s.py' % fake_module_path)
 
