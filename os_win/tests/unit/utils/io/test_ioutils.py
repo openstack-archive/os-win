@@ -20,6 +20,8 @@ import six
 from os_win import constants
 from os_win import exceptions
 from os_win.utils.io import ioutils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import wintypes
 
 
 class IOUtilsTestCase(base.BaseTestCase):
@@ -84,7 +86,7 @@ class IOUtilsTestCase(base.BaseTestCase):
             mock.sentinel.create_disposition,
             mock.sentinel.flags,
             None,
-            error_ret_vals=[ioutils.INVALID_HANDLE_VALUE],
+            error_ret_vals=[w_const.INVALID_HANDLE_VALUE],
             **self._run_args)
         self.assertEqual(self._mock_run.return_value, handle)
 
@@ -93,8 +95,8 @@ class IOUtilsTestCase(base.BaseTestCase):
                                 mock.sentinel.overlapped_struct,
                                 ignore_invalid_handle=True)
 
-        expected_ignored_err_codes = [ioutils.ERROR_NOT_FOUND,
-                                      ioutils.ERROR_INVALID_HANDLE]
+        expected_ignored_err_codes = [w_const.ERROR_NOT_FOUND,
+                                      w_const.ERROR_INVALID_HANDLE]
 
         self._mock_run.assert_called_once_with(
             ioutils.kernel32.CancelIoEx,
@@ -118,7 +120,7 @@ class IOUtilsTestCase(base.BaseTestCase):
             mock.sentinel.event,
             ioutils.WAIT_INFINITE_TIMEOUT,
             True,
-            error_ret_vals=[ioutils.WAIT_FAILED],
+            error_ret_vals=[w_const.WAIT_FAILED],
             **self._run_args)
 
     def test_set_event(self):
@@ -150,8 +152,8 @@ class IOUtilsTestCase(base.BaseTestCase):
                                                **self._run_args)
         self.assertEqual(self._mock_run.return_value, event)
 
-    @mock.patch.object(ioutils, 'LPOVERLAPPED', create=True)
-    @mock.patch.object(ioutils, 'LPOVERLAPPED_COMPLETION_ROUTINE',
+    @mock.patch.object(wintypes, 'LPOVERLAPPED', create=True)
+    @mock.patch.object(wintypes, 'LPOVERLAPPED_COMPLETION_ROUTINE',
                        lambda x: x, create=True)
     @mock.patch.object(ioutils.IOUtils, 'set_event')
     def test_get_completion_routine(self, mock_set_event,
@@ -164,12 +166,12 @@ class IOUtilsTestCase(base.BaseTestCase):
                       mock.sentinel.lpOverLapped)
 
         self._ctypes.cast.assert_called_once_with(mock.sentinel.lpOverLapped,
-                                                  ioutils.LPOVERLAPPED)
+                                                  wintypes.LPOVERLAPPED)
         mock_overlapped_struct = self._ctypes.cast.return_value.contents
         mock_set_event.assert_called_once_with(mock_overlapped_struct.hEvent)
         mock_callback.assert_called_once_with(mock.sentinel.num_bytes)
 
-    @mock.patch.object(ioutils, 'OVERLAPPED', create=True)
+    @mock.patch.object(wintypes, 'OVERLAPPED', create=True)
     @mock.patch.object(ioutils.IOUtils, '_create_event')
     def test_get_new_overlapped_structure(self, mock_create_event,
                                           mock_OVERLAPPED):

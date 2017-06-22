@@ -1,4 +1,4 @@
-# Copyright 2015 Cloudbase Solutions Srl
+# Copyright 2016 Cloudbase Solutions Srl
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -15,15 +15,25 @@
 
 import ctypes
 
+import os_win.conf
+from os_win.utils.winapi import wintypes
 
+CONF = os_win.conf.CONF
+
+lib_handle = None
+
+HBA_STATUS = ctypes.c_uint32
 HBA_HANDLE = ctypes.c_uint32
 HBA_PortType = ctypes.c_uint32
 HBA_PortSpeed = ctypes.c_uint32
 HBA_PortState = ctypes.c_uint32
 HBA_COS = ctypes.c_uint32
-HBA_WWN = ctypes.c_ubyte * 8
 HBA_FC4Types = ctypes.c_uint32 * 32
-HBA_FCPBindingType = ctypes.c_int
+HBA_FCPBindingType = wintypes.INT
+
+
+class HBA_WWN(ctypes.Structure):
+    _fields_ = [('wwn', ctypes.c_ubyte * 8)]
 
 
 class HBA_PortAttributes(ctypes.Structure):
@@ -34,8 +44,8 @@ class HBA_PortAttributes(ctypes.Structure):
                 ('PortState', HBA_PortState),
                 ('PortSupportedClassofService', HBA_COS),
                 ('PortSupportedFc4Types', HBA_FC4Types),
-                ('PortSymbolicName', ctypes.c_char * 256),
-                ('OSDeviceName', ctypes.c_char * 256),
+                ('PortSymbolicName', wintypes.CHAR * 256),
+                ('OSDeviceName', wintypes.CHAR * 256),
                 ('PortSupportedSpeed', HBA_PortSpeed),
                 ('PortSpeed', HBA_PortSpeed),
                 ('PortMaxFrameSize', ctypes.c_uint32),
@@ -51,7 +61,7 @@ class HBA_FCPId(ctypes.Structure):
 
 
 class HBA_ScsiId(ctypes.Structure):
-    _fields_ = [('OSDeviceName', ctypes.c_char * 256),
+    _fields_ = [('OSDeviceName', wintypes.CHAR * 256),
                 ('ScsiBusNumber', ctypes.c_uint32),
                 ('ScsiTargetNumber', ctypes.c_uint32),
                 ('ScsiOSLun', ctypes.c_uint32)]
@@ -75,16 +85,62 @@ def get_target_mapping_struct(entry_count=0):
 
 
 class HBA_AdapterAttributes(ctypes.Structure):
-    _fields_ = [('Manufacturer', ctypes.c_char * 64),
-                ('SerialNumber', ctypes.c_char * 64),
-                ('Model', ctypes.c_char * 256),
-                ('ModelDescription', ctypes.c_char * 256),
+    _fields_ = [('Manufacturer', wintypes.CHAR * 64),
+                ('SerialNumber', wintypes.CHAR * 64),
+                ('Model', wintypes.CHAR * 256),
+                ('ModelDescription', wintypes.CHAR * 256),
                 ('NodeWWN', HBA_WWN),
-                ('NodeSymbolicName', ctypes.c_char * 256),
-                ('HardwareVersion', ctypes.c_char * 256),
-                ('DriverVersion', ctypes.c_char * 256),
-                ('OptionROMVersion', ctypes.c_char * 256),
-                ('FirmwareVersion', ctypes.c_char * 256),
+                ('NodeSymbolicName', wintypes.CHAR * 256),
+                ('HardwareVersion', wintypes.CHAR * 256),
+                ('DriverVersion', wintypes.CHAR * 256),
+                ('OptionROMVersion', wintypes.CHAR * 256),
+                ('FirmwareVersion', wintypes.CHAR * 256),
                 ('VendorSpecificID', ctypes.c_uint32),
                 ('NumberOfPorts', ctypes.c_uint32),
-                ('DriverName', ctypes.c_char * 256)]
+                ('DriverName', wintypes.CHAR * 256)]
+
+
+def register():
+    global lib_handle
+    lib_handle = ctypes.cdll.LoadLibrary(CONF.os_win.hbaapi_lib_path)
+
+    lib_handle.HBA_CloseAdapter.argtypes = [HBA_HANDLE]
+    lib_handle.HBA_CloseAdapter.restype = None
+
+    lib_handle.HBA_GetAdapterAttributes.argtypes = [
+        HBA_HANDLE,
+        ctypes.POINTER(HBA_AdapterAttributes)]
+    lib_handle.HBA_GetAdapterAttributes.restype = HBA_STATUS
+
+    lib_handle.HBA_GetAdapterName.argtypes = [
+        ctypes.c_uint32,
+        wintypes.PCHAR
+    ]
+    lib_handle.HBA_GetAdapterName.restype = HBA_STATUS
+
+    lib_handle.HBA_GetAdapterPortAttributes.argtypes = [
+        HBA_HANDLE,
+        ctypes.c_uint32,
+        ctypes.POINTER(HBA_PortAttributes)
+    ]
+    lib_handle.HBA_GetAdapterPortAttributes.restype = HBA_STATUS
+
+    lib_handle.HBA_GetFcpTargetMapping.argtypes = [
+        HBA_HANDLE,
+        wintypes.PVOID
+    ]
+    lib_handle.HBA_GetFcpTargetMapping.restype = HBA_STATUS
+
+    lib_handle.HBA_GetNumberOfAdapters.argtypes = []
+    lib_handle.HBA_GetNumberOfAdapters.restype = ctypes.c_uint32
+
+    lib_handle.HBA_OpenAdapter.argtypes = [wintypes.PCHAR]
+    lib_handle.HBA_OpenAdapter.restype = HBA_HANDLE
+
+    lib_handle.HBA_OpenAdapterByWWN.argtypes = [
+        ctypes.POINTER(HBA_HANDLE),
+        HBA_WWN]
+    lib_handle.HBA_OpenAdapterByWWN.restype = HBA_STATUS
+
+    lib_handle.HBA_RefreshAdapterConfiguration.argtypes = []
+    lib_handle.HBA_RefreshAdapterConfiguration.restype = None

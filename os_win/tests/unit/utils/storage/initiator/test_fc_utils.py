@@ -20,8 +20,8 @@ from oslotest import base
 import six
 
 from os_win import exceptions
-from os_win.utils.storage.initiator import fc_structures as fc_struct
 from os_win.utils.storage.initiator import fc_utils
+from os_win.utils.winapi.libs import hbaapi as fc_struct
 
 
 class FCUtilsTestCase(base.BaseTestCase):
@@ -72,62 +72,76 @@ class FCUtilsTestCase(base.BaseTestCase):
         self.assertEqual(fc_utils.hbaapi.HBA_GetNumberOfAdapters.return_value,
                          hba_count)
 
-    def _test_open_adapter(self, adapter_name=None, adapter_wwn=None):
+    def test_open_adapter_by_name(self):
         self._ctypes_mocker.stop()
+
         self._mock_run.return_value = mock.sentinel.handle
 
-        if adapter_name:
-            expected_func = fc_utils.hbaapi.HBA_OpenAdapter
-        elif adapter_wwn:
-            expected_func = fc_utils.hbaapi.HBA_OpenAdapterByWWN
-
-        resulted_handle = self._fc_utils._open_adapter(
-            adapter_name=adapter_name, adapter_wwn=adapter_wwn)
+        resulted_handle = self._fc_utils._open_adapter_by_name(
+            self._FAKE_ADAPTER_NAME)
 
         args_list = self._mock_run.call_args_list[0][0]
-        self.assertEqual(expected_func, args_list[0])
-        if adapter_name:
-            self.assertEqual(six.b(adapter_name),
-                             args_list[1].value)
-        else:
-            self.assertEqual(adapter_wwn, list(args_list[1]))
+        self.assertEqual(fc_utils.hbaapi.HBA_OpenAdapter, args_list[0])
+        self.assertEqual(six.b(self._FAKE_ADAPTER_NAME), args_list[1].value)
 
         self.assertEqual(mock.sentinel.handle, resulted_handle)
 
-    def test_open_adapter_by_name(self):
-        self._test_open_adapter(adapter_name=self._FAKE_ADAPTER_NAME)
+    @mock.patch.object(fc_utils.fc_struct, 'HBA_HANDLE')
+    def test_open_adapter_by_wwn(self, mock_hba_handle_struct):
+        exp_handle = mock_hba_handle_struct.return_value
+        resulted_handle = self._fc_utils._open_adapter_by_wwn(
+            self._FAKE_ADAPTER_WWN)
 
-    def test_open_adapter_by_wwn(self):
-        self._test_open_adapter(adapter_wwn=self._FAKE_ADAPTER_WWN)
+        self.assertEqual(exp_handle, resulted_handle)
 
-    def test_open_adapter_not_specified(self):
-        self.assertRaises(exceptions.FCException,
-                          self._fc_utils._open_adapter)
+        args_list = self._mock_run.call_args_list[0][0]
+        self.assertEqual(fc_utils.hbaapi.HBA_OpenAdapterByWWN,
+                         args_list[0])
+        self.assertEqual(self._FAKE_ADAPTER_WWN, list(args_list[2].wwn))
+
+        self.assertEqual(self._ctypes.byref(exp_handle), args_list[1])
 
     def test_close_adapter(self):
         self._fc_utils._close_adapter(mock.sentinel.hba_handle)
         fc_utils.hbaapi.HBA_CloseAdapter.assert_called_once_with(
             mock.sentinel.hba_handle)
 
-    @mock.patch.object(fc_utils.FCUtils, '_open_adapter')
+    @mock.patch.object(fc_utils.FCUtils, '_open_adapter_by_name')
     @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
-    def test_get_hba_handle(self, mock_close_adapter, mock_open_adapter):
+    def test_get_hba_handle_by_name(self, mock_close_adapter,
+                                    mock_open_adapter):
         with self._fc_utils._get_hba_handle(
-                adapter_name=self._FAKE_ADAPTER_NAME):
+                adapter_name=self._FAKE_ADAPTER_NAME) as handle:
+            self.assertEqual(mock_open_adapter.return_value, handle)
             mock_open_adapter.assert_called_once_with(
-                adapter_name=self._FAKE_ADAPTER_NAME)
+                self._FAKE_ADAPTER_NAME)
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter.return_value)
 
-    @mock.patch.object(ctypes, 'byref')
-    def test_get_adapter_name(self, mock_byref):
+    @mock.patch.object(fc_utils.FCUtils, '_open_adapter_by_wwn')
+    @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
+    def test_get_hba_handle_by_wwn(self, mock_close_adapter,
+                                   mock_open_adapter):
+        with self._fc_utils._get_hba_handle(
+                adapter_wwn=self._FAKE_ADAPTER_WWN) as handle:
+            self.assertEqual(mock_open_adapter.return_value, handle)
+            mock_open_adapter.assert_called_once_with(
+                self._FAKE_ADAPTER_WWN)
+        mock_close_adapter.assert_called_once_with(
+            mock_open_adapter.return_value)
+
+    def test_get_hba_handle_missing_params(self):
+        self.assertRaises(exceptions.FCException,
+                          self._fc_utils._get_hba_handle().__enter__)
+
+    def test_get_adapter_name(self):
         self._ctypes_mocker.stop()
         fake_adapter_index = 1
 
-        def update_buff(buff):
+        def update_buff(func, adapter_index, buff):
             buff.value = six.b(self._FAKE_ADAPTER_NAME)
 
-        mock_byref.side_effect = update_buff
+        self._mock_run.side_effect = update_buff
 
         resulted_adapter_name = self._fc_utils._get_adapter_name(
             fake_adapter_index)
@@ -139,8 +153,7 @@ class FCUtilsTestCase(base.BaseTestCase):
         self.assertIsInstance(args_list[1], ctypes.c_uint32)
         self.assertEqual(fake_adapter_index, args_list[1].value)
 
-        arg_byref = mock_byref.call_args_list[0][0][0]
-        buff = ctypes.cast(arg_byref, ctypes.POINTER(
+        buff = ctypes.cast(args_list[2], ctypes.POINTER(
             ctypes.c_char * 256)).contents
         self.assertIsInstance(buff, ctypes.c_char * 256)
         self.assertEqual(self._FAKE_ADAPTER_NAME, resulted_adapter_name)
@@ -228,7 +241,7 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_get_adapter_ports.assert_has_calls(
             [mock.call(mock.sentinel.adapter_name)] * 2)
 
-    @mock.patch.object(fc_utils.FCUtils, '_open_adapter')
+    @mock.patch.object(fc_utils.FCUtils, '_open_adapter_by_name')
     @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
     @mock.patch.object(fc_utils.FCUtils, '_get_adapter_port_attributes')
     @mock.patch.object(fc_utils.FCUtils, '_get_adapter_attributes')
@@ -245,8 +258,8 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_adapter_attributes = mock.MagicMock()
         mock_adapter_attributes.NumberOfPorts = fake_port_count
         mock_port_attributes = mock.MagicMock()
-        mock_port_attributes.NodeWWN = fake_node_wwn
-        mock_port_attributes.PortWWN = fake_port_wwn
+        mock_port_attributes.NodeWWN.wwn = fake_node_wwn
+        mock_port_attributes.PortWWN.wwn = fake_port_wwn
 
         mock_get_adapter_attributes.return_value = mock_adapter_attributes
         mock_get_adapter_port_attributes.return_value = mock_port_attributes
@@ -260,8 +273,7 @@ class FCUtilsTestCase(base.BaseTestCase):
         }]
         self.assertEqual(expected_hba_ports, resulted_hba_ports)
 
-        mock_open_adapter.assert_called_once_with(
-            adapter_name=mock.sentinel.adapter_name)
+        mock_open_adapter.assert_called_once_with(mock.sentinel.adapter_name)
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter(mock.sentinel.adapter_nam))
         mock_get_adapter_attributes.assert_called_once_with(
@@ -286,7 +298,7 @@ class FCUtilsTestCase(base.BaseTestCase):
         expected_string = '000102'
         self.assertEqual(expected_string, resulted_string)
 
-    @mock.patch.object(fc_utils.FCUtils, '_open_adapter')
+    @mock.patch.object(fc_utils.FCUtils, '_open_adapter_by_wwn')
     @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
     @mock.patch.object(fc_utils.FCUtils, '_get_target_mapping')
     def test_get_fc_target_mapping(self, mock_get_target_mapping,
@@ -299,8 +311,8 @@ class FCUtilsTestCase(base.BaseTestCase):
 
         mock_fcp_mappings = mock.MagicMock()
         mock_entry = mock.MagicMock()
-        mock_entry.FcpId.NodeWWN = fake_node_wwn
-        mock_entry.FcpId.PortWWN = fake_port_wwn
+        mock_entry.FcpId.NodeWWN.wwn = fake_node_wwn
+        mock_entry.FcpId.PortWWN.wwn = fake_port_wwn
         mock_entry.ScsiId.OSDeviceName = mock.sentinel.OSDeviceName
         mock_entry.ScsiId.ScsiOSLun = mock.sentinel.ScsiOSLun
         mock_fcp_mappings.Entries = [mock_entry]
@@ -318,7 +330,7 @@ class FCUtilsTestCase(base.BaseTestCase):
             'lun': mock.sentinel.ScsiOSLun
         }]
         self.assertEqual(expected_mappings, resulted_mappings)
-        mock_open_adapter.assert_called_once_with(adapter_wwn=mock_node_wwn)
+        mock_open_adapter.assert_called_once_with(mock_node_wwn)
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter.return_value)
 

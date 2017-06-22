@@ -17,7 +17,6 @@ import collections
 import ctypes
 import os
 import re
-import sys
 
 from oslo_log import log as logging
 
@@ -26,9 +25,9 @@ from os_win import _utils
 from os_win import exceptions
 from os_win.utils import baseutils
 from os_win.utils import win32utils
+from os_win.utils.winapi import libs as w_lib
 
-if sys.platform == 'win32':
-    kernel32 = ctypes.windll.kernel32
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 

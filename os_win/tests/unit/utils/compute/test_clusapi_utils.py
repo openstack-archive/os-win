@@ -22,6 +22,9 @@ from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils.compute import _clusapi_utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi.libs import clusapi as clusapi_def
+from os_win.utils.winapi import wintypes
 
 
 @ddt.ddt
@@ -83,8 +86,8 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         clusprop_val_struct = self._clusapi_utils._get_clusprop_value_struct(
             val_type)
 
-        expected_fields = [('syntax', _clusapi_utils.DWORD),
-                           ('length', _clusapi_utils.DWORD),
+        expected_fields = [('syntax', wintypes.DWORD),
+                           ('length', wintypes.DWORD),
                            ('value', val_type),
                            ('_padding', ctypes.c_ubyte * expected_padding_sz)]
         self.assertEqual(expected_fields, clusprop_val_struct._fields_)
@@ -100,7 +103,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             syntax=fake_prop_syntax,
             value=fake_prop_val)
 
-        self.assertEqual(_clusapi_utils.CLUSPROP_SYNTAX_NAME,
+        self.assertEqual(w_const.CLUSPROP_SYNTAX_NAME,
                          entry.name.syntax)
         self.assertEqual(fake_prop_name,
                          entry.name.value)
@@ -116,7 +119,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             ctypes.sizeof(fake_prop_val),
             entry.value.length)
 
-        self.assertEqual(_clusapi_utils.CLUSPROP_SYNTAX_ENDMARK,
+        self.assertEqual(w_const.CLUSPROP_SYNTAX_ENDMARK,
                          entry._endmark)
 
     def test_get_property_list(self):
@@ -197,11 +200,11 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusapi.CloseClusterNode.assert_called_once_with(
             mock.sentinel.handle)
 
-    @ddt.data(0, _clusapi_utils.ERROR_IO_PENDING)
+    @ddt.data(0, w_const.ERROR_IO_PENDING)
     def test_cancel_cluster_group_operation(self, cancel_ret_val):
         self._mock_run.return_value = cancel_ret_val
 
-        expected_ret_val = cancel_ret_val != _clusapi_utils.ERROR_IO_PENDING
+        expected_ret_val = cancel_ret_val != w_const.ERROR_IO_PENDING
         ret_val = self._clusapi_utils.cancel_cluster_group_operation(
             mock.sentinel.group_handle)
 
@@ -211,7 +214,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             self._clusapi.CancelClusterGroupOperation,
             mock.sentinel.group_handle,
             0,
-            ignored_error_codes=[_clusapi_utils.ERROR_IO_PENDING])
+            ignored_error_codes=[w_const.ERROR_IO_PENDING])
 
     @ddt.data(mock.sentinel.prop_list, None)
     def test_move_cluster_group(self, prop_list):
@@ -235,7 +238,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.move_flags,
             expected_prop_list_arg,
             expected_prop_list_sz,
-            ignored_error_codes=[_clusapi_utils.ERROR_IO_PENDING])
+            ignored_error_codes=[w_const.ERROR_IO_PENDING])
 
     def test_get_cluster_group_state(self):
         owner_node = 'fake owner node'
@@ -257,15 +260,15 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
             node_name_len_arg = ctypes.cast(
                 node_name_len,
-                ctypes.POINTER(_clusapi_utils.DWORD)).contents
-            self.assertEqual(self._clusapi_utils._MAX_NODE_NAME,
+                wintypes.PDWORD).contents
+            self.assertEqual(w_const.MAX_PATH,
                              node_name_len_arg.value)
 
             node_name_arg = ctypes.cast(
                 node_name_buff,
                 ctypes.POINTER(
                     ctypes.c_wchar *
-                    self._clusapi_utils._MAX_NODE_NAME)).contents
+                    w_const.MAX_PATH)).contents
             node_name_arg.value = owner_node
             return mock.sentinel.group_state
 
@@ -277,9 +280,9 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                                    owner_node=owner_node)
         self.assertEqual(expected_state_info, state_info)
 
-    @ddt.data({'notif_filters': (_clusapi_utils.NOTIFY_FILTER_AND_TYPE * 2)(),
+    @ddt.data({'notif_filters': (clusapi_def.NOTIFY_FILTER_AND_TYPE * 2)(),
                'exp_notif_filters_len': 2},
-              {'notif_filters': _clusapi_utils.NOTIFY_FILTER_AND_TYPE(),
+              {'notif_filters': clusapi_def.NOTIFY_FILTER_AND_TYPE(),
                'notif_port_h': mock.sentinel.notif_port_h,
                'notif_key': mock.sentinel.notif_key})
     @ddt.unpack
@@ -297,7 +300,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             notif_key)
 
         exp_notif_key_p = self._ctypes.byref(notif_key) if notif_key else None
-        exp_notif_port_h = notif_port_h or _clusapi_utils.INVALID_HANDLE_VALUE
+        exp_notif_port_h = notif_port_h or w_const.INVALID_HANDLE_VALUE
 
         self._mock_run.assert_called_once_with(
             self._clusapi.CreateClusterNotifyPortV2,
@@ -337,10 +340,10 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
             obj_name_buff_sz = ctypes.cast(
                 p_obj_name_buff_sz,
-                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+                wintypes.PDWORD).contents
             buff_sz = ctypes.cast(
                 p_buff_sz,
-                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+                wintypes.PDWORD).contents
 
             # We'll just request the tested method to pass us
             # a buffer this large.
@@ -349,7 +352,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                 buff_sz.value = requested_buff_sz
                 obj_name_buff_sz.value = requested_buff_sz
                 raise exceptions.ClusterWin32Exception(
-                    error_code=_clusapi_utils.ERROR_MORE_DATA,
+                    error_code=w_const.ERROR_MORE_DATA,
                     func_name='GetClusterNotify',
                     error_message='error more data')
 
@@ -359,7 +362,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
             filter_and_type = ctypes.cast(
                 p_filter_and_type,
-                ctypes.POINTER(_clusapi_utils.NOTIFY_FILTER_AND_TYPE)).contents
+                ctypes.POINTER(clusapi_def.NOTIFY_FILTER_AND_TYPE)).contents
             filter_and_type.dwObjectType = fake_notif_type
             filter_and_type.FilterFlags = fake_filter_flags
 
@@ -404,18 +407,18 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(expected_event, event)
 
     def _get_fake_prop_list(self):
-        syntax = _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
-        migr_type = _clusapi_utils.DWORD(self._LIVE_MIGRATION_TYPE)
+        syntax = w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD
+        migr_type = wintypes.DWORD(self._LIVE_MIGRATION_TYPE)
 
         prop_entries = [
             self._clusapi_utils.get_property_list_entry(
-                _clusapi_utils.CLUSPROP_NAME_VM, syntax, migr_type),
+                w_const.CLUS_RESTYPE_NAME_VM, syntax, migr_type),
             self._clusapi_utils.get_property_list_entry(
-                _clusapi_utils.CLUSPROP_NAME_VM_CONFIG, syntax, migr_type),
+                w_const.CLUS_RESTYPE_NAME_VM_CONFIG, syntax, migr_type),
             self._clusapi_utils.get_property_list_entry(
-                _clusapi_utils.CLUSPROP_GROUP_STATUS_INFO,
-                _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER,
-                ctypes.c_ulonglong(_clusapi_utils.
+                w_const.CLUSREG_NAME_GRP_STATUS_INFORMATION,
+                w_const.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER,
+                ctypes.c_ulonglong(w_const.
                     CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE))  # noqa
         ]
 
@@ -444,7 +447,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._clusapi_utils.get_prop_list_entry_p,
                           ctypes.byref(prop_list),
                           ctypes.sizeof(prop_list),
-                          _clusapi_utils.CLUSPROP_NAME_VM)
+                          w_const.CLUS_RESTYPE_NAME_VM)
 
     def test_get_prop_list_entry_p(self):
         prop_list = self._get_fake_prop_list()
@@ -452,10 +455,10 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         prop_entry = self._clusapi_utils.get_prop_list_entry_p(
             ctypes.byref(prop_list),
             ctypes.sizeof(prop_list),
-            _clusapi_utils.CLUSPROP_NAME_VM_CONFIG)
+            w_const.CLUS_RESTYPE_NAME_VM_CONFIG)
 
         self.assertEqual(
-            _clusapi_utils.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
+            w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
             prop_entry['syntax'])
         self.assertEqual(
             ctypes.sizeof(ctypes.c_ulong),
@@ -483,14 +486,14 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
             req_buff_sz = ctypes.cast(
                 requested_buff_sz_p,
-                ctypes.POINTER(_clusapi_utils.DWORD)).contents
+                wintypes.PDWORD).contents
             req_buff_sz.value = requested_buff_sz
 
             # We'll just request the tested method to pass us
             # a buffer this large.
             if (out_buff_sz.value < requested_buff_sz):
                 raise exceptions.ClusterWin32Exception(
-                    error_code=_clusapi_utils.ERROR_MORE_DATA,
+                    error_code=w_const.ERROR_MORE_DATA,
                     func_name='ClusterGroupControl',
                     error_message='error more data')
 
@@ -522,5 +525,5 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         status_info = self._clusapi_utils.get_cluster_group_status_info(
             ctypes.byref(prop_list), ctypes.sizeof(prop_list))
         self.assertEqual(
-            _clusapi_utils.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE,
+            w_const.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE,
             status_info)

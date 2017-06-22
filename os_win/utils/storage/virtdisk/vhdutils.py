@@ -26,26 +26,54 @@ http://www.microsoft.com/en-us/download/details.aspx?id=34750
 import ctypes
 import os
 import struct
-import sys
 
 from oslo_log import log as logging
+from oslo_utils import units
 
 from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
-from os_win.utils.storage.virtdisk import (
-    virtdisk_constants as vdisk_const)
 from os_win.utils import win32utils
+from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi.libs import virtdisk as vdisk_struct
+from os_win.utils.winapi import wintypes
 
-if sys.platform == 'win32':
-    from ctypes import wintypes
-    kernel32 = ctypes.windll.kernel32
-    virtdisk = ctypes.windll.virtdisk
-
-    from os_win.utils.storage.virtdisk import (
-        virtdisk_structures as vdisk_struct)  # noqa
+kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
+virtdisk = w_lib.get_shared_lib_handle(w_lib.VIRTDISK)
 
 LOG = logging.getLogger(__name__)
+
+
+VHD_SIGNATURE = b'conectix'
+VHDX_SIGNATURE = b'vhdxfile'
+
+DEVICE_ID_MAP = {
+    constants.DISK_FORMAT_VHD: w_const.VIRTUAL_STORAGE_TYPE_DEVICE_VHD,
+    constants.DISK_FORMAT_VHDX: w_const.VIRTUAL_STORAGE_TYPE_DEVICE_VHDX,
+}
+
+VHD_HEADER_SIZE_FIX = 512
+VHD_BAT_ENTRY_SIZE = 4
+VHD_DYNAMIC_DISK_HEADER_SIZE = 1024
+VHD_HEADER_SIZE_DYNAMIC = 512
+VHD_FOOTER_SIZE_DYNAMIC = 512
+
+VHDX_BAT_ENTRY_SIZE = 8
+VHDX_HEADER_OFFSETS = [64 * units.Ki, 128 * units.Ki]
+VHDX_HEADER_SECTION_SIZE = units.Mi
+VHDX_LOG_LENGTH_OFFSET = 68
+VHDX_METADATA_SIZE_OFFSET = 64
+VHDX_REGION_TABLE_OFFSET = 192 * units.Ki
+VHDX_BS_METADATA_ENTRY_OFFSET = 48
+
+VIRTUAL_DISK_DEFAULT_SECTOR_SIZE = 0x200
+VIRTUAL_DISK_DEFAULT_PHYS_SECTOR_SIZE = 0x200
+
+CREATE_VIRTUAL_DISK_FLAGS = {
+    constants.VHD_TYPE_FIXED:
+        w_const.CREATE_VIRTUAL_DISK_FLAG_FULL_PHYSICAL_ALLOCATION,
+}
 
 
 class VHDUtils(object):
@@ -53,12 +81,12 @@ class VHDUtils(object):
         self._win32_utils = win32utils.Win32Utils()
 
         self._vhd_info_members = {
-            vdisk_const.GET_VIRTUAL_DISK_INFO_SIZE: 'Size',
-            vdisk_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION:
+            w_const.GET_VIRTUAL_DISK_INFO_SIZE: 'Size',
+            w_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION:
                 'ParentLocation',
-            vdisk_const.GET_VIRTUAL_DISK_INFO_VIRTUAL_STORAGE_TYPE:
+            w_const.GET_VIRTUAL_DISK_INFO_VIRTUAL_STORAGE_TYPE:
                 'VirtualStorageType',
-            vdisk_const.GET_VIRTUAL_DISK_INFO_PROVIDER_SUBTYPE:
+            w_const.GET_VIRTUAL_DISK_INFO_PROVIDER_SUBTYPE:
                 'ProviderSubtype'}
 
         # Describes the way error handling is performed
@@ -76,15 +104,17 @@ class VHDUtils(object):
             return self._win32_utils.run_and_check_output(*args, **kwargs)
         finally:
             if cleanup_handle:
-                self._close(cleanup_handle)
+                self._win32_utils.close_handle(cleanup_handle)
 
     def _open(self, vhd_path,
-              open_flag=None,
-              open_access_mask=vdisk_const.VIRTUAL_DISK_ACCESS_ALL,
+              open_flag=0,
+              open_access_mask=w_const.VIRTUAL_DISK_ACCESS_ALL,
               open_params=None):
         device_id = self._get_vhd_device_id(vhd_path)
 
-        vst = vdisk_struct.Win32_VIRTUAL_STORAGE_TYPE(DeviceId=device_id)
+        vst = vdisk_struct.VIRTUAL_STORAGE_TYPE(
+            DeviceId=device_id,
+            VendorId=w_const.VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT)
         handle = wintypes.HANDLE()
 
         self._run_and_check_output(virtdisk.OpenVirtualDisk,
@@ -103,24 +133,33 @@ class VHDUtils(object):
                    max_internal_size=0, parent_path=None):
         new_device_id = self._get_vhd_device_id(new_vhd_path)
 
-        vst = vdisk_struct.Win32_VIRTUAL_STORAGE_TYPE(DeviceId=new_device_id)
+        vst = vdisk_struct.VIRTUAL_STORAGE_TYPE(
+            DeviceId=new_device_id,
+            VendorId=w_const.VIRTUAL_STORAGE_TYPE_VENDOR_MICROSOFT)
 
-        params = vdisk_struct.Win32_CREATE_VIRTUAL_DISK_PARAMETERS(
-            MaximumSize=max_internal_size,
-            ParentPath=parent_path,
-            SourcePath=src_path)
+        params = vdisk_struct.CREATE_VIRTUAL_DISK_PARAMETERS()
+        params.Version = w_const.CREATE_VIRTUAL_DISK_VERSION_2
+        params.Version2.MaximumSize = max_internal_size
+        params.Version2.ParentPath = parent_path
+        params.Version2.SourcePath = src_path
+        params.Version2.PhysicalSectorSizeInBytes = (
+            VIRTUAL_DISK_DEFAULT_PHYS_SECTOR_SIZE)
+        params.Version2.BlockSizeInBytes = (
+            w_const.CREATE_VHD_PARAMS_DEFAULT_BLOCK_SIZE)
+        params.Version2.SectorSizeInBytes = (
+            VIRTUAL_DISK_DEFAULT_SECTOR_SIZE)
 
         handle = wintypes.HANDLE()
-        create_virtual_disk_flag = (
-            vdisk_const.CREATE_VIRTUAL_DISK_FLAGS.get(new_vhd_type))
+        create_virtual_disk_flag = CREATE_VIRTUAL_DISK_FLAGS.get(
+            new_vhd_type, 0)
 
         self._run_and_check_output(virtdisk.CreateVirtualDisk,
                                    ctypes.byref(vst),
                                    ctypes.c_wchar_p(new_vhd_path),
-                                   None,
+                                   0,
                                    None,
                                    create_virtual_disk_flag,
-                                   None,
+                                   0,
                                    ctypes.byref(params),
                                    None,
                                    ctypes.byref(handle),
@@ -142,7 +181,7 @@ class VHDUtils(object):
 
     def get_vhd_format(self, vhd_path):
         vhd_format = os.path.splitext(vhd_path)[1][1:].upper()
-        device_id = vdisk_const.DEVICE_ID_MAP.get(vhd_format)
+        device_id = DEVICE_ID_MAP.get(vhd_format)
         # If the disk format is not recognised by extension,
         # we attempt to retrieve it by seeking the signature.
         if not device_id and os.path.exists(vhd_path):
@@ -156,13 +195,13 @@ class VHDUtils(object):
 
     def _get_vhd_device_id(self, vhd_path):
         vhd_format = self.get_vhd_format(vhd_path)
-        return vdisk_const.DEVICE_ID_MAP.get(vhd_format)
+        return DEVICE_ID_MAP.get(vhd_format)
 
     def _get_vhd_format_by_signature(self, vhd_path):
         with open(vhd_path, 'rb') as f:
             # print f.read()
             # Read header
-            if f.read(8) == vdisk_const.VHDX_SIGNATURE:
+            if f.read(8) == VHDX_SIGNATURE:
                 return constants.DISK_FORMAT_VHDX
 
             # Read footer
@@ -170,7 +209,7 @@ class VHDUtils(object):
             file_size = f.tell()
             if file_size >= 512:
                 f.seek(-512, 2)
-                if f.read(8) == vdisk_const.VHD_SIGNATURE:
+                if f.read(8) == VHD_SIGNATURE:
                     return constants.DISK_FORMAT_VHD
 
     def get_vhd_info(self, vhd_path, info_members=None,
@@ -197,10 +236,10 @@ class VHDUtils(object):
         vhd_info = {}
         info_members = info_members or self._vhd_info_members
 
-        open_flag = (vdisk_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS
+        open_flag = (w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS
                      if not open_parents else 0)
-        open_access_mask = (vdisk_const.VIRTUAL_DISK_ACCESS_GET_INFO |
-                            vdisk_const.VIRTUAL_DISK_ACCESS_DETACH)
+        open_access_mask = (w_const.VIRTUAL_DISK_ACCESS_GET_INFO |
+                            w_const.VIRTUAL_DISK_ACCESS_DETACH)
         handle = self._open(
             vhd_path,
             open_flag=open_flag,
@@ -211,13 +250,13 @@ class VHDUtils(object):
                 info = self._get_vhd_info_member(handle, member)
                 vhd_info.update(info)
         finally:
-            self._close(handle)
+            self._win32_utils.close_handle(handle)
 
         return vhd_info
 
     def _get_vhd_info_member(self, vhd_file, info_member):
-        virt_disk_info = vdisk_struct.Win32_GET_VIRTUAL_DISK_INFO_PARAMETERS()
-        virt_disk_info.VERSION = ctypes.c_uint(info_member)
+        virt_disk_info = vdisk_struct.GET_VIRTUAL_DISK_INFO()
+        virt_disk_info.Version = ctypes.c_uint(info_member)
 
         infoSize = ctypes.sizeof(virt_disk_info)
 
@@ -226,8 +265,8 @@ class VHDUtils(object):
         # Note(lpetrut): If the vhd has no parent image, this will
         # return an error. No need to raise an exception in this case.
         ignored_error_codes = []
-        if info_member == vdisk_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION:
-            ignored_error_codes.append(vdisk_const.ERROR_VHD_INVALID_TYPE)
+        if info_member == w_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION:
+            ignored_error_codes.append(w_const.ERROR_VHD_INVALID_TYPE)
 
         self._run_and_check_output(virtdisk.GetVirtualDiskInformation,
                                    vhd_file,
@@ -241,7 +280,7 @@ class VHDUtils(object):
     def _parse_vhd_info(self, virt_disk_info, info_member):
         vhd_info = {}
         vhd_info_member = self._vhd_info_members[info_member]
-        info = getattr(virt_disk_info.VhdInfo, vhd_info_member)
+        info = getattr(virt_disk_info, vhd_info_member)
 
         if hasattr(info, '_fields_'):
             for field in info._fields_:
@@ -258,13 +297,13 @@ class VHDUtils(object):
         block size and sector size of the vhd.
         """
         size = self.get_vhd_info(vhd_path,
-                                 [vdisk_const.GET_VIRTUAL_DISK_INFO_SIZE])
+                                 [w_const.GET_VIRTUAL_DISK_INFO_SIZE])
         return size
 
     def get_vhd_parent_path(self, vhd_path):
         vhd_info = self.get_vhd_info(
             vhd_path,
-            [vdisk_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION])
+            [w_const.GET_VIRTUAL_DISK_INFO_PARENT_LOCATION])
         parent_path = vhd_info['ParentPath']
 
         return parent_path if parent_path else None
@@ -272,23 +311,26 @@ class VHDUtils(object):
     def get_vhd_type(self, vhd_path):
         vhd_info = self.get_vhd_info(
             vhd_path,
-            [vdisk_const.GET_VIRTUAL_DISK_INFO_PROVIDER_SUBTYPE])
+            [w_const.GET_VIRTUAL_DISK_INFO_PROVIDER_SUBTYPE])
         return vhd_info['ProviderSubtype']
 
     def merge_vhd(self, vhd_path, delete_merged_image=True):
         """Merges a VHD/x image into the immediate next parent image."""
-        open_params = vdisk_struct.Win32_OPEN_VIRTUAL_DISK_PARAMETERS_V1(
-            RWDepth=2)
+        open_params = vdisk_struct.OPEN_VIRTUAL_DISK_PARAMETERS()
+        open_params.Version = w_const.OPEN_VIRTUAL_DISK_VERSION_1
+        open_params.Version1.RWDepth = 2
 
         handle = self._open(vhd_path,
                             open_params=ctypes.byref(open_params))
 
-        params = vdisk_struct.Win32_MERGE_VIRTUAL_DISK_PARAMETERS(MergeDepth=1)
+        params = vdisk_struct.MERGE_VIRTUAL_DISK_PARAMETERS()
+        params.Version = w_const.MERGE_VIRTUAL_DISK_VERSION_1
+        params.Version1.MergeDepth = 1
 
         self._run_and_check_output(
             virtdisk.MergeVirtualDisk,
             handle,
-            None,
+            0,
             ctypes.byref(params),
             None,
             cleanup_handle=handle)
@@ -297,17 +339,19 @@ class VHDUtils(object):
             os.remove(vhd_path)
 
     def reconnect_parent_vhd(self, child_path, parent_path):
-        open_params = vdisk_struct.Win32_OPEN_VIRTUAL_DISK_PARAMETERS_V2(
-            GetInfoOnly=False)
+        open_params = vdisk_struct.OPEN_VIRTUAL_DISK_PARAMETERS()
+        open_params.Version = w_const.OPEN_VIRTUAL_DISK_VERSION_2
+        open_params.Version2.GetInfoOnly = False
 
         handle = self._open(
             child_path,
-            open_flag=vdisk_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS,
-            open_access_mask=None,
+            open_flag=w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS,
+            open_access_mask=0,
             open_params=ctypes.byref(open_params))
 
-        params = vdisk_struct.Win32_SET_VIRTUAL_DISK_INFO_PARAMETERS(
-            ParentFilePath=parent_path)
+        params = vdisk_struct.SET_VIRTUAL_DISK_INFO()
+        params.Version = w_const.SET_VIRTUAL_DISK_INFO_PARENT_PATH
+        params.ParentFilePath = parent_path
 
         self._run_and_check_output(virtdisk.SetVirtualDiskInformation,
                                    handle,
@@ -350,13 +394,14 @@ class VHDUtils(object):
     def _resize_vhd(self, vhd_path, new_max_size):
         handle = self._open(vhd_path)
 
-        params = vdisk_struct.Win32_RESIZE_VIRTUAL_DISK_PARAMETERS(
-            NewSize=new_max_size)
+        params = vdisk_struct.RESIZE_VIRTUAL_DISK_PARAMETERS()
+        params.Version = w_const.RESIZE_VIRTUAL_DISK_VERSION_1
+        params.Version1.NewSize = new_max_size
 
         self._run_and_check_output(
             virtdisk.ResizeVirtualDisk,
             handle,
-            None,
+            0,
             ctypes.byref(params),
             None,
             cleanup_handle=handle)
@@ -373,7 +418,7 @@ class VHDUtils(object):
             return self.get_internal_vhd_size_by_file_size(
                 vhd_parent, new_vhd_file_size)
 
-        if vhd_dev_id == vdisk_const.VIRTUAL_STORAGE_TYPE_DEVICE_VHD:
+        if vhd_dev_id == w_const.VIRTUAL_STORAGE_TYPE_DEVICE_VHD:
             func = self._get_internal_vhd_size_by_file_size
         else:
             func = self._get_internal_vhdx_size_by_file_size
@@ -403,14 +448,14 @@ class VHDUtils(object):
 
         vhd_type = vhd_info['ProviderSubtype']
         if vhd_type == constants.VHD_TYPE_FIXED:
-            vhd_header_size = vdisk_const.VHD_HEADER_SIZE_FIX
+            vhd_header_size = VHD_HEADER_SIZE_FIX
             return new_vhd_file_size - vhd_header_size
         else:
             bs = vhd_info['BlockSize']
-            bes = vdisk_const.VHD_BAT_ENTRY_SIZE
-            ddhs = vdisk_const.VHD_DYNAMIC_DISK_HEADER_SIZE
-            hs = vdisk_const.VHD_HEADER_SIZE_DYNAMIC
-            fs = vdisk_const.VHD_FOOTER_SIZE_DYNAMIC
+            bes = VHD_BAT_ENTRY_SIZE
+            ddhs = VHD_DYNAMIC_DISK_HEADER_SIZE
+            hs = VHD_HEADER_SIZE_DYNAMIC
+            fs = VHD_FOOTER_SIZE_DYNAMIC
 
             max_internal_size = (new_vhd_file_size -
                                  (hs + ddhs + fs)) * bs // (bes + bs)
@@ -435,8 +480,8 @@ class VHDUtils(object):
 
         try:
             with open(vhd_path, 'rb') as f:
-                hs = vdisk_const.VHDX_HEADER_SECTION_SIZE
-                bes = vdisk_const.VHDX_BAT_ENTRY_SIZE
+                hs = VHDX_HEADER_SECTION_SIZE
+                bes = VHDX_BAT_ENTRY_SIZE
 
                 lss = vhd_info['SectorSize']
                 bs = self._get_vhdx_block_size(f)
@@ -460,23 +505,22 @@ class VHDUtils(object):
 
     def _get_vhdx_current_header_offset(self, vhdx_file):
         sequence_numbers = []
-        for offset in vdisk_const.VHDX_HEADER_OFFSETS:
+        for offset in VHDX_HEADER_OFFSETS:
             vhdx_file.seek(offset + 8)
             sequence_numbers.append(struct.unpack('<Q',
                                     vhdx_file.read(8))[0])
         current_header = sequence_numbers.index(max(sequence_numbers))
-        return vdisk_const.VHDX_HEADER_OFFSETS[current_header]
+        return VHDX_HEADER_OFFSETS[current_header]
 
     def _get_vhdx_log_size(self, vhdx_file):
         current_header_offset = self._get_vhdx_current_header_offset(vhdx_file)
-        offset = current_header_offset + vdisk_const.VHDX_LOG_LENGTH_OFFSET
+        offset = current_header_offset + VHDX_LOG_LENGTH_OFFSET
         vhdx_file.seek(offset)
         log_size = struct.unpack('<I', vhdx_file.read(4))[0]
         return log_size
 
     def _get_vhdx_metadata_size_and_offset(self, vhdx_file):
-        offset = (vdisk_const.VHDX_METADATA_SIZE_OFFSET +
-                  vdisk_const.VHDX_REGION_TABLE_OFFSET)
+        offset = VHDX_METADATA_SIZE_OFFSET + VHDX_REGION_TABLE_OFFSET
         vhdx_file.seek(offset)
         metadata_offset = struct.unpack('<Q', vhdx_file.read(8))[0]
         metadata_size = struct.unpack('<I', vhdx_file.read(4))[0]
@@ -484,7 +528,7 @@ class VHDUtils(object):
 
     def _get_vhdx_block_size(self, vhdx_file):
         metadata_offset = self._get_vhdx_metadata_size_and_offset(vhdx_file)[1]
-        offset = metadata_offset + vdisk_const.VHDX_BS_METADATA_ENTRY_OFFSET
+        offset = metadata_offset + VHDX_BS_METADATA_ENTRY_OFFSET
         vhdx_file.seek(offset)
         file_parameter_offset = struct.unpack('<I', vhdx_file.read(4))[0]
 
