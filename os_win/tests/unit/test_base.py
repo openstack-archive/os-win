@@ -19,6 +19,7 @@ from oslotest import base
 from six.moves import builtins
 
 from os_win import exceptions
+from os_win.utils import baseutils
 
 
 class TestingException(Exception):
@@ -37,6 +38,7 @@ class OsWinBaseTestCase(base.BaseTestCase):
         super(OsWinBaseTestCase, self).setUp()
 
         self._mock_wmi = mock.MagicMock()
+        baseutils.BaseUtilsVirt._old_wmi = self._mock_wmi
 
         mock_os = mock.MagicMock(Version='6.3.0')
         self._mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = (

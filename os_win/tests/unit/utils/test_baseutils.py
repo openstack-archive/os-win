@@ -100,6 +100,7 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(baseutils, 'imp')
     @mock.patch.object(baseutils, 'wmi', create=True)
     def test_vs_man_svc_2012(self, mock_wmi, mock_imp):
+        baseutils.BaseUtilsVirt._old_wmi = None
         mock_os = mock.MagicMock(Version='6.2.0')
         mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
             mock_os]
