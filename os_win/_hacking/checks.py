@@ -14,9 +14,12 @@
 #    under the License.
 
 import ast
+import os
 import re
 
 import pep8
+
+from os_win.utils.winapi import libs as w_lib
 
 """
 Guidelines for writing new hacking checks
@@ -77,6 +80,13 @@ import_translation_for_log_or_exception = re.compile(
 # We need this for cases where they have created their own _ function.
 custom_underscore_check = re.compile(r"(.)*_\s*=\s*(.)*")
 dict_constructor_with_list_copy_re = re.compile(r".*\bdict\((\[)?(\(|\[)")
+ctypes_external_lib_re = re.compile(r"ctypes\.(?:win|c|py|ole)dll",
+                                    re.IGNORECASE)
+ctypes_func_typedefs_re = re.compile(
+    r"(?:^|[^\w])(%s)\.(\w+)" % '|'.join(w_lib.libs),
+    re.IGNORECASE)
+
+_module_src_cache = {}
 
 
 class BaseASTChecker(ast.NodeVisitor):
@@ -397,6 +407,46 @@ def assert_equal_in(logical_line):
                   "contents.")
 
 
+def assert_ctypes_libs_not_used_directly(logical_line, filename):
+    # We allow this only for the modules containing the library definitions.
+    w_lib_path = os.path.join(*w_lib.__name__.split('.'))
+
+    if w_lib_path in filename:
+        return
+
+    res = ctypes_external_lib_re.search(logical_line)
+    if res:
+        yield (0, "O301: Using external libraries via ctypes directly "
+                  "is not allowed. Please use the following function to "
+                  "retrieve a supported library handle: "
+                  "%s.get_shared_lib_handle" % w_lib.__name__)
+
+
+def _get_module_src(path):
+    if not _module_src_cache.get(path):
+        with open(path, 'r') as f:
+            _module_src_cache[path] = f.read()
+
+    return _module_src_cache[path]
+
+
+def assert_ctypes_foreign_func_argtypes_defined(logical_line):
+    res = ctypes_func_typedefs_re.findall(logical_line)
+
+    for lib_name, func_name in res:
+        mod_path = "%s.py" % os.path.join(os.path.dirname(w_lib.__file__),
+                                          lib_name)
+        module_src = _get_module_src(mod_path)
+
+        argtypes_expr = "%s.argtypes =" % func_name
+        restype_expr = "%s.restype =" % func_name
+
+        if not (argtypes_expr in module_src and restype_expr in module_src):
+            yield (0, "O302: Foreign function called using ctypes without "
+                      "having its argument and return value types declared "
+                      "in %s.%s.py." % (w_lib.__name__, lib_name))
+
+
 def factory(register):
     register(use_timeutils_utcnow)
     register(capital_cfg_help)
@@ -416,3 +466,5 @@ def factory(register):
     register(assert_true_or_false_with_in)
     register(dict_constructor_with_list_copy)
     register(assert_equal_in)
+    register(assert_ctypes_libs_not_used_directly)
+    register(assert_ctypes_foreign_func_argtypes_defined)
