@@ -32,7 +32,6 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_JOB_PATH = 'fake_job_path'
     _FAKE_ERROR = "fake_error"
     _FAKE_ELAPSED_TIME = 0
-    _CONCRETE_JOB = "Msvm_ConcreteJob"
 
     def setUp(self):
         super(JobUtilsTestCase, self).setUp()
@@ -52,41 +51,33 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertFalse(mock_wait_for_job.called)
 
     def test_check_ret_val_exception(self):
-        self.assertRaises(exceptions.HyperVException,
+        self.assertRaises(exceptions.WMIJobFailed,
                           self.jobutils.check_ret_val,
                           mock.sentinel.ret_val_bad,
                           mock.sentinel.job_path)
 
-    def test_wait_for_job_exception_concrete_job(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.path.return_value.Class = self._CONCRETE_JOB
-        self.assertRaises(exceptions.HyperVException,
-                          self.jobutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-
-    def test_wait_for_job_exception_with_error(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.GetError.return_value = (self._FAKE_ERROR, self._FAKE_RET_VAL)
-        self.assertRaises(exceptions.HyperVException,
-                          self.jobutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-        mock_job.GetError.assert_called_once_with()
-
-    def test_wait_for_job_exception_no_error_details(self):
-        mock_job = self._prepare_wait_for_job()
-        mock_job.GetError.return_value = (None, None)
-        self.assertRaises(exceptions.HyperVException,
-                          self.jobutils._wait_for_job,
-                          self._FAKE_JOB_PATH)
-
     def test_wait_for_job_ok(self):
         mock_job = self._prepare_wait_for_job(
-            constants.WMI_JOB_STATE_COMPLETED)
+            constants.JOB_STATE_COMPLETED_WITH_WARNINGS)
         job = self.jobutils._wait_for_job(self._FAKE_JOB_PATH)
         self.assertEqual(mock_job, job)
 
-    @ddt.data(True, False)
-    def test_get_pending_jobs(self, ignore_error_state):
+    def test_wait_for_job_error_state(self):
+        self._prepare_wait_for_job(
+            constants.JOB_STATE_TERMINATED)
+        self.assertRaises(exceptions.WMIJobFailed,
+                          self.jobutils._wait_for_job,
+                          self._FAKE_JOB_PATH)
+
+    def test_wait_for_job_error_code(self):
+        self._prepare_wait_for_job(
+            constants.JOB_STATE_COMPLETED_WITH_WARNINGS,
+            error_code=1)
+        self.assertRaises(exceptions.WMIJobFailed,
+                          self.jobutils._wait_for_job,
+                          self._FAKE_JOB_PATH)
+
+    def test_get_pending_jobs(self):
         mock_killed_job = mock.Mock(JobState=constants.JOB_STATE_KILLED)
         mock_running_job = mock.Mock(JobState=constants.WMI_JOB_STATE_RUNNING)
         mock_error_st_job = mock.Mock(JobState=constants.JOB_STATE_EXCEPTION)
@@ -99,12 +90,8 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_affected_element = mock.Mock()
 
         expected_pending_jobs = [mock_running_job]
-        if not ignore_error_state:
-            expected_pending_jobs.append(mock_error_st_job)
-
         pending_jobs = self.jobutils._get_pending_jobs_affecting_element(
-            mock_affected_element,
-            ignore_error_state=ignore_error_state)
+            mock_affected_element)
         self.assertEqual(expected_pending_jobs, pending_jobs)
 
         self.jobutils._conn.Msvm_AffectedJobElement.assert_called_once_with(
@@ -161,8 +148,7 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
                               mock.sentinel.vm)
 
         mock_get_pending_jobs.assert_has_calls(
-            [mock.call(mock.sentinel.vm, ignore_error_state=False),
-             mock.call(mock.sentinel.vm)])
+            [mock.call(mock.sentinel.vm)] * 2)
 
         mock_job1.RequestStateChange.assert_called_once_with(
             self.jobutils._KILL_JOB_STATE_CHANGE_REQUEST)
@@ -186,9 +172,11 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertFalse(self.jobutils._is_job_completed(job))
 
-    def _prepare_wait_for_job(self, state=_FAKE_JOB_STATUS_BAD):
+    def _prepare_wait_for_job(self, state=_FAKE_JOB_STATUS_BAD,
+                              error_code=0):
         mock_job = mock.MagicMock()
         mock_job.JobState = state
+        mock_job.ErrorCode = error_code
         mock_job.Description = self._FAKE_JOB_DESCRIPTION
         mock_job.ElapsedTime = self._FAKE_ELAPSED_TIME
 
