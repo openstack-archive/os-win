@@ -98,40 +98,6 @@ class LiveMigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                           self.liveutils._get_vm,
                           mock_conn_v2, self._FAKE_VM_NAME)
 
-    def test_destroy_planned_vm(self):
-        mock_planned_vm = mock.MagicMock()
-        mock_planned_vm.path_.return_value = mock.sentinel.planned_vm_path
-        mock_vs_man_svc = self.liveutils._vs_man_svc
-        mock_vs_man_svc.DestroySystem.return_value = (
-            mock.sentinel.job_path, mock.sentinel.ret_val)
-
-        self.liveutils._destroy_planned_vm(mock_planned_vm)
-
-        mock_vs_man_svc.DestroySystem.assert_called_once_with(
-            mock.sentinel.planned_vm_path)
-        self.liveutils._jobutils.check_ret_val.assert_called_once_with(
-            mock.sentinel.ret_val,
-            mock.sentinel.job_path)
-
-    @ddt.data({'planned_vm': None}, {'planned_vm': mock.sentinel.planned_vm})
-    @ddt.unpack
-    @mock.patch.object(livemigrationutils.LiveMigrationUtils,
-                       '_destroy_planned_vm')
-    @mock.patch.object(livemigrationutils.LiveMigrationUtils,
-                       '_get_planned_vm')
-    def test_destroy_existing_planned_vm(self, mock_get_planned_vm,
-                                         mock_destroy_planned_vm, planned_vm):
-        mock_get_planned_vm.return_value = planned_vm
-
-        self.liveutils.destroy_existing_planned_vm(mock.sentinel.vm_name)
-
-        mock_get_planned_vm.assert_called_once_with(
-            mock.sentinel.vm_name, self._conn)
-        if planned_vm:
-            mock_destroy_planned_vm.assert_called_once_with(planned_vm)
-        else:
-            self.assertFalse(mock_destroy_planned_vm.called)
-
     def test_create_planned_vm_helper(self):
         mock_vm = mock.MagicMock()
         mock_v2 = mock.MagicMock()

@@ -225,7 +225,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
             return vms[0]
 
     def vm_exists(self, vm_name):
-        return self._lookup_vm(vm_name) is not None
+        """Checks if the Realized VM with the given name exists on the host."""
+        # NOTE(claudiub): A planned VM and a realized VM cannot exist at the
+        # same time on the same host. The 2 types must be treated separately,
+        # thus, this will only check if the Realized VM exits.
+        return self._lookup_vm(vm_name, False) is not None
 
     def get_vm_id(self, vm_name):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)

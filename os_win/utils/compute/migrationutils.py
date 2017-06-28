@@ -13,12 +13,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_log import log as logging
+
 from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
 from os_win.utils.compute import vmutils
 from os_win.utils import jobutils
+
+LOG = logging.getLogger(__name__)
 
 
 class MigrationUtils(baseutils.BaseUtilsVirt):
@@ -78,3 +82,19 @@ class MigrationUtils(baseutils.BaseUtilsVirt):
             raise exceptions.HyperVException(
                 _('Cannot find planned VM with name: %s') % vm_name)
         return None
+
+    def planned_vm_exists(self, vm_name):
+        """Checks if the Planned VM with the given name exists on the host."""
+        return self._get_planned_vm(vm_name) is not None
+
+    def _destroy_planned_vm(self, planned_vm):
+        LOG.debug("Destroying existing planned VM: %s",
+                  planned_vm.ElementName)
+        (job_path,
+         ret_val) = self._vs_man_svc.DestroySystem(planned_vm.path_())
+        self._jobutils.check_ret_val(ret_val, job_path)
+
+    def destroy_existing_planned_vm(self, vm_name):
+        planned_vm = self._get_planned_vm(vm_name, self._compat_conn)
+        if planned_vm:
+            self._destroy_planned_vm(planned_vm)

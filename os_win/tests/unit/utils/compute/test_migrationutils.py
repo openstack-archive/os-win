@@ -140,3 +140,43 @@ class MigrationUtilsTestCase(test_base.OsWinBaseTestCase):
 
         planned_computer_system.assert_called_once_with(
             ElementName=self._FAKE_VM_NAME)
+
+    @mock.patch.object(migrationutils.MigrationUtils, '_get_planned_vm')
+    def test_planned_vm_exists(self, mock_get_planned_vm):
+        mock_get_planned_vm.return_value = None
+
+        result = self._migrationutils.planned_vm_exists(mock.sentinel.vm_name)
+        self.assertFalse(result)
+        mock_get_planned_vm.assert_called_once_with(mock.sentinel.vm_name)
+
+    def test_destroy_planned_vm(self):
+        mock_planned_vm = mock.MagicMock()
+        mock_planned_vm.path_.return_value = mock.sentinel.planned_vm_path
+        mock_vs_man_svc = self._migrationutils._vs_man_svc
+        mock_vs_man_svc.DestroySystem.return_value = (
+            mock.sentinel.job_path, mock.sentinel.ret_val)
+
+        self._migrationutils._destroy_planned_vm(mock_planned_vm)
+
+        mock_vs_man_svc.DestroySystem.assert_called_once_with(
+            mock.sentinel.planned_vm_path)
+        self._migrationutils._jobutils.check_ret_val.assert_called_once_with(
+            mock.sentinel.ret_val,
+            mock.sentinel.job_path)
+
+    @ddt.data({'planned_vm': None}, {'planned_vm': mock.sentinel.planned_vm})
+    @ddt.unpack
+    @mock.patch.object(migrationutils.MigrationUtils, '_destroy_planned_vm')
+    @mock.patch.object(migrationutils.MigrationUtils, '_get_planned_vm')
+    def test_destroy_existing_planned_vm(self, mock_get_planned_vm,
+                                         mock_destroy_planned_vm, planned_vm):
+        mock_get_planned_vm.return_value = planned_vm
+
+        self._migrationutils.destroy_existing_planned_vm(mock.sentinel.vm_name)
+
+        mock_get_planned_vm.assert_called_once_with(
+            mock.sentinel.vm_name, self._migrationutils._compat_conn)
+        if planned_vm:
+            mock_destroy_planned_vm.assert_called_once_with(planned_vm)
+        else:
+            self.assertFalse(mock_destroy_planned_vm.called)
