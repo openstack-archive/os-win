@@ -185,7 +185,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
         _stop_jobs_with_timeout()
 
-    @_utils.not_found_decorator
+    @_utils.not_found_decorator()
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_virt_resource(self, virt_resource, parent):
         (job_path, new_resources,
@@ -196,7 +196,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     # modify_virt_resource can fail, especially while setting up the VM's
     # serial port connection. Retrying the operation will yield success.
-    @_utils.not_found_decorator
+    @_utils.not_found_decorator()
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def modify_virt_resource(self, virt_resource):
         (job_path, out_set_data,
@@ -207,7 +207,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def remove_virt_resource(self, virt_resource):
         self.remove_multiple_virt_resources([virt_resource])
 
-    @_utils.not_found_decorator
+    @_utils.not_found_decorator()
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def remove_multiple_virt_resources(self, virt_resources):
         (job, ret_val) = self._vs_man_svc.RemoveResourceSettings(
@@ -217,7 +217,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def add_virt_feature(self, virt_feature, parent):
         self.add_multiple_virt_features([virt_feature], parent)
 
-    @_utils.not_found_decorator
+    @_utils.not_found_decorator()
     @_utils.retry_decorator(exceptions=exceptions.HyperVException)
     def add_multiple_virt_features(self, virt_features, parent):
         (job_path, out_set_data,
@@ -228,7 +228,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def remove_virt_feature(self, virt_feature):
         self.remove_multiple_virt_features([virt_feature])
 
-    @_utils.not_found_decorator
+    @_utils.not_found_decorator()
     def remove_multiple_virt_features(self, virt_features):
         (job_path, ret_val) = self._vs_man_svc.RemoveFeatureSettings(
             FeatureSettings=[f.path_() for f in virt_features])
