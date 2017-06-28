@@ -227,17 +227,18 @@ def _is_not_found_exc(exc):
     return hresult == _WBEM_E_NOT_FOUND
 
 
-def not_found_decorator(func):
+def not_found_decorator(translated_exc=exceptions.NotFound):
     """Wraps x_wmi: Not Found exceptions as os_win.exceptions.NotFound."""
 
-    def inner(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except exceptions.x_wmi as ex:
-            if _is_not_found_exc(ex):
-                LOG.debug('x_wmi: Not Found exception raised while '
-                          'running %s', func.__name__)
-                raise exceptions.NotFound(six.text_type(ex))
-            raise
-
-    return inner
+    def wrapper(func):
+        def inner(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except exceptions.x_wmi as ex:
+                if _is_not_found_exc(ex):
+                    LOG.debug('x_wmi: Not Found exception raised while '
+                              'running %s', func.__name__)
+                    raise translated_exc(message=six.text_type(ex))
+                raise
+        return inner
+    return wrapper

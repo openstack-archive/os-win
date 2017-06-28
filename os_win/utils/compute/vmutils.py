@@ -158,6 +158,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
                     ['ElementName'],
                     VirtualSystemType=self._VIRTUAL_SYSTEM_TYPE_REALIZED)]
 
+    @_utils.not_found_decorator(
+        translated_exc=exceptions.HyperVVMNotFoundException)
     def get_vm_summary_info(self, vm_name):
         vmsettings = self._lookup_vm_check(vm_name)
 
