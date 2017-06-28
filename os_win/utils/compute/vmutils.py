@@ -661,6 +661,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
                                                              Reason=reason)
         self._jobutils.check_ret_val(ret_val, None)
 
+    @_utils.retry_decorator(exceptions=exceptions.WMIJobFailed)
     def set_vm_state(self, vm_name, req_state):
         """Set the desired state of the VM."""
 
