@@ -22,6 +22,7 @@ from oslo_log import log as logging
 
 from os_win._i18n import _
 from os_win import _utils
+from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
 from os_win.utils import win32utils
@@ -30,6 +31,36 @@ from os_win.utils.winapi import libs as w_lib
 kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
+
+
+class DEVICE_ID_VPD_PAGE(ctypes.BigEndianStructure):
+    _fields_ = [
+        ('DeviceType', ctypes.c_ubyte, 5),
+        ('Qualifier', ctypes.c_ubyte, 3),
+        ('PageCode', ctypes.c_ubyte),
+        ('PageLength', ctypes.c_uint16)
+    ]
+
+
+class IDENTIFICATION_DESCRIPTOR(ctypes.Structure):
+    _fields_ = [
+        ('CodeSet', ctypes.c_ubyte, 4),
+        ('ProtocolIdentifier', ctypes.c_ubyte, 4),
+        ('IdentifierType', ctypes.c_ubyte, 4),
+        ('Association', ctypes.c_ubyte, 2),
+        ('_reserved', ctypes.c_ubyte, 1),
+        ('Piv', ctypes.c_ubyte, 1),
+        ('_reserved', ctypes.c_ubyte),
+        ('IdentifierLength', ctypes.c_ubyte)
+    ]
+
+
+PDEVICE_ID_VPD_PAGE = ctypes.POINTER(DEVICE_ID_VPD_PAGE)
+PIDENTIFICATION_DESCRIPTOR = ctypes.POINTER(IDENTIFICATION_DESCRIPTOR)
+
+SCSI_ID_ASSOC_TYPE_DEVICE = 0
+SCSI_ID_CODE_SET_BINARY = 1
+SCSI_ID_CODE_SET_ASCII = 2
 
 
 class DiskUtils(baseutils.BaseUtils):
@@ -106,3 +137,110 @@ class DiskUtils(baseutils.BaseUtils):
                 return 0, 0
             else:
                 raise exc
+
+    def _parse_scsi_page_83(self, buff,
+                            select_supported_identifiers=False):
+        """Parse SCSI Device Identification VPD (page 0x83 data).
+
+        :param buff: a byte array containing the SCSI page 0x83 data.
+        :param select_supported_identifiers: select identifiers supported
+            by Windows, in the order of precedence.
+        :returns: a list of identifiers represented as dicts, containing
+                  SCSI Unique IDs.
+        """
+        identifiers = []
+
+        buff_sz = len(buff)
+        buff = (ctypes.c_ubyte * buff_sz)(*bytearray(buff))
+
+        vpd_pg_struct_sz = ctypes.sizeof(DEVICE_ID_VPD_PAGE)
+
+        if buff_sz < vpd_pg_struct_sz:
+            reason = _('Invalid VPD page data.')
+            raise exceptions.SCSIPageParsingError(page='0x83',
+                                                  reason=reason)
+
+        vpd_page = ctypes.cast(buff, PDEVICE_ID_VPD_PAGE).contents
+        vpd_page_addr = ctypes.addressof(vpd_page)
+        total_page_sz = vpd_page.PageLength + vpd_pg_struct_sz
+
+        if vpd_page.PageCode != 0x83:
+            reason = _('Unexpected page code: %s') % vpd_page.PageCode
+            raise exceptions.SCSIPageParsingError(page='0x83',
+                                                  reason=reason)
+        if total_page_sz > buff_sz:
+            reason = _('VPD page overflow.')
+            raise exceptions.SCSIPageParsingError(page='0x83',
+                                                  reason=reason)
+        if not vpd_page.PageLength:
+            LOG.info('Page 0x83 data does not contain any '
+                     'identification descriptors.')
+            return identifiers
+
+        id_desc_offset = vpd_pg_struct_sz
+        while id_desc_offset < total_page_sz:
+            id_desc_addr = vpd_page_addr + id_desc_offset
+            # Remaining buffer size
+            id_desc_buff_sz = buff_sz - id_desc_offset
+
+            identifier = self._parse_scsi_id_desc(id_desc_addr,
+                                                  id_desc_buff_sz)
+            identifiers.append(identifier)
+
+            id_desc_offset += identifier['raw_id_desc_size']
+
+        if select_supported_identifiers:
+            identifiers = self._select_supported_scsi_identifiers(identifiers)
+
+        return identifiers
+
+    def _parse_scsi_id_desc(self, id_desc_addr, buff_sz):
+        """Parse SCSI VPD identification descriptor."""
+        id_desc_struct_sz = ctypes.sizeof(IDENTIFICATION_DESCRIPTOR)
+
+        if buff_sz < id_desc_struct_sz:
+            reason = _('Identifier descriptor overflow.')
+            raise exceptions.SCSIIdDescriptorParsingError(reason=reason)
+
+        id_desc = IDENTIFICATION_DESCRIPTOR.from_address(id_desc_addr)
+        id_desc_sz = id_desc_struct_sz + id_desc.IdentifierLength
+        identifier_addr = id_desc_addr + id_desc_struct_sz
+
+        if id_desc_sz > buff_sz:
+            reason = _('Identifier overflow.')
+            raise exceptions.SCSIIdDescriptorParsingError(reason=reason)
+
+        identifier = (ctypes.c_ubyte *
+                      id_desc.IdentifierLength).from_address(
+                          identifier_addr)
+        raw_id = bytearray(identifier)
+
+        if id_desc.CodeSet == SCSI_ID_CODE_SET_ASCII:
+            parsed_id = bytes(
+                bytearray(identifier)).decode('ascii').strip('\x00')
+        else:
+            parsed_id = _utils.byte_array_to_hex_str(raw_id)
+
+        id_dict = {
+            'code_set': id_desc.CodeSet,
+            'protocol': (id_desc.ProtocolIdentifier
+                         if id_desc.Piv else None),
+            'type': id_desc.IdentifierType,
+            'association': id_desc.Association,
+            'raw_id': raw_id,
+            'id': parsed_id,
+            'raw_id_desc_size': id_desc_sz,
+        }
+        return id_dict
+
+    def _select_supported_scsi_identifiers(self, identifiers):
+        # This method will filter out unsupported SCSI identifiers,
+        # also sorting them based on the order of precedence.
+        selected_identifiers = []
+
+        for id_type in constants.SUPPORTED_SCSI_UID_FORMATS:
+            for identifier in identifiers:
+                if identifier['type'] == id_type:
+                    selected_identifiers.append(identifier)
+
+        return selected_identifiers
