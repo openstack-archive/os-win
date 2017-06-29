@@ -23,15 +23,20 @@ import re
 
 from eventlet import patcher
 from eventlet import tpool
+from oslo_log import log as logging
 from oslo_utils import units
 import six
 
 from os_win._i18n import _
+from os_win import conf
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
 from os_win.utils import baseutils
 from os_win.utils import jobutils
+
+CONF = conf.CONF
+LOG = logging.getLogger(__name__)
 
 _PORT_PROFILE_ATTR_MAP = {
     "profile_id": "ProfileId",
@@ -105,8 +110,13 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     def __init__(self):
         super(NetworkUtils, self).__init__()
         self._jobutils = jobutils.JobUtils()
+        self._enable_cache = CONF.os_win.cache_temporary_wmi_objects
 
     def init_caches(self):
+        if not self._enable_cache:
+            LOG.info('WMI caching is disabled.')
+            return
+
         for vswitch in self._conn.Msvm_VirtualEthernetSwitch():
             self._switches[vswitch.ElementName] = vswitch
 
@@ -150,6 +160,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 self._bandwidth_sds[match.group()] = bandwidth_sd
 
     def update_cache(self):
+        if not self._enable_cache:
+            return
+
         # map between switch port ID and switch port WMI object.
         self._switch_ports.clear()
         for port in self._conn.Msvm_EthernetPortAllocationSettingData():
@@ -176,8 +189,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         if not len(vswitch):
             raise exceptions.HyperVException(_('VSwitch not found: %s') %
                                              vswitch_name)
-
-        self._switches[vswitch_name] = vswitch[0]
+        if self._enable_cache:
+            self._switches[vswitch_name] = vswitch[0]
         return vswitch[0]
 
     def _get_vswitch_external_port(self, vswitch_name):
@@ -555,7 +568,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             _wqlutils.get_element_associated_class(
                 self._conn, data_class,
                 element_instance_id=port_alloc.InstanceID))
-        if setting_data:
+        if setting_data and self._enable_cache:
             cache[port_alloc.InstanceID] = setting_data
         return setting_data
 
@@ -572,7 +585,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             # newly created setting data cannot be cached, they do not
             # represent real objects yet.
             # if it was found, it means that it was not created.
-            self._switch_ports[switch_port_name] = switch_port
+            if self._enable_cache:
+                self._switch_ports[switch_port_name] = switch_port
         elif expected:
             raise exceptions.HyperVPortNotFoundException(
                 port_name=switch_port_name)
@@ -732,7 +746,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         acls = _wqlutils.get_element_associated_class(
             self._conn, self._PORT_EXT_ACL_SET_DATA,
             element_instance_id=port.InstanceID)
-        self._sg_acl_sds[port.ElementName] = acls
+        if self._enable_cache:
+            self._sg_acl_sds[port.ElementName] = acls
 
         return acls
 
