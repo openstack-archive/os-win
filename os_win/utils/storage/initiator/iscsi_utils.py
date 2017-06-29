@@ -252,7 +252,11 @@ class ISCSIInitiatorUtils(object):
                                                fail_if_not_found)[0]
 
     def get_device_number_and_path(self, target_name, target_lun,
-                                   fail_if_not_found=False):
+                                   fail_if_not_found=False,
+                                   retry_attempts=10,
+                                   retry_interval=0.1,
+                                   rescan_disks=False,
+                                   ensure_mpio_claimed=False):
         # We try to avoid the need to seek the disk twice as this may take
         # unnecessary time.
         device_number, device_path = None, None
@@ -261,10 +265,12 @@ class ISCSIInitiatorUtils(object):
             # Even if the disk was already discovered, under heavy load we may
             # fail to locate it, in which case some retries will be performed.
             (device_number,
-             device_path) = self.ensure_lun_available(target_name, target_lun,
-                                                      rescan_attempts=10,
-                                                      retry_interval=0.1,
-                                                      rescan_disks=False)
+             device_path) = self.ensure_lun_available(
+                target_name, target_lun,
+                rescan_attempts=retry_attempts,
+                retry_interval=retry_interval,
+                rescan_disks=rescan_disks,
+                ensure_mpio_claimed=ensure_mpio_claimed)
         except exceptions.ISCSILunNotAvailable:
             if fail_if_not_found:
                 raise
@@ -424,7 +430,8 @@ class ISCSIInitiatorUtils(object):
     def ensure_lun_available(self, target_iqn, target_lun,
                              rescan_attempts=_DEFAULT_RESCAN_ATTEMPTS,
                              retry_interval=0,
-                             rescan_disks=True):
+                             rescan_disks=True,
+                             ensure_mpio_claimed=False):
         # This method should be called only after the iSCSI
         # target has already been logged in.
         for attempt in range(rescan_attempts + 1):
@@ -440,8 +447,16 @@ class ISCSIInitiatorUtils(object):
                     device_number = device.StorageDeviceNumber.DeviceNumber
                     device_path = device.LegacyName
 
-                    if device_path and device_number not in (None, -1):
-                        return device_number, device_path
+                    if not device_path or device_number in (None, -1):
+                        continue
+
+                    if ensure_mpio_claimed and not (
+                            self._diskutils.is_mpio_disk(device_number)):
+                        LOG.debug("Disk %s was not claimed yet by the MPIO "
+                                  "service.", device_path)
+                        continue
+
+                    return device_number, device_path
                 except exceptions.ISCSIInitiatorAPIException:
                     err_msg = ("Could not find lun %(target_lun)s  "
                                "for iSCSI target %(target_iqn)s.")
