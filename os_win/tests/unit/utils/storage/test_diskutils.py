@@ -70,6 +70,21 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._diskutils.get_disk_uid_and_uid_type,
                           mock.sentinel.disk_number)
 
+    @ddt.data({'disk_path': r'\\?\MPio#disk&ven_fakeVendor',
+               'expect_mpio': True},
+              {'disk_path': r'\\?\SCSI#disk&ven_fakeVendor',
+               'expect_mpio': False})
+    @ddt.unpack
+    @mock.patch.object(diskutils.DiskUtils, '_get_disk')
+    def test_is_mpio_disk(self, mock_get_disk, disk_path, expect_mpio):
+        mock_disk = mock_get_disk.return_value
+        mock_disk.Path = disk_path
+
+        result = self._diskutils.is_mpio_disk(mock.sentinel.disk_number)
+        self.assertEqual(expect_mpio, result)
+
+        mock_get_disk.assert_called_once_with(mock.sentinel.disk_number)
+
     @mock.patch.object(diskutils.DiskUtils, '_get_disk')
     def test_refresh_disk(self, mock_get_disk):
         mock_disk = mock_get_disk.return_value
