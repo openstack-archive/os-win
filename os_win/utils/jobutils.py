@@ -22,7 +22,6 @@ import time
 
 from oslo_log import log as logging
 
-from os_win._i18n import _
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
@@ -41,7 +40,10 @@ class JobUtils(baseutils.BaseUtilsVirt):
     _completed_job_states = [constants.JOB_STATE_COMPLETED,
                              constants.JOB_STATE_TERMINATED,
                              constants.JOB_STATE_KILLED,
-                             constants.JOB_STATE_COMPLETED_WITH_WARNINGS]
+                             constants.JOB_STATE_COMPLETED_WITH_WARNINGS,
+                             constants.JOB_STATE_EXCEPTION]
+    _successful_job_states = [constants.JOB_STATE_COMPLETED,
+                              constants.JOB_STATE_COMPLETED_WITH_WARNINGS]
 
     def check_ret_val(self, ret_val, job_path, success_values=[0]):
         """Checks that the job represented by the given arguments succeeded.
@@ -58,18 +60,20 @@ class JobUtils(baseutils.BaseUtilsVirt):
         :param success_values: list of return values that can be considered
             successful. WMI_JOB_STATUS_STARTED and WMI_JOB_STATE_RUNNING
             values are ignored.
-        :raises exceptions.HyperVException: if the given ret_val is
+        :raises exceptions.WMIJobFailed: if the given ret_val is
             WMI_JOB_STATUS_STARTED or WMI_JOB_STATE_RUNNING and the state of
             job represented by the given job_path is not
-            WMI_JOB_STATE_COMPLETED, or if the given ret_val is not in the
-            list of given success_values.
+            WMI_JOB_STATE_COMPLETED or JOB_STATE_COMPLETED_WITH_WARNINGS, or
+            if the given ret_val is not in the list of given success_values.
         """
         if ret_val in [constants.WMI_JOB_STATUS_STARTED,
                        constants.WMI_JOB_STATE_RUNNING]:
             return self._wait_for_job(job_path)
         elif ret_val not in success_values:
-            raise exceptions.HyperVException(
-                _('Operation failed with return value: %s') % ret_val)
+            raise exceptions.WMIJobFailed(error_code=ret_val,
+                                          job_state=None,
+                                          error_summ_desc=None,
+                                          error_desc=None)
 
     def _wait_for_job(self, job_path):
         """Poll WMI job state and wait for completion."""
@@ -77,44 +81,35 @@ class JobUtils(baseutils.BaseUtilsVirt):
         job_wmi_path = job_path.replace('\\', '/')
         job = self._get_wmi_obj(job_wmi_path)
 
-        while job.JobState == constants.WMI_JOB_STATE_RUNNING:
+        while not self._is_job_completed(job):
             time.sleep(0.1)
             job = self._get_wmi_obj(job_wmi_path)
 
-        if job.JobState != constants.WMI_JOB_STATE_COMPLETED:
-            job_state = job.JobState
-            if job.path().Class == "Msvm_ConcreteJob":
-                err_sum_desc = job.ErrorSummaryDescription
-                err_desc = job.ErrorDescription
-                err_code = job.ErrorCode
-                data = {'job_state': job_state,
-                        'err_sum_desc': err_sum_desc,
-                        'err_desc': err_desc,
-                        'err_code': err_code}
-                raise exceptions.HyperVException(
-                    _("WMI job failed with status %(job_state)d. "
-                      "Error details: %(err_sum_desc)s - %(err_desc)s - "
-                      "Error code: %(err_code)d") % data)
-            else:
-                (error, ret_val) = job.GetError()
-                if not ret_val and error:
-                    data = {'job_state': job_state,
-                            'error': error}
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %(job_state)d. "
-                          "Error details: %(error)s") % data)
-                else:
-                    raise exceptions.HyperVException(
-                        _("WMI job failed with status %d. No error "
-                          "description available") % job_state)
+        job_state = job.JobState
+        err_code = job.ErrorCode
+
+        # We'll raise an exception for killed jobs.
+        job_failed = job_state not in self._successful_job_states or err_code
+        if job_failed:
+            err_sum_desc = getattr(job, 'ErrorSummaryDescription', None)
+            err_desc = job.ErrorDescription
+
+            raise exceptions.WMIJobFailed(job_state=job_state,
+                                          error_code=err_code,
+                                          error_summ_desc=err_sum_desc,
+                                          error_desc=err_desc)
+
+        if job_state == constants.JOB_STATE_COMPLETED_WITH_WARNINGS:
+            LOG.warning("WMI job completed with warnings. For detailed "
+                        "information, please check the Windows event logs.")
+
         desc = job.Description
         elap = job.ElapsedTime
         LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
                   {'desc': desc, 'elap': elap})
         return job
 
-    def _get_pending_jobs_affecting_element(self, element,
-                                            ignore_error_state=True):
+    def _get_pending_jobs_affecting_element(self, element):
         # Msvm_AffectedJobElement is in fact an association between
         # the affected element and the affecting job.
         mappings = self._conn.Msvm_AffectedJobElement(
@@ -123,7 +118,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
         for mapping in mappings:
             try:
                 if mapping.AffectingElement and not self._is_job_completed(
-                        mapping.AffectingElement, ignore_error_state):
+                        mapping.AffectingElement):
                     pending_jobs.append(mapping.AffectingElement)
 
             except exceptions.x_wmi as ex:
@@ -134,16 +129,13 @@ class JobUtils(baseutils.BaseUtilsVirt):
         return pending_jobs
 
     def _stop_jobs(self, element):
-        pending_jobs = self._get_pending_jobs_affecting_element(
-            element, ignore_error_state=False)
+        pending_jobs = self._get_pending_jobs_affecting_element(element)
         for job in pending_jobs:
             try:
                 if not job.Cancellable:
                     LOG.debug("Got request to terminate "
                               "non-cancelable job.")
                     continue
-                elif job.JobState == constants.JOB_STATE_EXCEPTION:
-                    LOG.debug("Attempting to terminate exception state job.")
 
                 job.RequestStateChange(
                     self._KILL_JOB_STATE_CHANGE_REQUEST)
@@ -162,10 +154,8 @@ class JobUtils(baseutils.BaseUtilsVirt):
                            pending_count=len(pending_jobs)))
             raise exceptions.JobTerminateFailed()
 
-    def _is_job_completed(self, job, ignore_error_state=True):
-        return (job.JobState in self._completed_job_states or
-                (job.JobState == constants.JOB_STATE_EXCEPTION and
-                 ignore_error_state))
+    def _is_job_completed(self, job):
+        return job.JobState in self._completed_job_states
 
     def stop_jobs(self, element, timeout=_DEFAULT_JOB_TERMINATE_TIMEOUT):
         """Stops the Hyper-V jobs associated with the given resource.
