@@ -64,7 +64,7 @@ class IOUtils(object):
     @_utils.retry_decorator(exceptions=exceptions.Win32IOException,
                             max_sleep_time=2)
     def wait_named_pipe(self, pipe_name, timeout=WAIT_PIPE_DEFAULT_TIMEOUT):
-        """Wait a given ammount of time for a pipe to become available."""
+        """Wait a given amount of time for a pipe to become available."""
         self._run_and_check_output(kernel32.WaitNamedPipeW,
                                    ctypes.c_wchar_p(pipe_name),
                                    timeout * units.k)
@@ -138,7 +138,7 @@ class IOUtils(object):
         return wintypes.LPOVERLAPPED_COMPLETION_ROUTINE(_completion_routine)
 
     def get_new_overlapped_structure(self):
-        """Structure used for asyncronous IO operations."""
+        """Structure used for asynchronous IO operations."""
         # Event used for signaling IO completion
         hEvent = self._create_event()
 

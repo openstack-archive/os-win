@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 
 
 class NamedPipeHandler(object):
-    """Handles asyncronous I/O operations on a specified named pipe."""
+    """Handles asynchronous I/O operations on a specified named pipe."""
 
     _MAX_LOG_ROTATE_RETRIES = 5
 
@@ -150,7 +150,7 @@ class NamedPipeHandler(object):
     def _cancel_io(self):
         if self._pipe_handle:
             # We ignore invalid handle errors. Even if the pipe is closed
-            # and the handle reused, by specifing the overlapped structures
+            # and the handle reused, by specifying the overlapped structures
             # we ensure that we don't cancel IO operations other than the
             # ones that we care about.
             self._ioutils.cancel_io(self._pipe_handle, self._r_overlapped,

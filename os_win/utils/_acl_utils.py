@@ -33,7 +33,7 @@ class ACLUtils(object):
     def get_named_security_info(self, obj_name, obj_type, security_info_flags):
         """Retrieve object security information.
 
-        :param security_info_flags: specifies which informations will
+        :param security_info_flags: specifies which information will
                                    be retrieved.
         :param ret_val: dict, containing pointers to the requested structures.
                         Note that the returned security descriptor will have
@@ -68,7 +68,7 @@ class ACLUtils(object):
 
     def set_entries_in_acl(self, entry_count, p_explicit_entry_list,
                            p_old_acl):
-        """Merge new ACEs into an existing ACL, returing a new ACL."""
+        """Merge new ACEs into an existing ACL, returning a new ACL."""
         pp_new_acl = self._get_void_pp()
 
         self._win32_utils.run_and_check_output(

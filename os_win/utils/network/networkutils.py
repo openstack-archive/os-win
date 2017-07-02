@@ -760,7 +760,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         return acl
 
     def _create_security_acl(self, sg_rule, weight):
-        # Acl instance can be created new eachtime, the object should be
+        # Acl instance can be created new each time, the object should be
         # of type ExtendedEthernetSettingsData.
         acl = self._create_default_setting_data(self._PORT_EXT_ACL_SET_DATA)
         acl.set(**sg_rule.to_dict())

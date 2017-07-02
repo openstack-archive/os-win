@@ -394,7 +394,7 @@ class ISCSIInitiatorUtils(object):
             LOG.debug("Logging in iSCSI target %(target_iqn)s",
                       dict(target_iqn=target_iqn))
             # If the multipath flag is set, multiple sessions to the same
-            # target may be estabilished. MPIO must be enabled and configured
+            # target may be established. MPIO must be enabled and configured
             # to claim iSCSI disks, otherwise data corruption can occur.
             login_flags = (w_const.ISCSI_LOGIN_FLAG_MULTIPATH_ENABLED
                            if mpio_enabled else 0)

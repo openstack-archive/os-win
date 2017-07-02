@@ -130,7 +130,7 @@ class HostUtils(baseutils.BaseUtilsVirt):
         return _utils.get_ips(hostname)
 
     def get_host_tick_count64(self):
-        """Returns host uptime in miliseconds."""
+        """Returns host uptime in milliseconds."""
         return kernel32.GetTickCount64()
 
     def host_power_action(self, action):

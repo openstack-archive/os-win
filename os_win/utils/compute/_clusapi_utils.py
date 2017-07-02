@@ -148,7 +148,7 @@ class ClusApiUtils(object):
         This only applies to move operations requested by
         MoveClusterGroup(Ex), thus it will not apply to fail overs.
 
-        return: True if the cancel request completed succesfuly,
+        return: True if the cancel request completed successfuly,
                 False if it's still in progress.
         """
         ret_val = self._run_and_check_output(

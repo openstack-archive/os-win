@@ -214,7 +214,7 @@ class VHDUtils(object):
 
     def get_vhd_info(self, vhd_path, info_members=None,
                      open_parents=False):
-        """Returns a dict containing VHD image informations.
+        """Returns a dict containing VHD image information.
 
         :param info_members: A list of information members to be retrieved.
 

@@ -36,7 +36,7 @@ class _RESIZE_VIRTUAL_DISK_PARAMETERS_V1(ctypes.Structure):
     ]
 
 
-# Only V1 is used, we avoid defining an union.
+# Only V1 is used, we avoid defining a union.
 class RESIZE_VIRTUAL_DISK_PARAMETERS(ctypes.Structure):
     _fields_ = [
         ('Version', wintypes.DWORD),
@@ -87,7 +87,7 @@ class _MERGE_VIRTUAL_DISK_PARAMETERS_V1(ctypes.Structure):
     ]
 
 
-# Only V1 is used, we avoid defining an union.
+# Only V1 is used, we avoid defining a union.
 class MERGE_VIRTUAL_DISK_PARAMETERS(ctypes.Structure):
     _fields_ = [
         ('Version', wintypes.DWORD),
@@ -115,7 +115,7 @@ class _CREATE_VIRTUAL_DISK_PARAMETERS_V2(ctypes.Structure):
     ]
 
 
-# Only V2 is used, we avoid defining an union.
+# Only V2 is used, we avoid defining a union.
 class CREATE_VIRTUAL_DISK_PARAMETERS(ctypes.Structure):
     _fields_ = [
         ('Version', wintypes.DWORD),
@@ -179,7 +179,7 @@ class GET_VIRTUAL_DISK_INFO(ctypes.Structure):
 PGET_VIRTUAL_DISK_INFO = ctypes.POINTER(GET_VIRTUAL_DISK_INFO)
 
 
-# Only this version is used, we avoid defining an union.
+# Only this version is used, we avoid defining a union.
 class SET_VIRTUAL_DISK_INFO(ctypes.Structure):
     _fields_ = [
         ('Version', wintypes.DWORD),

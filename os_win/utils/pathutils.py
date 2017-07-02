@@ -161,7 +161,7 @@ class PathUtils(object):
     def create_sym_link(self, link, target, target_is_dir=True):
         """If target_is_dir is True, a junction will be created.
 
-        NOTE: Juctions only work on same filesystem.
+        NOTE: Junctions only work on same filesystem.
         """
 
         self._win32_utils.run_and_check_output(kernel32.CreateSymbolicLinkW,

@@ -42,7 +42,7 @@ from os_win.utils import pathutils
 LOG = logging.getLogger(__name__)
 
 # TODO(claudiub): remove the is_planned_vm argument from methods once it is not
-# used  anymore.
+# used anymore.
 
 
 class VMUtils(baseutils.BaseUtilsVirt):
@@ -1093,7 +1093,7 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         # NOTE(abalutoiu): new_boot_order will contain ROOT uppercase
         # in the device paths while old_boot_order will contain root
-        # lowercase, which will cause the tupple addition result to contain
+        # lowercase, which will cause the tuple addition result to contain
         # each device path twice because of the root lowercase and uppercase.
         # Forcing all the device paths to uppercase fixes the issue.
         new_boot_order = [x.upper() for x in new_boot_order]

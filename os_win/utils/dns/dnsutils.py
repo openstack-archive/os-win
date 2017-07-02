@@ -85,7 +85,7 @@ class DNSUtils(baseutils.BaseUtils):
             1 = Secondary zone, MUST include at least one master IP
             2 = Stub zone, MUST include at least one master IP
             3 = Zone forwarder, MUST include at least one master IP
-        :param ds_integrated: Only Primary zones cand be stored in AD
+        :param ds_integrated: Only Primary zones can be stored in AD
             True = the zone data is stored in the Active Directory
             False = the data zone is stored in files
         :param data_file_name(Optional): name of the data file associated
@@ -136,12 +136,12 @@ class DNSUtils(baseutils.BaseUtils):
             2 = Notify the specified servers
         :param reverse: Indicates whether the Zone is reverse (TRUE)
             or forward (FALSE).
-        :param securese_condaries:
+        :param secure_secondaries:
             0 = Allowed to Any host
             1 = Only to the Servers listed on the Name Servers tab
             2 = To the following servers (destination servers IP addresses
                 are specified in SecondaryServers value)
-            3 = Zone tranfers not allowed
+            3 = Zone transfers not allowed
         """
 
         zone = self._get_zone(zone_name, ignore_missing=False)

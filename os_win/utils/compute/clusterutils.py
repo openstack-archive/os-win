@@ -449,7 +449,7 @@ class ClusterUtils(baseutils.BaseUtils):
 
         This method will poll the last _WMI_EVENT_CHECK_INTERVAL + 1
         seconds for new events and listens for _WMI_EVENT_TIMEOUT_MS
-        miliseconds, since listening is a thread blocking action.
+        milliseconds, since listening is a thread blocking action.
 
         Any event object caught will then be processed.
         """
@@ -461,7 +461,7 @@ class ClusterUtils(baseutils.BaseUtils):
         vm_name = None
         new_host = None
         try:
-            # wait for new event for _WMI_EVENT_TIMEOUT_MS miliseconds.
+            # wait for new event for _WMI_EVENT_TIMEOUT_MS milliseconds.
             if patcher.is_monkey_patched('thread'):
                 wmi_object = tpool.execute(self._watcher,
                                            event_timeout_ms)
