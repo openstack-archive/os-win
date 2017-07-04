@@ -76,18 +76,6 @@ class LiveMigrationUtils(migrationutils.MigrationUtils):
                                              % vm_name)
         return vms[0]
 
-    def _destroy_planned_vm(self, planned_vm):
-        LOG.debug("Destroying existing planned VM: %s",
-                  planned_vm.ElementName)
-        (job_path,
-         ret_val) = self._vs_man_svc.DestroySystem(planned_vm.path_())
-        self._jobutils.check_ret_val(ret_val, job_path)
-
-    def destroy_existing_planned_vm(self, vm_name):
-        planned_vm = self._get_planned_vm(vm_name, self._compat_conn)
-        if planned_vm:
-            self._destroy_planned_vm(planned_vm)
-
     def _create_planned_vm(self, conn_v2_local, conn_v2_remote,
                            vm, ip_addr_list, dest_host):
         # Staged

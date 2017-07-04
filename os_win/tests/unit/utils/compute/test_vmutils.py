@@ -128,6 +128,13 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         vssd = self._vmutils._lookup_vm_check(self._FAKE_VM_NAME)
         self.assertEqual(expected_vssd, vssd)
 
+    @mock.patch.object(vmutils.VMUtils, '_lookup_vm')
+    def test_vm_exists(self, mock_lookup_vm):
+        result = self._vmutils.vm_exists(mock.sentinel.vm_name)
+
+        self.assertTrue(result)
+        mock_lookup_vm.assert_called_once_with(mock.sentinel.vm_name, False)
+
     def test_set_vm_memory_static(self):
         self._test_set_vm_memory_dynamic(dynamic_memory_ratio=1.0)
 
