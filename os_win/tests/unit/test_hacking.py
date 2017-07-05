@@ -127,3 +127,11 @@ class HackingTestCase(test_base.OsWinBaseTestCase):
 
         code = "_fake_kernel32.WaitNamedPipeW(x, y)"
         self._assert_has_no_errors(code, checker)
+
+    def test_no_log_translations(self):
+        for log in checks._all_log_levels:
+            bad = 'LOG.%s(_("Bad"))' % log
+            self.assertEqual(1, len(list(checks.no_translate_logs(bad))))
+            # Catch abuses when used with a variable and not a literal
+            bad = 'LOG.%s(_(msg))' % log
+            self.assertEqual(1, len(list(checks.no_translate_logs(bad))))

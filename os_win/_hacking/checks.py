@@ -17,8 +17,6 @@ import ast
 import os
 import re
 
-import pep8
-
 from os_win.utils.winapi import libs as w_lib
 
 """
@@ -61,17 +59,14 @@ asse_true_false_with_in_or_not_in_spaces = re.compile(
     r"[\[|'|\"](, .*)?\)")
 asse_raises_regexp = re.compile(r"assertRaisesRegexp\(")
 conf_attribute_set_re = re.compile(r"CONF\.[a-z0-9_.]+\s*=\s*\w")
-log_translation = re.compile(
-    r"(.)*LOG\.(audit|error|critical)\(\s*('|\")")
-log_translation_info = re.compile(
-    r"(.)*LOG\.(info)\(\s*(_\(|'|\")")
-log_translation_exception = re.compile(
-    r"(.)*LOG\.(exception)\(\s*(_\(|'|\")")
-log_translation_LW = re.compile(
-    r"(.)*LOG\.(warning|warn)\(\s*(_\(|'|\")")
-translated_log = re.compile(
-    r"(.)*LOG\.(audit|error|info|critical|exception)"
-    "\(\s*_\(\s*('|\")")
+_all_log_levels = {'critical', 'error', 'exception', 'info',
+                   'warning', 'debug'}
+# Since _Lx() have been removed, we just need to check _()
+_log_translation_hint = re.compile(
+    r".*LOG\.(%(levels)s)\(\s*(%(hints)s)\(" % {
+        'levels': '|'.join(_all_log_levels),
+        'hints': '_',
+    })
 mutable_default_args = re.compile(r"^\s*def .+\((.+=\{\}|.+=\[\])")
 string_translation = re.compile(r"[^_]*_\(\s*('|\")")
 underscore_import_check = re.compile(r"(.)*import _(.)*")
@@ -187,21 +182,20 @@ def assert_equal_none(logical_line):
                "sentences not allowed")
 
 
-def no_translate_debug_logs(logical_line, filename):
-    """Check for 'LOG.debug(_('
+def no_translate_logs(logical_line):
+    """Check for 'LOG.*(_('
 
-    As per our translation policy,
-    https://wiki.openstack.org/wiki/LoggingStandards#Log_Translation
-    we shouldn't translate debug level logs.
+    Starting with the Pike series, OpenStack no longer supports log
+    translation. We shouldn't translate logs.
 
-    * This check assumes that 'LOG' is a logger.
-    * Use filename so we can start enforcing this in specific folders instead
-      of needing to do so all at once.
+    - This check assumes that 'LOG' is a logger.
+    - Use filename so we can start enforcing this in specific folders
+      instead of needing to do so all at once.
 
-    N319
+    C312
     """
-    if logical_line.startswith("LOG.debug(_("):
-        yield(0, "N319 Don't translate debug level logs")
+    if _log_translation_hint.match(logical_line):
+        yield(0, "C312: Log messages should not be translated!")
 
 
 def no_import_translation_in_tests(logical_line, filename):
@@ -233,26 +227,6 @@ def no_setting_conf_directly_in_tests(logical_line, filename):
                       "forbidden. Use self.flags(option=value) instead")
 
 
-def validate_log_translations(logical_line, physical_line, filename):
-    # Translations are not required in the test directory
-    if "os_win/tests" in filename:
-        return
-    if pep8.noqa(physical_line):
-        return
-    msg = "N328: LOG.info messages require translations `_LI()`!"
-    if log_translation_info.match(logical_line):
-        yield (0, msg)
-    msg = "N329: LOG.exception messages require translations `_LE()`!"
-    if log_translation_exception.match(logical_line):
-        yield (0, msg)
-    msg = "N330: LOG.warning, LOG.warn messages require translations `_LW()`!"
-    if log_translation_LW.match(logical_line):
-        yield (0, msg)
-    msg = "N321: Log messages require translations!"
-    if log_translation.match(logical_line):
-        yield (0, msg)
-
-
 def no_mutable_default_args(logical_line):
     msg = "N322: Method's default argument shouldn't be mutable!"
     if mutable_default_args.match(logical_line):
@@ -275,8 +249,7 @@ def check_explicit_underscore_import(logical_line, filename):
     elif (underscore_import_check.match(logical_line) or
           custom_underscore_check.match(logical_line)):
         UNDERSCORE_IMPORT_FILES.append(filename)
-    elif (translated_log.match(logical_line) or
-          string_translation.match(logical_line)):
+    elif string_translation.match(logical_line):
         yield(0, "N323: Found use of _() without explicit import of _ !")
 
 
@@ -455,9 +428,8 @@ def factory(register):
     register(assert_equal_type)
     register(assert_equal_none)
     register(assert_raises_regexp)
-    register(no_translate_debug_logs)
+    register(no_translate_logs)
     register(no_setting_conf_directly_in_tests)
-    register(validate_log_translations)
     register(no_mutable_default_args)
     register(check_explicit_underscore_import)
     register(use_jsonutils)
