@@ -199,7 +199,8 @@ class FCUtils(object):
                 mapping = dict(node_name=wwnn,
                                port_name=wwpn,
                                device_name=entry.ScsiId.OSDeviceName,
-                               lun=entry.ScsiId.ScsiOSLun)
+                               lun=entry.ScsiId.ScsiOSLun,
+                               fcp_lun=entry.FcpId.FcpLun)
                 mappings.append(mapping)
         return mappings
 
