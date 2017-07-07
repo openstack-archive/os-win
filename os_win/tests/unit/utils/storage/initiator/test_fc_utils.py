@@ -305,8 +305,6 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_entry = mock.MagicMock()
         mock_entry.FcpId.NodeWWN.wwn = fake_node_wwn
         mock_entry.FcpId.PortWWN.wwn = fake_port_wwn
-        mock_entry.ScsiId.OSDeviceName = mock.sentinel.OSDeviceName
-        mock_entry.ScsiId.ScsiOSLun = mock.sentinel.ScsiOSLun
         mock_fcp_mappings.Entries = [mock_entry]
         mock_get_target_mapping.return_value = mock_fcp_mappings
 
@@ -316,8 +314,9 @@ class FCUtilsTestCase(base.BaseTestCase):
         expected_mappings = [{
             'node_name': _utils.byte_array_to_hex_str(fake_node_wwn),
             'port_name': _utils.byte_array_to_hex_str(fake_port_wwn),
-            'device_name': mock.sentinel.OSDeviceName,
-            'lun': mock.sentinel.ScsiOSLun
+            'device_name': mock_entry.ScsiId.OSDeviceName,
+            'lun': mock_entry.ScsiId.ScsiOSLun,
+            'fcp_lun': mock_entry.FcpId.FcpLun
         }]
         self.assertEqual(expected_mappings, resulted_mappings)
 
