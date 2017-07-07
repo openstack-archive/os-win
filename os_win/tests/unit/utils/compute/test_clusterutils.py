@@ -229,18 +229,25 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         ret = self._clusterutils.list_instance_uuids()
         self.assertItemsEqual(['uuid1', 'uuid2'], ret)
 
+    @ddt.data(True, False)
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_lookup_vm_group_check')
-    def test_add_vm_to_cluster(self, mock_lookup_vm_group_check):
+    def test_add_vm_to_cluster(self, auto_failback,
+                               mock_lookup_vm_group_check):
         self._clusterutils._cluster.AddVirtualMachine = mock.MagicMock()
         vm_group = mock.Mock()
         mock_lookup_vm_group_check.return_value = vm_group
 
-        self._clusterutils.add_vm_to_cluster(self._FAKE_VM_NAME)
+        self._clusterutils.add_vm_to_cluster(
+            self._FAKE_VM_NAME, mock.sentinel.max_failover_count,
+            mock.sentinel.failover_period, auto_failback)
 
+        self.assertEqual(mock.sentinel.max_failover_count,
+                         vm_group.FailoverThreshold)
+        self.assertEqual(mock.sentinel.failover_period,
+                         vm_group.FailoverPeriod)
         self.assertTrue(vm_group.PersistentState)
-        self.assertEqual(vm_group.AutoFailbackType,
-                         self._clusterutils._FAILBACK_TRUE)
+        self.assertEqual(vm_group.AutoFailbackType, int(auto_failback))
         self.assertEqual(vm_group.FailbackWindowStart,
                          self._clusterutils._FAILBACK_WINDOW_MIN)
         self.assertEqual(vm_group.FailbackWindowEnd,
