@@ -215,6 +215,14 @@ class JobUtils(baseutils.BaseUtilsVirt):
             parent.path_(), [f.GetText_(1) for f in virt_features])
         self.check_ret_val(ret_val, job_path)
 
+    @_utils.not_found_decorator()
+    @_utils.retry_decorator(exceptions=exceptions.HyperVException)
+    def modify_virt_feature(self, virt_feature):
+        (job_path, out_set_data,
+         ret_val) = self._vs_man_svc.ModifyFeatureSettings(
+            FeatureSettings=[virt_feature.GetText_(1)])
+        self.check_ret_val(ret_val, job_path)
+
     def remove_virt_feature(self, virt_feature):
         self.remove_multiple_virt_features([virt_feature])
 

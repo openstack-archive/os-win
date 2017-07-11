@@ -238,6 +238,11 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
                                True, mock.sentinel.vm_path,
                                [mock.sentinel.res_data])
 
+    def test_modify_virt_feature(self):
+        self._test_virt_method('ModifyFeatureSettings', 3,
+                               'modify_virt_feature', False,
+                               FeatureSettings=[mock.sentinel.res_data])
+
     def test_remove_virt_feature(self):
         self._test_virt_method('RemoveFeatureSettings', 2,
                                'remove_virt_feature', False,

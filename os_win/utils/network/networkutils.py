@@ -62,6 +62,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _PORT_VLAN_SET_DATA = 'Msvm_EthernetSwitchPortVlanSettingData'
     _PORT_PROFILE_SET_DATA = 'Msvm_EthernetSwitchPortProfileSettingData'
     _PORT_SECURITY_SET_DATA = 'Msvm_EthernetSwitchPortSecuritySettingData'
+    _PORT_HW_OFFLOAD_SET_DATA = 'Msvm_EthernetSwitchPortOffloadSettingData'
     _PORT_ALLOC_ACL_SET_DATA = 'Msvm_EthernetSwitchPortAclSettingData'
     _PORT_BANDWIDTH_SET_DATA = 'Msvm_EthernetSwitchPortBandwidthSettingData'
     _PORT_EXT_ACL_SET_DATA = _PORT_ALLOC_ACL_SET_DATA
@@ -71,6 +72,9 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _VIRTUAL_SYSTEM_SETTING_DATA = 'Msvm_VirtualSystemSettingData'
     _VM_SUMMARY_ENABLED_STATE = 100
     _HYPERV_VM_STATE_ENABLED = 2
+
+    _IOV_ENABLED = 100
+    _IOV_DISABLED = 0
 
     _ACL_DIR_IN = 1
     _ACL_DIR_OUT = 2
@@ -103,6 +107,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     _switch_ports = {}
     _vlan_sds = {}
     _profile_sds = {}
+    _hw_offload_sds = {}
     _vsid_sds = {}
     _sg_acl_sds = {}
     _bandwidth_sds = {}
@@ -158,6 +163,14 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             match = switch_port_id_regex.match(bandwidth_sd.InstanceID)
             if match:
                 self._bandwidth_sds[match.group()] = bandwidth_sd
+
+        # map between switch port's InstanceID and their HW offload setting
+        # data WMI objects.
+        hw_offloads = self._conn.Msvm_EthernetSwitchPortOffloadSettingData()
+        for hw_offload_sd in hw_offloads:
+            match = switch_port_id_regex.match(hw_offload_sd.InstanceID)
+            if match:
+                self._hw_offload_sds[match.group()] = hw_offload_sd
 
     def update_cache(self):
         if not self._enable_cache:
@@ -359,6 +372,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         self._vlan_sds.pop(sw_port.InstanceID, None)
         self._vsid_sds.pop(sw_port.InstanceID, None)
         self._bandwidth_sds.pop(sw_port.InstanceID, None)
+        self._hw_offload_sds.pop(sw_port.InstanceID, None)
 
     def set_vswitch_port_profile_id(self, switch_port_name, profile_id,
                                     profile_data, profile_name, vendor_name,
@@ -559,6 +573,28 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             raise exceptions.HyperVException(
                 _('Port Security Settings not found: %s') % switch_port_name)
 
+    def set_vswitch_port_sriov(self, switch_port_name, enabled):
+        """Enables / Disables SR-IOV for the given port.
+
+        :param switch_port_name: the name of the port which will have SR-IOV
+            enabled or disabled.
+        :param enabled: boolean, if SR-IOV should be turned on or off.
+        """
+        port_alloc = self._get_switch_port_allocation(switch_port_name)[0]
+
+        # NOTE(claudiub): All ports have a HW offload SD.
+        hw_offload_sd = self._get_hw_offload_sd_from_port_alloc(port_alloc)
+        desired_state = self._IOV_ENABLED if enabled else self._IOV_DISABLED
+        if hw_offload_sd.IOVOffloadWeight == desired_state:
+            # already in the desired state. noop.
+            return
+
+        hw_offload_sd.IOVOffloadWeight = desired_state
+
+        # NOTE(claudiub): The HW offload SD can simply be modified. No need to
+        # remove it and create a new one.
+        self._jobutils.modify_virt_feature(hw_offload_sd)
+
     def _get_profile_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(
             port_alloc, self._profile_sds, self._PORT_PROFILE_SET_DATA)
@@ -570,6 +606,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
     def _get_security_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(
             port_alloc, self._vsid_sds, self._PORT_SECURITY_SET_DATA)
+
+    def _get_hw_offload_sd_from_port_alloc(self, port_alloc):
+        return self._get_setting_data_from_port_alloc(
+            port_alloc, self._hw_offload_sds, self._PORT_HW_OFFLOAD_SET_DATA)
 
     def _get_bandwidth_setting_data_from_port_alloc(self, port_alloc):
         return self._get_setting_data_from_port_alloc(

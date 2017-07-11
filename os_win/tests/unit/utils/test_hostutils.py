@@ -47,9 +47,20 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
     def setUp(self):
         self._hostutils = hostutils.HostUtils()
         self._hostutils._conn_cimv2 = mock.MagicMock()
+        self._hostutils._conn_scimv2 = mock.MagicMock()
         self._hostutils._conn_attr = mock.MagicMock()
+        self._hostutils._netutils_prop = mock.MagicMock()
+        self._conn = self._hostutils._conn
+        self._conn_scimv2 = self._hostutils._conn_scimv2
+        self._netutils = self._hostutils._netutils
 
         super(HostUtilsTestCase, self).setUp()
+
+    @mock.patch('os_win.utilsfactory.get_networkutils')
+    def test_netutils(self, mock_get_networkutils):
+        self._hostutils._netutils_prop = None
+        self.assertEqual(self._hostutils._netutils,
+                         mock_get_networkutils.return_value)
 
     @mock.patch('os_win.utils.hostutils.kernel32')
     def test_get_host_tick_count64(self, mock_kernel32):
@@ -174,6 +185,37 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_sv_feature_cls.assert_called_once_with(
             ID=mock.sentinel.feature_id)
+
+    def test_get_nic_sriov_vfs(self):
+        mock_vswitch_sd = mock.Mock()
+        mock_hw_offload_sd_bad = mock.Mock(IovVfCapacity=0)
+        mock_hw_offload_sd_ok = mock.Mock()
+        vswitch_sds_class = self._conn.Msvm_VirtualEthernetSwitchSettingData
+        vswitch_sds_class.return_value = [mock_vswitch_sd] * 3
+        self._conn.Msvm_EthernetSwitchHardwareOffloadData.side_effect = [
+            [mock_hw_offload_sd_bad], [mock_hw_offload_sd_ok],
+            [mock_hw_offload_sd_ok]]
+        self._netutils.get_vswitch_external_network_name.side_effect = [
+            None, mock.sentinel.nic_name]
+        mock_nic = mock.Mock()
+        self._conn_scimv2.MSFT_NetAdapter.return_value = [mock_nic]
+
+        vfs = self._hostutils.get_nic_sriov_vfs()
+
+        expected = {
+            'vswitch_name': mock_vswitch_sd.ElementName,
+            'device_id': mock_nic.PnPDeviceID,
+            'total_vfs': mock_hw_offload_sd_ok.IovVfCapacity,
+            'used_vfs': mock_hw_offload_sd_ok.IovVfUsage,
+        }
+        self.assertEqual([expected], vfs)
+        vswitch_sds_class.assert_called_once_with(IOVPreferred=True)
+        self._conn.Msvm_EthernetSwitchHardwareOffloadData.assert_has_calls([
+            mock.call(SystemName=mock_vswitch_sd.VirtualSystemIdentifier)] * 3)
+        self._netutils.get_vswitch_external_network_name.assert_has_calls([
+            mock.call(mock_vswitch_sd.ElementName)] * 2)
+        self._conn_scimv2.MSFT_NetAdapter.assert_called_once_with(
+            InterfaceDescription=mock.sentinel.nic_name)
 
     def _check_get_numa_nodes_missing_info(self):
         numa_node = mock.MagicMock()

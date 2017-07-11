@@ -73,6 +73,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.netutils._switch_ports = {}
         self.netutils._vlan_sds = {}
         self.netutils._profile_sds = {}
+        self.netutils._hw_offload_sds = {}
         self.netutils._vsid_sds = {}
         self.netutils._bandwidth_sds = {}
         conn = self.netutils._conn
@@ -94,6 +95,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock_bad_sd, mock_sd]
         conn.Msvm_EthernetSwitchPortBandwidthSettingData.return_value = [
             mock_bad_sd, mock_sd]
+        conn.Msvm_EthernetSwitchPortOffloadSettingData.return_value = [
+            mock_bad_sd, mock_sd]
 
         self.netutils.init_caches()
 
@@ -106,6 +109,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual([mock_sd], list(self.netutils._vsid_sds.values()))
         self.assertEqual([mock_sd],
                          list(self.netutils._bandwidth_sds.values()))
+        self.assertEqual([mock_sd],
+                         list(self.netutils._hw_offload_sds.values()))
 
     def test_update_cache_disabled(self):
         self.netutils._enable_cache = False
@@ -644,6 +649,36 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertFalse(self.netutils._jobutils.add_virt_feature.called)
 
     @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_hw_offload_sd_from_port_alloc')
+    def test_set_vswitch_port_sriov_already_set(self, mock_get_hw_offload_sd):
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+        mock_hw_offload_sd = mock_get_hw_offload_sd.return_value
+        mock_hw_offload_sd.IOVOffloadWeight = self.netutils._IOV_ENABLED
+
+        self.netutils.set_vswitch_port_sriov(mock.sentinel.port_name,
+                                             True)
+
+        mock_get_hw_offload_sd.assert_called_once_with(mock_port_alloc)
+        self.netutils._jobutils.modify_virt_feature.assert_not_called()
+
+    @ddt.data(True, False)
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_hw_offload_sd_from_port_alloc')
+    def test_set_vswitch_port_sriov(self, state, mock_get_hw_offload_sd):
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+        mock_hw_offload_sd = mock_get_hw_offload_sd.return_value
+
+        self.netutils.set_vswitch_port_sriov(mock.sentinel.port_name,
+                                             state)
+
+        mock_get_hw_offload_sd.assert_called_once_with(mock_port_alloc)
+        self.netutils._jobutils.modify_virt_feature.assert_called_with(
+            mock_hw_offload_sd)
+        desired_state = (self.netutils._IOV_ENABLED if state else
+                         self.netutils._IOV_DISABLED)
+        self.assertEqual(desired_state, mock_hw_offload_sd.IOVOffloadWeight)
+
+    @mock.patch.object(networkutils.NetworkUtils,
                        '_get_setting_data_from_port_alloc')
     def test_get_profile_setting_data_from_port_alloc(self, mock_get_sd):
         result = self.netutils._get_profile_setting_data_from_port_alloc(
@@ -676,6 +711,17 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_sd.assert_called_once_with(
             mock_port, self.netutils._vsid_sds,
             self.netutils._PORT_SECURITY_SET_DATA)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_setting_data_from_port_alloc')
+    def test_get_hw_offload_sd_from_port_alloc(self, mock_get_sd):
+        mock_port = mock.MagicMock()
+        result = self.netutils._get_hw_offload_sd_from_port_alloc(mock_port)
+
+        self.assertEqual(mock_get_sd.return_value, result)
+        mock_get_sd.assert_called_once_with(
+            mock_port, self.netutils._hw_offload_sds,
+            self.netutils._PORT_HW_OFFLOAD_SET_DATA)
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_get_setting_data_from_port_alloc')
