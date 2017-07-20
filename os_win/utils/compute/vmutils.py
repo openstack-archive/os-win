@@ -784,10 +784,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
                                                                   is_physical)
         return disk_resource is not None
 
-    def detach_vm_disk(self, vm_name, disk_path, is_physical=True):
+    def detach_vm_disk(self, vm_name, disk_path=None, is_physical=True,
+                       serial=None):
         # TODO(claudiub): remove vm_name argument, no longer used.
-        disk_resource = self._get_mounted_disk_resource_from_path(disk_path,
-                                                                  is_physical)
+        disk_resource = self._get_mounted_disk_resource_from_path(
+            disk_path, is_physical, serial=serial)
 
         if disk_resource:
             parent = self._conn.query("SELECT * FROM "
@@ -799,7 +800,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
             if not is_physical:
                 self._jobutils.remove_virt_resource(parent)
 
-    def _get_mounted_disk_resource_from_path(self, disk_path, is_physical):
+    def _get_mounted_disk_resource_from_path(self, disk_path, is_physical,
+                                             serial=None):
         if is_physical:
             class_name = self._RESOURCE_ALLOC_SETTING_DATA_CLASS
         else:
@@ -814,9 +816,15 @@ class VMUtils(baseutils.BaseUtilsVirt):
                      'res_sub_type_virt': self._HARD_DISK_RES_SUB_TYPE,
                      'res_sub_type_dvd': self._DVD_DISK_RES_SUB_TYPE})
 
+        if serial:
+            query += " AND ElementName='%s'" % serial
+
         disk_resources = self._compat_conn.query(query)
 
         for disk_resource in disk_resources:
+            if serial:
+                return disk_resource
+
             if disk_resource.HostResource:
                 if disk_resource.HostResource[0].lower() == disk_path.lower():
                     return disk_resource
