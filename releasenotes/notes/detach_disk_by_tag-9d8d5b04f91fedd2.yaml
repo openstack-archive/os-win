@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    os-win now allows detaching VM disks by their unique tag. This considerably
+    reduces the time needed for this operation in case of passthrough disks
+    as the disk paths no longer have to be retrieved (which can be really time
+    consuming, especially under high load).
