@@ -351,7 +351,7 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
             mock_get_element_associated_class.return_value)
 
     def test_set_snapshot_type(self):
-        vmsettings = mock.Mock()
+        vmsettings = mock.Mock(Version='6.2')
 
         self._vmutils._set_vm_snapshot_type(
             vmsettings, mock.sentinel.snapshot_type)
