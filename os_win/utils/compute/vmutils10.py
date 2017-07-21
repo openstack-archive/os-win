@@ -19,6 +19,7 @@ from oslo_log import log as logging
 import six
 
 from os_win._i18n import _
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import _wqlutils
@@ -289,6 +290,7 @@ class VMUtils10(vmutils.VMUtils):
         if pci_sds:
             self._jobutils.remove_multiple_virt_resources(pci_sds)
 
+    @_utils.required_vm_version(min_version=constants.VM_VERSION_6_2)
     def _set_vm_snapshot_type(self, vmsettings, snapshot_type):
         # We expect the caller to actually push the vmsettings update.
         vmsettings.UserSnapshotType = snapshot_type
