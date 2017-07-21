@@ -57,7 +57,6 @@ class ClusterUtils(baseutils.BaseUtils):
     _IGNORE_LOCKED = 1
     _DESTROY_GROUP = 1
 
-    _FAILBACK_TRUE = 1
     _FAILBACK_WINDOW_MIN = 0
     _FAILBACK_WINDOW_MAX = 23
 
@@ -162,13 +161,29 @@ class ClusterUtils(baseutils.BaseUtils):
     def list_instance_uuids(self):
         return [r.Id for r in self._get_vm_groups()]
 
-    def add_vm_to_cluster(self, vm_name):
+    def add_vm_to_cluster(self, vm_name, max_failover_count=1,
+                          failover_period=6, auto_failback=True):
+        """Adds the VM to the Hyper-V Cluster.
+
+        :param vm_name: The name of the VM to be added to the Hyper-V Cluster
+        :param max_failover_count: The number of times the Hyper-V Cluster will
+            try to failover the VM within the given failover period. If the VM
+            will try to failover more than this number of the given
+            failover_period, the VM will end up in a failed state.
+        :param failover_period: The period (hours) over which the given
+            max_failover_count failovers can occur. After this period expired,
+            the failover count for the given VM is reset.
+        :param auto_failback: boolean, whether the VM will be allowed to
+            move back to its original host when it is available again.
+        """
         LOG.debug("Add vm to cluster called for vm %s" % vm_name)
         self._cluster.AddVirtualMachine(vm_name)
 
         vm_group = self._lookup_vm_group_check(vm_name)
+        vm_group.FailoverThreshold = max_failover_count
+        vm_group.FailoverPeriod = failover_period
         vm_group.PersistentState = True
-        vm_group.AutoFailbackType = self._FAILBACK_TRUE
+        vm_group.AutoFailbackType = int(bool(auto_failback))
         # set the earliest and latest time that the group can be moved
         # back to its preferred node. The unit is in hours.
         vm_group.FailbackWindowStart = self._FAILBACK_WINDOW_MIN
