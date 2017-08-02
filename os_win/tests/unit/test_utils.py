@@ -270,3 +270,19 @@ class UtilsTestCase(base.BaseTestCase):
 
         to_call.side_effect = exceptions.x_wmi()
         self.assertRaises(exceptions.x_wmi, f, to_call)
+
+    def test_hex_str_to_byte_array(self):
+        fake_hex_str = '0x0010A'
+
+        resulted_array = _utils.hex_str_to_byte_array(fake_hex_str)
+        expected_array = bytearray([0, 1, 10])
+
+        self.assertEqual(expected_array, resulted_array)
+
+    def test_byte_array_to_hex_str(self):
+        fake_byte_array = bytearray(range(3))
+
+        resulted_string = _utils.byte_array_to_hex_str(fake_byte_array)
+        expected_string = '000102'
+
+        self.assertEqual(expected_string, resulted_string)
