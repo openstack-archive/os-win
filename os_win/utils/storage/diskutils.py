@@ -54,6 +54,10 @@ class DiskUtils(baseutils.BaseUtils):
         disk = self._get_disk(disk_number)
         return disk.UniqueId, disk.UniqueIdFormat
 
+    def is_mpio_disk(self, disk_number):
+        disk = self._get_disk(disk_number)
+        return disk.Path.lower().startswith(r'\\?\mpio')
+
     def refresh_disk(self, disk_number):
         disk = self._get_disk(disk_number)
         disk.Refresh()
