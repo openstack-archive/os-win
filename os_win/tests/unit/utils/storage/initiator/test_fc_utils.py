@@ -19,6 +19,7 @@ import mock
 from oslotest import base
 import six
 
+from os_win import _utils
 from os_win import exceptions
 from os_win.utils.storage.initiator import fc_utils
 from os_win.utils.winapi.libs import hbaapi as fc_struct
@@ -65,6 +66,13 @@ class FCUtilsTestCase(base.BaseTestCase):
                 adapter_name=self._FAKE_ADAPTER_NAME,
                 failure_exc=exceptions.FCWin32Exception)
 
+    def test_get_wwn_struct_from_hex_str(self):
+        wwn_b_array = list(range(8))
+        wwn_str = _utils.byte_array_to_hex_str(wwn_b_array)
+
+        wwn_struct = self._fc_utils._wwn_struct_from_hex_str(wwn_str)
+        self.assertEqual(wwn_b_array, list(wwn_struct.wwn))
+
     def test_get_fc_hba_count(self):
         hba_count = self._fc_utils.get_fc_hba_count()
 
@@ -90,16 +98,14 @@ class FCUtilsTestCase(base.BaseTestCase):
     def test_open_adapter_by_wwn(self, mock_hba_handle_struct):
         exp_handle = mock_hba_handle_struct.return_value
         resulted_handle = self._fc_utils._open_adapter_by_wwn(
-            self._FAKE_ADAPTER_WWN)
+            mock.sentinel.wwn)
 
         self.assertEqual(exp_handle, resulted_handle)
 
-        args_list = self._mock_run.call_args_list[0][0]
-        self.assertEqual(fc_utils.hbaapi.HBA_OpenAdapterByWWN,
-                         args_list[0])
-        self.assertEqual(self._FAKE_ADAPTER_WWN, list(args_list[2].wwn))
-
-        self.assertEqual(self._ctypes.byref(exp_handle), args_list[1])
+        self._mock_run.assert_called_once_with(
+            fc_utils.hbaapi.HBA_OpenAdapterByWWN,
+            self._ctypes.byref(exp_handle),
+            mock.sentinel.wwn)
 
     def test_close_adapter(self):
         self._fc_utils._close_adapter(mock.sentinel.hba_handle)
@@ -123,10 +129,9 @@ class FCUtilsTestCase(base.BaseTestCase):
     def test_get_hba_handle_by_wwn(self, mock_close_adapter,
                                    mock_open_adapter):
         with self._fc_utils._get_hba_handle(
-                adapter_wwn=self._FAKE_ADAPTER_WWN) as handle:
+                adapter_wwn_struct=mock.sentinel.wwn) as handle:
             self.assertEqual(mock_open_adapter.return_value, handle)
-            mock_open_adapter.assert_called_once_with(
-                self._FAKE_ADAPTER_WWN)
+            mock_open_adapter.assert_called_once_with(mock.sentinel.wwn)
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter.return_value)
 
@@ -268,8 +273,8 @@ class FCUtilsTestCase(base.BaseTestCase):
             mock.sentinel.adapter_name)
 
         expected_hba_ports = [{
-            'node_name': self._fc_utils._wwn_array_to_hex_str(fake_node_wwn),
-            'port_name': self._fc_utils._wwn_array_to_hex_str(fake_port_wwn)
+            'node_name': _utils.byte_array_to_hex_str(fake_node_wwn),
+            'port_name': _utils.byte_array_to_hex_str(fake_port_wwn)
         }]
         self.assertEqual(expected_hba_ports, resulted_hba_ports)
 
@@ -281,33 +286,16 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_get_adapter_port_attributes.assert_called_once_with(
             mock_open_adapter.return_value, fake_port_index)
 
-    def test_wwn_hex_string_to_array(self):
-        fake_wwn_hex_string = '000102'
-
-        resulted_array = self._fc_utils._wwn_hex_string_to_array(
-            fake_wwn_hex_string)
-
-        expected_wwn_hex_array = list(range(3))
-        self.assertEqual(expected_wwn_hex_array, resulted_array)
-
-    def test_wwn_array_to_hex_str(self):
-        fake_wwn_array = list(range(3))
-
-        resulted_string = self._fc_utils._wwn_array_to_hex_str(fake_wwn_array)
-
-        expected_string = '000102'
-        self.assertEqual(expected_string, resulted_string)
-
+    @mock.patch.object(fc_utils.FCUtils, '_wwn_struct_from_hex_str')
     @mock.patch.object(fc_utils.FCUtils, '_open_adapter_by_wwn')
     @mock.patch.object(fc_utils.FCUtils, '_close_adapter')
     @mock.patch.object(fc_utils.FCUtils, '_get_target_mapping')
     def test_get_fc_target_mapping(self, mock_get_target_mapping,
-                                   mock_close_adapter, mock_open_adapter):
-        # Local WWNN
-        fake_node_wwn_string = "123"
+                                   mock_close_adapter, mock_open_adapter,
+                                   mock_wwn_struct_from_hex_str):
         # Remote WWNs
-        fake_node_wwn = list(range(3))
-        fake_port_wwn = list(range(3))
+        fake_node_wwn = list(range(8))
+        fake_port_wwn = list(range(8)[::-1])
 
         mock_fcp_mappings = mock.MagicMock()
         mock_entry = mock.MagicMock()
@@ -317,20 +305,23 @@ class FCUtilsTestCase(base.BaseTestCase):
         mock_entry.ScsiId.ScsiOSLun = mock.sentinel.ScsiOSLun
         mock_fcp_mappings.Entries = [mock_entry]
         mock_get_target_mapping.return_value = mock_fcp_mappings
-        mock_node_wwn = self._fc_utils._wwn_hex_string_to_array(
-            fake_node_wwn_string)
 
         resulted_mappings = self._fc_utils.get_fc_target_mappings(
-            fake_node_wwn_string)
+            mock.sentinel.local_wwnn)
 
         expected_mappings = [{
-            'node_name': self._fc_utils._wwn_array_to_hex_str(fake_node_wwn),
-            'port_name': self._fc_utils._wwn_array_to_hex_str(fake_port_wwn),
+            'node_name': _utils.byte_array_to_hex_str(fake_node_wwn),
+            'port_name': _utils.byte_array_to_hex_str(fake_port_wwn),
             'device_name': mock.sentinel.OSDeviceName,
             'lun': mock.sentinel.ScsiOSLun
         }]
         self.assertEqual(expected_mappings, resulted_mappings)
-        mock_open_adapter.assert_called_once_with(mock_node_wwn)
+
+        mock_wwn_struct_from_hex_str.assert_called_once_with(
+            mock.sentinel.local_wwnn)
+        mock_open_adapter.assert_called_once_with(
+            mock_wwn_struct_from_hex_str.return_value)
+
         mock_close_adapter.assert_called_once_with(
             mock_open_adapter.return_value)
 

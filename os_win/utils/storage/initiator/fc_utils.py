@@ -15,7 +15,6 @@
 
 import contextlib
 import ctypes
-import textwrap
 
 from oslo_log import log as logging
 import six
@@ -47,6 +46,16 @@ class FCUtils(object):
         kwargs['failure_exc'] = exceptions.FCWin32Exception
         return self._win32_utils.run_and_check_output(*args, **kwargs)
 
+    def _wwn_struct_from_hex_str(self, wwn_hex_str):
+        try:
+            wwn_struct = fc_struct.HBA_WWN()
+            wwn_struct.wwn[:] = _utils.hex_str_to_byte_array(wwn_hex_str)
+        except ValueError:
+            err_msg = _("Invalid WWN hex string received: %s") % wwn_hex_str
+            raise exceptions.FCException(err_msg)
+
+        return wwn_struct
+
     def get_fc_hba_count(self):
         return hbaapi.HBA_GetNumberOfAdapters()
 
@@ -59,15 +68,13 @@ class FCUtils(object):
             error_ret_vals=[0])
         return handle
 
-    def _open_adapter_by_wwn(self, adapter_wwn):
+    def _open_adapter_by_wwn(self, adapter_wwn_struct):
         handle = fc_struct.HBA_HANDLE()
-        hba_wwn = fc_struct.HBA_WWN()
-        hba_wwn.wwn[:] = adapter_wwn
 
         self._run_and_check_output(
             hbaapi.HBA_OpenAdapterByWWN,
             ctypes.byref(handle),
-            hba_wwn)
+            adapter_wwn_struct)
 
         return handle
 
@@ -75,11 +82,11 @@ class FCUtils(object):
         hbaapi.HBA_CloseAdapter(hba_handle)
 
     @contextlib.contextmanager
-    def _get_hba_handle(self, adapter_name=None, adapter_wwn=None):
+    def _get_hba_handle(self, adapter_name=None, adapter_wwn_struct=None):
         if adapter_name:
             hba_handle = self._open_adapter_by_name(adapter_name)
-        elif adapter_wwn:
-            hba_handle = self._open_adapter_by_wwn(adapter_wwn)
+        elif adapter_wwn_struct:
+            hba_handle = self._open_adapter_by_wwn(adapter_wwn_struct)
         else:
             err_msg = _("Could not open HBA adapter. "
                         "No HBA name or WWN was specified")
@@ -138,11 +145,11 @@ class FCUtils(object):
             port_count = adapter_attributes.NumberOfPorts
 
             for port_index in range(port_count):
-                port_attributes = self._get_adapter_port_attributes(
+                port_attr = self._get_adapter_port_attributes(
                     hba_handle,
                     port_index)
-                wwnn = self._wwn_array_to_hex_str(port_attributes.NodeWWN.wwn)
-                wwpn = self._wwn_array_to_hex_str(port_attributes.PortWWN.wwn)
+                wwnn = _utils.byte_array_to_hex_str(port_attr.NodeWWN.wwn)
+                wwpn = _utils.byte_array_to_hex_str(port_attr.PortWWN.wwn)
 
                 hba_port_info = dict(node_name=wwnn,
                                      port_name=wwpn)
@@ -174,21 +181,21 @@ class FCUtils(object):
 
         return hba_ports
 
-    def _wwn_hex_string_to_array(self, wwn):
-        return [int(hex_byte, 16) for hex_byte in textwrap.wrap(wwn, 2)]
-
-    def _wwn_array_to_hex_str(self, wwn):
-        return ''.join('{:02X}'.format(b) for b in wwn)
-
     def get_fc_target_mappings(self, node_wwn):
-        mappings = []
-        node_wwn = self._wwn_hex_string_to_array(node_wwn)
+        """Retrieve FCP target mappings.
 
-        with self._get_hba_handle(adapter_wwn=node_wwn) as hba_handle:
+        :param node_wwn: a HBA node WWN represented as a hex string.
+        :returns: a list of FCP mappings represented as dicts.
+        """
+        mappings = []
+        node_wwn_struct = self._wwn_struct_from_hex_str(node_wwn)
+
+        with self._get_hba_handle(
+                adapter_wwn_struct=node_wwn_struct) as hba_handle:
             fcp_mappings = self._get_target_mapping(hba_handle)
             for entry in fcp_mappings.Entries:
-                wwnn = self._wwn_array_to_hex_str(entry.FcpId.NodeWWN.wwn)
-                wwpn = self._wwn_array_to_hex_str(entry.FcpId.PortWWN.wwn)
+                wwnn = _utils.byte_array_to_hex_str(entry.FcpId.NodeWWN.wwn)
+                wwpn = _utils.byte_array_to_hex_str(entry.FcpId.PortWWN.wwn)
                 mapping = dict(node_name=wwnn,
                                port_name=wwpn,
                                device_name=entry.ScsiId.OSDeviceName,

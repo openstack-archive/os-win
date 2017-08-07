@@ -15,6 +15,7 @@
 #    under the License.
 
 import ctypes
+import textwrap
 import time
 import types
 
@@ -242,3 +243,16 @@ def not_found_decorator(translated_exc=exceptions.NotFound):
                 raise
         return inner
     return wrapper
+
+
+def hex_str_to_byte_array(string):
+    string = string.lower().replace('0x', '')
+    if len(string) % 2:
+        string = "0%s" % string
+
+    return bytearray(
+        [int(hex_byte, 16) for hex_byte in textwrap.wrap(string, 2)])
+
+
+def byte_array_to_hex_str(byte_aray):
+    return ''.join('{:02X}'.format(b) for b in byte_aray)
