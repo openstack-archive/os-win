@@ -17,6 +17,7 @@ import collections
 import ctypes
 import os
 import re
+import threading
 
 from oslo_log import log as logging
 
@@ -61,6 +62,8 @@ PIDENTIFICATION_DESCRIPTOR = ctypes.POINTER(IDENTIFICATION_DESCRIPTOR)
 SCSI_ID_ASSOC_TYPE_DEVICE = 0
 SCSI_ID_CODE_SET_BINARY = 1
 SCSI_ID_CODE_SET_ASCII = 2
+
+_RESCAN_LOCK = threading.Lock()
 
 
 class DiskUtils(baseutils.BaseUtils):
@@ -132,9 +135,30 @@ class DiskUtils(baseutils.BaseUtils):
         err_msg = _("Could not find device number for device: %s")
         raise exceptions.DiskNotFound(err_msg % device_name)
 
+    def rescan_disks(self, merge_requests=False):
+        """Perform a disk rescan.
+
+        :param merge_requests: If this flag is set and a disk rescan is
+                               already pending, we'll just wait for it to
+                               finish without issuing a new rescan request.
+        """
+        if merge_requests:
+            rescan_pending = _RESCAN_LOCK.locked()
+            if rescan_pending:
+                LOG.debug("A disk rescan is already pending. "
+                          "Waiting for it to complete.")
+
+            with _RESCAN_LOCK:
+                if not rescan_pending:
+                    self._rescan_disks()
+        else:
+            self._rescan_disks()
+
     @_utils.retry_decorator(exceptions=(exceptions.x_wmi,
                                         exceptions.OSWinException))
-    def rescan_disks(self):
+    def _rescan_disks(self):
+        LOG.debug("Rescanning disks.")
+
         ret = self._conn_storage.Msft_StorageSetting.UpdateHostStorageCache()
 
         if isinstance(ret, collections.Iterable):
@@ -143,6 +167,8 @@ class DiskUtils(baseutils.BaseUtils):
         if ret:
             err_msg = _("Rescanning disks failed. Error code: %s.")
             raise exceptions.OSWinException(err_msg % ret)
+
+        LOG.debug("Finished rescanning disks.")
 
     def get_disk_capacity(self, path, ignore_errors=False):
         norm_path = os.path.abspath(path)
