@@ -16,6 +16,8 @@
 import ddt
 import mock
 
+from os_win import _utils
+from os_win import constants
 from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils.storage import diskutils
@@ -185,3 +187,117 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_disk_capacity_raised_exc(self):
         self._test_get_disk_capacity(
             raised_exc=exceptions.Win32Exception)
+
+    def test_parse_scsi_id_desc(self):
+        vpd_str = ('008300240103001060002AC00000000000000EA0'
+                   '0000869902140004746573740115000400000001')
+        buff = _utils.hex_str_to_byte_array(vpd_str)
+
+        identifiers = self._diskutils._parse_scsi_page_83(buff)
+
+        exp_scsi_id_0 = '60002AC00000000000000EA000008699'
+        exp_scsi_id_1 = '74657374'
+        exp_scsi_id_2 = '00000001'
+
+        exp_identifiers = [
+            {'protocol': None,
+             'raw_id_desc_size': 20,
+             'raw_id': _utils.hex_str_to_byte_array(exp_scsi_id_0),
+             'code_set': 1,
+             'type': 3,
+             'id': exp_scsi_id_0,
+             'association': 0},
+            {'protocol': None,
+             'raw_id_desc_size': 8,
+             'raw_id': _utils.hex_str_to_byte_array(exp_scsi_id_1),
+             'code_set': 2,
+             'type': 4,
+             'id': 'test',
+             'association': 1},
+            {'protocol': None,
+             'raw_id_desc_size': 8,
+             'raw_id': _utils.hex_str_to_byte_array(exp_scsi_id_2),
+             'code_set': 1,
+             'type': 5,
+             'id': exp_scsi_id_2,
+             'association': 1}]
+
+        self.assertEqual(exp_identifiers, identifiers)
+
+    def test_parse_supported_scsi_id_desc(self):
+        vpd_str = ('008300240103001060002AC00000000000000EA0'
+                   '0000869901140004000003F40115000400000001')
+        buff = _utils.hex_str_to_byte_array(vpd_str)
+
+        identifiers = self._diskutils._parse_scsi_page_83(
+            buff, select_supported_identifiers=True)
+
+        exp_scsi_id = '60002AC00000000000000EA000008699'
+        exp_identifiers = [
+            {'protocol': None,
+             'raw_id_desc_size': 20,
+             'raw_id': _utils.hex_str_to_byte_array(exp_scsi_id),
+             'code_set': 1,
+             'type': 3,
+             'id': exp_scsi_id,
+             'association': 0}]
+        self.assertEqual(exp_identifiers, identifiers)
+
+    def test_parse_scsi_page_83_no_desc(self):
+        # We've set the page length field to 0, so we're expecting an
+        # empty list to be returned.
+        vpd_str = ('008300000103001060002AC00000000000000EA0'
+                   '0000869901140004000003F40115000400000001')
+        buff = _utils.hex_str_to_byte_array(vpd_str)
+
+        identifiers = self._diskutils._parse_scsi_page_83(buff)
+        self.assertEqual([], identifiers)
+
+    def test_parse_scsi_id_desc_exc(self):
+        vpd_str = '0083'
+        # Invalid VPD page data (buffer too small)
+        self.assertRaises(exceptions.SCSIPageParsingError,
+                          self._diskutils._parse_scsi_page_83,
+                          _utils.hex_str_to_byte_array(vpd_str))
+
+        vpd_str = ('00FF00240103001060002AC00000000000000EA0'
+                   '0000869901140004000003F40115000400000001')
+        # Unexpected page code
+        self.assertRaises(exceptions.SCSIPageParsingError,
+                          self._diskutils._parse_scsi_page_83,
+                          _utils.hex_str_to_byte_array(vpd_str))
+
+        vpd_str = ('008300F40103001060002AC00000000000000EA0'
+                   '0000869901140004000003F40115000400000001')
+        # VPD page overflow
+        self.assertRaises(exceptions.SCSIPageParsingError,
+                          self._diskutils._parse_scsi_page_83,
+                          _utils.hex_str_to_byte_array(vpd_str))
+
+        vpd_str = ('00830024010300FF60002AC00000000000000EA0'
+                   '0000869901140004000003F40115000400000001')
+        # Identifier overflow
+        self.assertRaises(exceptions.SCSIIdDescriptorParsingError,
+                          self._diskutils._parse_scsi_page_83,
+                          _utils.hex_str_to_byte_array(vpd_str))
+
+        vpd_str = ('0083001F0103001060002AC00000000000000EA0'
+                   '0000869901140004000003F4011500')
+        # Invalid identifier structure (too small)
+        self.assertRaises(exceptions.SCSIIdDescriptorParsingError,
+                          self._diskutils._parse_scsi_page_83,
+                          _utils.hex_str_to_byte_array(vpd_str))
+
+    def test_select_supported_scsi_identifiers(self):
+        identifiers = [
+            {'type': id_type}
+            for id_type in constants.SUPPORTED_SCSI_UID_FORMATS[::-1]]
+        identifiers.append({'type': mock.sentinel.scsi_id_format})
+
+        expected_identifiers = [
+            {'type': id_type}
+            for id_type in constants.SUPPORTED_SCSI_UID_FORMATS]
+
+        result = self._diskutils._select_supported_scsi_identifiers(
+            identifiers)
+        self.assertEqual(expected_identifiers, result)
