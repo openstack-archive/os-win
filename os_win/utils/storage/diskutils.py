@@ -65,33 +65,64 @@ SCSI_ID_CODE_SET_ASCII = 2
 
 class DiskUtils(baseutils.BaseUtils):
 
-    _wmi_namespace = 'root/microsoft/windows/storage'
+    _wmi_cimv2_namespace = 'root/cimv2'
+    _wmi_storage_namespace = 'root/microsoft/windows/storage'
 
     def __init__(self):
-        self._conn_storage = self._get_wmi_conn(self._wmi_namespace)
+        self._conn_cimv2 = self._get_wmi_conn(self._wmi_cimv2_namespace)
+        self._conn_storage = self._get_wmi_conn(self._wmi_storage_namespace)
         self._win32_utils = win32utils.Win32Utils()
 
         # Physical device names look like \\.\PHYSICALDRIVE1
         self._phys_dev_name_regex = re.compile(r'\\\\.*\\[a-zA-Z]*([\d]+)')
 
-    def _get_disk(self, disk_number):
-        disk = self._conn_storage.Msft_Disk(Number=disk_number)
+    def _get_disk_by_number(self, disk_number, msft_disk_cls=True):
+        if msft_disk_cls:
+            disk = self._conn_storage.Msft_Disk(Number=disk_number)
+        else:
+            disk = self._conn_cimv2.Win32_DiskDrive(Index=disk_number)
+
         if not disk:
             err_msg = _("Could not find the disk number %s")
             raise exceptions.DiskNotFound(err_msg % disk_number)
         return disk[0]
 
+    def _get_disks_by_unique_id(self, unique_id, unique_id_format):
+        # In some cases, multiple disks having the same unique id may be
+        # exposed to the OS. This may happen if there are multiple paths
+        # to the LUN and MPIO is not properly configured. This can be
+        # valuable information to the caller.
+        disks = self._conn_storage.Msft_Disk(UniqueId=unique_id,
+                                             UniqueIdFormat=unique_id_format)
+        if not disks:
+            err_msg = _("Could not find any disk having unique id "
+                        "'%(unique_id)s' and unique id format "
+                        "'%(unique_id_format)s'")
+            raise exceptions.DiskNotFound(err_msg % dict(
+                unique_id=unique_id,
+                unique_id_format=unique_id_format))
+        return disks
+
+    def get_disk_numbers_by_unique_id(self, unique_id, unique_id_format):
+        disks = self._get_disks_by_unique_id(unique_id, unique_id_format)
+        return [disk.Number for disk in disks]
+
     def get_disk_uid_and_uid_type(self, disk_number):
-        disk = self._get_disk(disk_number)
+        disk = self._get_disk_by_number(disk_number)
         return disk.UniqueId, disk.UniqueIdFormat
 
     def is_mpio_disk(self, disk_number):
-        disk = self._get_disk(disk_number)
+        disk = self._get_disk_by_number(disk_number)
         return disk.Path.lower().startswith(r'\\?\mpio')
 
     def refresh_disk(self, disk_number):
-        disk = self._get_disk(disk_number)
+        disk = self._get_disk_by_number(disk_number)
         disk.Refresh()
+
+    def get_device_name_by_device_number(self, device_number):
+        disk = self._get_disk_by_number(device_number,
+                                        msft_disk_cls=False)
+        return disk.Name
 
     def get_device_number_from_device_name(self, device_name):
         matches = self._phys_dev_name_regex.findall(device_name)
