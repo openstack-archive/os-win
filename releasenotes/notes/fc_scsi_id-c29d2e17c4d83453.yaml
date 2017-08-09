@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    os-win now supports retrieving SCSI unique ids for FibreChannel disks. This
+    allows discovering FibreChannel disks in a more efficient way.

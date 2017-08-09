@@ -142,5 +142,20 @@ def register():
         HBA_WWN]
     lib_handle.HBA_OpenAdapterByWWN.restype = HBA_STATUS
 
+    lib_handle.HBA_ScsiInquiryV2.argtypes = [
+        HBA_HANDLE,
+        HBA_WWN,
+        HBA_WWN,
+        ctypes.c_uint64,
+        ctypes.c_uint8,
+        ctypes.c_uint8,
+        wintypes.PVOID,
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_uint8),
+        wintypes.PVOID,
+        ctypes.POINTER(ctypes.c_uint32)
+    ]
+    lib_handle.HBA_ScsiInquiryV2.restype = HBA_STATUS
+
     lib_handle.HBA_RefreshAdapterConfiguration.argtypes = []
     lib_handle.HBA_RefreshAdapterConfiguration.restype = None

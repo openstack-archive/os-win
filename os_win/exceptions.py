@@ -257,3 +257,13 @@ class ClusterPropertyListEntryNotFound(ClusterPropertyRetrieveFailed):
 
 class ClusterPropertyListParsingError(ClusterPropertyRetrieveFailed):
     msg_fmt = _("Parsing a cluster property list failed.")
+
+
+class SCSIPageParsingError(Invalid):
+    msg_fmt = _("Parsing SCSI Page %(page)s failed. "
+                "Reason: %(reason)s.")
+
+
+class SCSIIdDescriptorParsingError(Invalid):
+    msg_fmt = _("Parsing SCSI identification descriptor failed. "
+                "Reason: %(reason)s.")
