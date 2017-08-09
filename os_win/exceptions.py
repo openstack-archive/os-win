@@ -104,6 +104,12 @@ class InvalidParameterValue(Invalid):
                 "%(param_name)s=%(param_value)s")
 
 
+class InvalidVMVersion(Invalid):
+    msg_fmt = _("VM '%(vm_name)s' has an invalid version for this operation: "
+                "%(version)s. Version is expected to be between: "
+                "%(min_version)s and %(max_version)s.")
+
+
 class SMBException(OSWinException):
     pass
 
