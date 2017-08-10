@@ -1017,9 +1017,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                                               enabled_state)
         mock_tpool.execute.assert_has_calls(
             fake_listener,
-            [mock.call(self._vmutils._DEFAULT_EVENT_TIMEOUT_MS)] * 4)
+            [mock.call(constants.DEFAULT_WMI_EVENT_TIMEOUT_MS)] * 4)
         mock_sleep.assert_called_once_with(
-            self._vmutils._DEFAULT_EVENT_TIMEOUT_MS / 1000)
+            constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
 
     def _test_get_vm_generation(self, vm_gen):
         mock_settings = self._lookup_vm()

@@ -425,11 +425,12 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_tpool.execute.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
-        self._clusterutils.monitor_vm_failover(fake_callback)
+        self._clusterutils.monitor_vm_failover(fake_callback,
+                                               mock.sentinel.event_timeout_ms)
 
         mock_tpool.execute.assert_called_once_with(
             self._clusterutils._watcher,
-            self._clusterutils._WMI_EVENT_TIMEOUT_MS)
+            mock.sentinel.event_timeout_ms)
         fake_callback.assert_not_called()
 
     @mock.patch.object(clusterutils, 'tpool')
@@ -451,3 +452,20 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_callback.assert_called_once_with(self._FAKE_VM_NAME,
                                               self._FAKE_PREV_HOST,
                                               self._FAKE_HOST)
+
+    @mock.patch.object(clusterutils.ClusterUtils, 'monitor_vm_failover')
+    @mock.patch.object(clusterutils, 'time')
+    def test_get_vm_owner_change_listener(self, mock_time, mock_monitor):
+        mock_monitor.side_effect = [None, exceptions.OSWinException,
+                                    KeyboardInterrupt]
+
+        listener = self._clusterutils.get_vm_owner_change_listener()
+        self.assertRaises(KeyboardInterrupt,
+                          listener,
+                          mock.sentinel.callback)
+
+        mock_monitor.assert_has_calls(
+            [mock.call(mock.sentinel.callback,
+                       constants.DEFAULT_WMI_EVENT_TIMEOUT_MS)] * 3)
+        mock_time.sleep.assert_called_once_with(
+            constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
