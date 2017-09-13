@@ -99,6 +99,10 @@ class Invalid(OSWinException):
     pass
 
 
+class UnsupportedOperation(Invalid):
+    msg_fmt = _("The operation failed due to the reason: %(reason)s")
+
+
 class InvalidParameterValue(Invalid):
     msg_fmt = _("Invalid parameter value for: "
                 "%(param_name)s=%(param_value)s")

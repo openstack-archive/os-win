@@ -125,8 +125,12 @@ utils_map = {
     'vmutils': {
         'VMUtils': {
             'min_version': 6.2,
-            'max_version': 10,
+            'max_version': 6.3,
             'path': 'os_win.utils.compute.vmutils.VMUtils'},
+        'VMUtils6_3': {
+            'min_version': 6.3,
+            'max_version': 10,
+            'path': 'os_win.utils.compute.vmutils.VMUtils6_3'},
         'VMUtils10': {
             'min_version': 10,
             'max_version': None,
