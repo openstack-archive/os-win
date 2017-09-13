@@ -29,7 +29,7 @@ from oslo_utils import units
 LOG = logging.getLogger(__name__)
 
 
-class VMUtils10(vmutils.VMUtils):
+class VMUtils10(vmutils.VMUtils6_3):
 
     _UEFI_CERTIFICATE_AUTH = 'MicrosoftUEFICertificateAuthority'
     _SERIAL_PORT_SETTING_DATA_CLASS = "Msvm_SerialPortSettingData"

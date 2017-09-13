@@ -1273,28 +1273,13 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                 vs_data, mock.sentinel.certificate_required)
             mock_modify_virtual_system.assert_called_once_with(vs_data)
 
-    @mock.patch.object(vmutils.VMUtils,
-                       '_get_mounted_disk_resource_from_path')
-    def test_set_disk_qos_specs(self, mock_get_disk_resource):
-        mock_disk = mock_get_disk_resource.return_value
+    def test_set_disk_qos_specs_exc(self):
+        self.assertRaises(exceptions.UnsupportedOperation,
+                          self._vmutils.set_disk_qos_specs,
+                          mock.sentinel.disk_path, mock.sentinel.max_iops)
 
-        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path,
-                                         max_iops=mock.sentinel.max_iops,
-                                         min_iops=mock.sentinel.min_iops)
-
-        mock_get_disk_resource.assert_called_once_with(
-            mock.sentinel.disk_path, is_physical=False)
-        self.assertEqual(mock.sentinel.max_iops, mock_disk.IOPSLimit)
-        self.assertEqual(mock.sentinel.min_iops, mock_disk.IOPSReservation)
-        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
-            mock_disk)
-
-    @mock.patch.object(vmutils.VMUtils,
-                       '_get_mounted_disk_resource_from_path')
-    def test_set_disk_qos_specs_missing_values(self, mock_get_disk_resource):
-        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path)
-
-        self.assertFalse(mock_get_disk_resource.called)
+    def test_set_disk_qos_specs_noop(self):
+        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path, 0, 0)
 
     def _test_is_drive_physical(self, is_physical):
         self._vmutils._pathutils.exists.return_value = not is_physical
@@ -1564,3 +1549,35 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_remove_all_pci_devices(self):
         self._vmutils.remove_all_pci_devices(mock.sentinel.vm_name)
+
+
+class VMUtils6_3TestCase(test_base.OsWinBaseTestCase):
+
+    def setUp(self):
+        super(VMUtils6_3TestCase, self).setUp()
+        self._vmutils = vmutils.VMUtils6_3()
+        self._vmutils._conn_attr = mock.MagicMock()
+        self._vmutils._jobutils = mock.MagicMock()
+
+    @mock.patch.object(vmutils.VMUtils,
+                       '_get_mounted_disk_resource_from_path')
+    def test_set_disk_qos_specs(self, mock_get_disk_resource):
+        mock_disk = mock_get_disk_resource.return_value
+
+        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path,
+                                         max_iops=mock.sentinel.max_iops,
+                                         min_iops=mock.sentinel.min_iops)
+
+        mock_get_disk_resource.assert_called_once_with(
+            mock.sentinel.disk_path, is_physical=False)
+        self.assertEqual(mock.sentinel.max_iops, mock_disk.IOPSLimit)
+        self.assertEqual(mock.sentinel.min_iops, mock_disk.IOPSReservation)
+        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
+            mock_disk)
+
+    @mock.patch.object(vmutils.VMUtils,
+                       '_get_mounted_disk_resource_from_path')
+    def test_set_disk_qos_specs_missing_values(self, mock_get_disk_resource):
+        self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path)
+
+        self.assertFalse(mock_get_disk_resource.called)

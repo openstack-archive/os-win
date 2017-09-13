@@ -1054,20 +1054,17 @@ class VMUtils(baseutils.BaseUtilsVirt):
                   'this Hyper-V version.'))
 
     def set_disk_qos_specs(self, disk_path, max_iops=None, min_iops=None):
-        if min_iops is None and max_iops is None:
-            LOG.debug("Skipping setting disk QoS specs as no "
-                      "value was provided.")
-            return
+        """Hyper-V disk QoS policy.
 
-        disk_resource = self._get_mounted_disk_resource_from_path(
-            disk_path, is_physical=False)
+        This feature is supported on Windows / Hyper-V Server 2012 R2 or newer.
 
-        if max_iops is not None:
-            disk_resource.IOPSLimit = max_iops
-        if min_iops is not None:
-            disk_resource.IOPSReservation = min_iops
-
-        self._jobutils.modify_virt_resource(disk_resource)
+        :raises os_win.exceptions.UnsupportedOperation: if the given max_iops
+            or min_iops have non-zero values.
+        """
+        if min_iops or max_iops:
+            raise exceptions.UnsupportedOperation(
+                reason=_("Virtual disk QoS is not supported on this "
+                         "hypervisor version."))
 
     def _is_drive_physical(self, drive_path):
         # TODO(atuvenie): Find better way to check if path represents
@@ -1264,3 +1261,23 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def _set_vm_snapshot_type(self, vmsettings, snapshot_type):
         # Supported on Windows Server 2016 or newer.
         pass
+
+
+class VMUtils6_3(VMUtils):
+
+    def set_disk_qos_specs(self, disk_path, max_iops=None, min_iops=None):
+        """Sets the disk's QoS policy."""
+        if min_iops is None and max_iops is None:
+            LOG.debug("Skipping setting disk QoS specs as no "
+                      "value was provided.")
+            return
+
+        disk_resource = self._get_mounted_disk_resource_from_path(
+            disk_path, is_physical=False)
+
+        if max_iops is not None:
+            disk_resource.IOPSLimit = max_iops
+        if min_iops is not None:
+            disk_resource.IOPSReservation = min_iops
+
+        self._jobutils.modify_virt_resource(disk_resource)
