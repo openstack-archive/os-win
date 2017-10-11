@@ -1281,41 +1281,36 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_set_disk_qos_specs_noop(self):
         self._vmutils.set_disk_qos_specs(mock.sentinel.disk_path, 0, 0)
 
-    def _test_is_drive_physical(self, is_physical):
-        self._vmutils._pathutils.exists.return_value = not is_physical
-        ret = self._vmutils._is_drive_physical(mock.sentinel.fake_drive_path)
-
-        self.assertEqual(is_physical, ret)
-
-    def test_is_drive_phyisical_true(self):
-        self._test_is_drive_physical(is_physical=True)
-
-    def test_is_drive_physical_false(self):
-        self._test_is_drive_physical(is_physical=False)
-
-    @mock.patch.object(vmutils.VMUtils, '_is_drive_physical')
+    @ddt.data(
+        {'drive_path':
+            r'\\ADCONTROLLER\root\virtualization\v2:Msvm_DiskDrive.'
+            r'CreationClassName="Msvm_DiskDrive",DeviceID="Microsoft:'
+            r'6344C73D-6FD6-4A74-8BE8-8EEAC2737369\\0\\0\\D",'
+            r'SystemCreationClassName="Msvm_ComputerSystem"',
+         'exp_phys_disk': True},
+        {'drive_path': 'some_image.vhdx',
+         'exp_phys_disk': False})
+    @ddt.unpack
     @mock.patch.object(vmutils.VMUtils,
                        '_get_mounted_disk_resource_from_path')
     def test_drive_to_boot_source(self, mock_get_disk_res_from_path,
-                                  mock_is_drive_physical):
-        mock_is_drive_physical.return_value = True
+                                  drive_path, exp_phys_disk):
         mock_drive = mock.MagicMock()
         mock_drive.Parent = mock.sentinel.bssd
         mock_get_disk_res_from_path.return_value = mock_drive
 
-        mock_rasd_path = mock_drive.path_.return_value
+        exp_rasd_path = (mock_drive.path_.return_value
+                         if exp_phys_disk else mock_drive.Parent)
         mock_same_element = mock.MagicMock()
         self._vmutils._conn.Msvm_LogicalIdentity.return_value = [
             mock.Mock(SameElement=mock_same_element)]
 
-        ret = self._vmutils._drive_to_boot_source(mock.sentinel.drive_path)
+        ret = self._vmutils._drive_to_boot_source(drive_path)
 
         self._vmutils._conn.Msvm_LogicalIdentity.assert_called_once_with(
-            SystemElement=mock_rasd_path)
-        mock_is_drive_physical.assert_called_once_with(
-            mock.sentinel.drive_path)
+            SystemElement=exp_rasd_path)
         mock_get_disk_res_from_path.assert_called_once_with(
-            mock.sentinel.drive_path, is_physical=True)
+            drive_path, is_physical=exp_phys_disk)
         expected_path = mock_same_element.path_.return_value
         self.assertEqual(expected_path, ret)
 
