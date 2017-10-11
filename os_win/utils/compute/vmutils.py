@@ -403,26 +403,46 @@ class VMUtils(baseutils.BaseUtilsVirt):
         return self._get_vm_scsi_controller(vmsettings)
 
     def _get_vm_scsi_controller(self, vmsettings):
+        res = self._get_vm_disk_controllers(vmsettings,
+                                            self._SCSI_CTRL_RES_SUB_TYPE)
+        return res[0].path_() if res else None
+
+    def _get_vm_disk_controllers(self, vmsettings, ctrl_res_sub_type):
         rasds = _wqlutils.get_element_associated_class(
             self._conn, self._RESOURCE_ALLOC_SETTING_DATA_CLASS,
             element_instance_id=vmsettings.InstanceID)
         res = [r for r in rasds
-               if r.ResourceSubType == self._SCSI_CTRL_RES_SUB_TYPE][0]
-        return res.path_()
+               if r.ResourceSubType == ctrl_res_sub_type]
+        return res
 
     def _get_vm_ide_controller(self, vmsettings, ctrller_addr):
-        rasds = _wqlutils.get_element_associated_class(
-            self._conn, self._RESOURCE_ALLOC_SETTING_DATA_CLASS,
-            element_instance_id=vmsettings.InstanceID)
-        ide_ctrls = [r for r in rasds
-                     if r.ResourceSubType == self._IDE_CTRL_RES_SUB_TYPE and
-                     r.Address == str(ctrller_addr)]
+        ide_ctrls = self._get_vm_disk_controllers(vmsettings,
+                                                  self._IDE_CTRL_RES_SUB_TYPE)
+        ctrl = [r for r in ide_ctrls
+                if r.Address == str(ctrller_addr)]
 
-        return ide_ctrls[0].path_() if ide_ctrls else None
+        return ctrl[0].path_() if ctrl else None
 
     def get_vm_ide_controller(self, vm_name, ctrller_addr):
         vmsettings = self._lookup_vm_check(vm_name)
         return self._get_vm_ide_controller(vmsettings, ctrller_addr)
+
+    def _get_disk_ctrl_addr(self, controller_path):
+        ctrl = self._get_wmi_obj(controller_path)
+        if ctrl.ResourceSubType == self._IDE_CTRL_RES_SUB_TYPE:
+            return ctrl.Address
+
+        vmsettings = ctrl.associators(
+            wmi_result_class=self._VIRTUAL_SYSTEM_SETTING_DATA_CLASS)[0]
+        # The powershell commandlets rely on the controller index as SCSI
+        # controllers are missing the 'Address' attribute. We'll do the
+        # same.
+        scsi_ctrls = self._get_vm_disk_controllers(
+            vmsettings, self._SCSI_CTRL_RES_SUB_TYPE)
+        ctrl_paths = [rasd.path_().upper() for rasd in scsi_ctrls]
+
+        if controller_path.upper() in ctrl_paths:
+            return ctrl_paths.index(controller_path.upper())
 
     def get_attached_disks(self, scsi_controller_path):
         volumes = self._conn.query(
@@ -531,10 +551,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
         ctrl_slot = int(drive.AddressOnParent)
         ctrl_path = drive.Parent
         ctrl_type = self._get_disk_controller_type(ctrl_path)
+        ctrl_addr = self._get_disk_ctrl_addr(ctrl_path)
 
         attachment_info = dict(controller_slot=ctrl_slot,
                                controller_path=ctrl_path,
-                               controller_type=ctrl_type)
+                               controller_type=ctrl_type,
+                               controller_addr=ctrl_addr)
         return attachment_info
 
     def _get_disk_controller_type(self, controller_path):

@@ -464,6 +464,41 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_rasds.Address = self._FAKE_ADDRESS
         mock_get_element_associated_class.return_value = [mock_rasds]
 
+    @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
+    def test_get_ide_ctrl_addr(self, mock_get_wmi_obj):
+        mock_rasds = mock.Mock()
+        mock_rasds.ResourceSubType = self._vmutils._IDE_CTRL_RES_SUB_TYPE
+        mock_rasds.Address = mock.sentinel.ctrl_addr
+        mock_get_wmi_obj.return_value = mock_rasds
+
+        ret_val = self._vmutils._get_disk_ctrl_addr(mock.sentinel.ctrl_path)
+        self.assertEqual(mock.sentinel.ctrl_addr, ret_val)
+
+        mock_get_wmi_obj.assert_called_once_with(mock.sentinel.ctrl_path)
+
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_disk_controllers')
+    @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
+    def test_get_scsi_ctrl_addr(self, mock_get_wmi_obj, mock_get_ctrls):
+        mock_rasds = mock.Mock()
+        mock_rasds.ResourceSubType = self._vmutils._SCSI_CTRL_RES_SUB_TYPE
+        mock_rasds.associators.return_value = [mock.sentinel.vmsettings]
+        mock_get_wmi_obj.return_value = mock_rasds
+
+        mock_scsi_ctrls = ['someCtrl', self._FAKE_CTRL_PATH.upper(),
+                           'someOtherCtrl']
+        exp_ctrl_addr = 1
+
+        mock_scsi_ctrl = mock.Mock()
+        mock_scsi_ctrl.path_.side_effect = mock_scsi_ctrls
+        mock_get_ctrls.return_value = [mock_scsi_ctrl] * len(mock_scsi_ctrls)
+
+        ret_val = self._vmutils._get_disk_ctrl_addr(self._FAKE_CTRL_PATH)
+        self.assertEqual(exp_ctrl_addr, ret_val)
+
+        mock_get_wmi_obj.assert_called_once_with(self._FAKE_CTRL_PATH)
+        mock_get_ctrls.assert_called_once_with(
+            mock.sentinel.vmsettings, self._vmutils._SCSI_CTRL_RES_SUB_TYPE)
+
     @mock.patch.object(vmutils.VMUtils, 'get_free_controller_slot')
     @mock.patch.object(vmutils.VMUtils, '_get_vm_scsi_controller')
     def test_attach_scsi_drive(self, mock_get_vm_scsi_controller,
@@ -597,7 +632,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                        '_get_disk_controller_type')
     @mock.patch.object(vmutils.VMUtils,
                        '_get_wmi_obj')
+    @mock.patch.object(vmutils.VMUtils, '_get_disk_ctrl_addr')
     def test_get_disk_attachment_info(self, is_physical,
+                                      mock_get_disk_ctrl_addr,
                                       mock_get_wmi_obj,
                                       mock_get_disk_ctrl_type,
                                       mock_get_disk_res):
@@ -610,7 +647,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         exp_att_info = dict(
             controller_slot=fake_slot,
             controller_path=exp_res.Parent,
-            controller_type=mock_get_disk_ctrl_type.return_value)
+            controller_type=mock_get_disk_ctrl_type.return_value,
+            controller_addr=mock_get_disk_ctrl_addr.return_value)
 
         att_info = self._vmutils.get_disk_attachment_info(
             mock.sentinel.disk_path,
@@ -620,6 +658,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         if not is_physical:
             mock_get_wmi_obj.assert_called_once_with(mock_res.Parent)
         mock_get_disk_ctrl_type.assert_called_once_with(exp_res.Parent)
+        mock_get_disk_ctrl_addr.assert_called_once_with(exp_res.Parent)
 
     @ddt.data(vmutils.VMUtils._SCSI_CTRL_RES_SUB_TYPE,
               vmutils.VMUtils._IDE_CTRL_RES_SUB_TYPE)
