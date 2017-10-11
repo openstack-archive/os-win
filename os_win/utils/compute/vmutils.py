@@ -1068,13 +1068,18 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 reason=_("Virtual disk QoS is not supported on this "
                          "hypervisor version."))
 
-    def _is_drive_physical(self, drive_path):
-        # TODO(atuvenie): Find better way to check if path represents
-        # physical or virtual drive.
-        return not self._pathutils.exists(drive_path)
-
     def _drive_to_boot_source(self, drive_path):
-        is_physical = self._is_drive_physical(drive_path)
+        # We expect the drive path to be the one that was passed to the
+        # 'attach_drive' or 'attach_volume_to_controller' methods. In case of
+        # passthrough disks, the drive path will be a Msvm_DiskDrive WMI
+        # object path while for image files it will be the actual image path.
+        #
+        # Note that Msvm_DiskDrive objects will also exist for attached disk
+        # images, but that's not what we'll get in this situation. If we ever
+        # need to accept Msvm_DiskDrive object paths for image files as well,
+        # an extra check will be needed, but that may lead to some other
+        # inconsistencies.
+        is_physical = r'root\virtualization\v2:Msvm_DiskDrive' in drive_path
         drive = self._get_mounted_disk_resource_from_path(
             drive_path, is_physical=is_physical)
 
