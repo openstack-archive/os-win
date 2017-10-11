@@ -582,11 +582,13 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertRaises(exceptions.DiskNotFound,
                           self._vmutils.get_disk_attachment_info,
                           mock.sentinel.disk_path,
-                          mock.sentinel.is_physical)
+                          mock.sentinel.is_physical,
+                          mock.sentinel.serial)
 
         mock_get_disk_res.assert_called_once_with(
             mock.sentinel.disk_path,
-            mock.sentinel.is_physical)
+            mock.sentinel.is_physical,
+            serial=mock.sentinel.serial)
 
     @ddt.data(True, False)
     @mock.patch.object(vmutils.VMUtils,

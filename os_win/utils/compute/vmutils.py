@@ -514,9 +514,11 @@ class VMUtils(baseutils.BaseUtilsVirt):
             self._jobutils.remove_virt_resource(drive)
             raise
 
-    def get_disk_attachment_info(self, attached_disk_path, is_physical=True):
+    def get_disk_attachment_info(self, attached_disk_path=None,
+                                 is_physical=True, serial=None):
         res = self._get_mounted_disk_resource_from_path(attached_disk_path,
-                                                        is_physical)
+                                                        is_physical,
+                                                        serial=serial)
         if not res:
             err_msg = _("Disk '%s' is not attached to a vm.")
             raise exceptions.DiskNotFound(err_msg % attached_disk_path)
