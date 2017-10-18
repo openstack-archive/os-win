@@ -645,8 +645,12 @@ class VMUtils(baseutils.BaseUtilsVirt):
                          'address': address})
 
     def _get_nic_data_by_name(self, name):
-        return self._conn.Msvm_SyntheticEthernetPortSettingData(
-            ElementName=name)[0]
+        nics = self._conn.Msvm_SyntheticEthernetPortSettingData(
+            ElementName=name)
+        if nics:
+            return nics[0]
+
+        raise exceptions.HyperVvNicNotFound(vnic_name=name)
 
     def create_nic(self, vm_name, nic_name, mac_address):
         """Create a (synthetic) nic and attach it to the vm."""
@@ -672,8 +676,13 @@ class VMUtils(baseutils.BaseUtilsVirt):
         :param nic_name: The NIC's ElementName.
         """
         # TODO(claudiub): remove vm_name argument, no longer used.
-        nic_data = self._get_nic_data_by_name(nic_name)
-        self._jobutils.remove_virt_resource(nic_data)
+        try:
+            nic_data = self._get_nic_data_by_name(nic_name)
+            self._jobutils.remove_virt_resource(nic_data)
+        except exceptions.NotFound:
+            LOG.debug("Ignoring NotFound exception while attempting "
+                      "to remove vm nic: '%s'. It may have been already "
+                      "deleted.", nic_name)
 
     def soft_shutdown_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)

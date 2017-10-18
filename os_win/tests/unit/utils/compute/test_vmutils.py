@@ -724,9 +724,30 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.add_virt_resource.assert_called_once_with(
             mock_nic, mock_vm)
 
+    def test_get_nic_data_by_name(self):
+        nic_cls = self._vmutils._conn.Msvm_SyntheticEthernetPortSettingData
+        nic_cls.return_value = [mock.sentinel.nic]
+
+        nic = self._vmutils._get_nic_data_by_name(mock.sentinel.name)
+
+        self.assertEqual(mock.sentinel.nic, nic)
+        nic_cls.assert_called_once_with(ElementName=mock.sentinel.name)
+
+    def test_get_missing_nic_data_by_name(self):
+        nic_cls = self._vmutils._conn.Msvm_SyntheticEthernetPortSettingData
+        nic_cls.return_value = []
+        self.assertRaises(
+            exceptions.HyperVvNicNotFound,
+            self._vmutils._get_nic_data_by_name,
+            mock.sentinel.name)
+
     @mock.patch.object(vmutils.VMUtils, '_get_nic_data_by_name')
     def test_destroy_nic(self, mock_get_nic_data_by_name):
         mock_nic_data = mock_get_nic_data_by_name.return_value
+
+        # We expect this exception to be ignored.
+        self._vmutils._jobutils.remove_virt_resource.side_effect = (
+            exceptions.NotFound(message='fake_exc'))
 
         self._vmutils.destroy_nic(self._FAKE_VM_NAME,
                                   mock.sentinel.FAKE_NIC_NAME)
