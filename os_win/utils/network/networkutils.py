@@ -175,6 +175,22 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         vswitch = self._get_vswitch(vswitch_name)
         return vswitch.Name
 
+    def get_vswitch_extensions(self, vswitch_name):
+        vswitch = self._get_vswitch(vswitch_name)
+
+        extensions = self._conn.Msvm_EthernetSwitchExtension(
+            SystemName=vswitch.Name)
+        dict_ext_list = [
+            {'name': ext.ElementName,
+             'version': ext.Version,
+             'vendor': ext.Vendor,
+             'description': ext.Description,
+             'enabled_state': ext.EnabledState,
+             'extension_type': ext.ExtensionType}
+            for ext in extensions]
+
+        return dict_ext_list
+
     def get_vswitch_external_network_name(self, vswitch_name):
         ext_port = self._get_vswitch_external_port(vswitch_name)
         if ext_port:
