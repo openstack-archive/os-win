@@ -369,3 +369,18 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
         result = self._diskutils._select_supported_scsi_identifiers(
             identifiers)
         self.assertEqual(expected_identifiers, result)
+
+    def test_get_new_disk_policy(self):
+        mock_setting_obj = mock.Mock()
+        setting_cls = self._diskutils._conn_storage.MSFT_StorageSetting
+        setting_cls.Get.return_value = (0, mock_setting_obj)
+
+        policy = self._diskutils.get_new_disk_policy()
+        self.assertEqual(mock_setting_obj.NewDiskPolicy, policy)
+
+    def test_set_new_disk_policy(self):
+        self._diskutils.set_new_disk_policy(mock.sentinel.policy)
+
+        setting_cls = self._diskutils._conn_storage.MSFT_StorageSetting
+        setting_cls.Set.assert_called_once_with(
+            NewDiskPolicy=mock.sentinel.policy)

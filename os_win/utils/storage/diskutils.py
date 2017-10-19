@@ -301,3 +301,18 @@ class DiskUtils(baseutils.BaseUtils):
                     selected_identifiers.append(identifier)
 
         return selected_identifiers
+
+    def get_new_disk_policy(self):
+        # This policy is also known as the 'SAN policy', describing
+        # how new disks will be handled.
+        storsetting = self._conn_storage.MSFT_StorageSetting.Get()[1]
+        return storsetting.NewDiskPolicy
+
+    def set_new_disk_policy(self, policy):
+        """Sets the new disk policy, also known as SAN policy.
+
+        :param policy: an integer value, one of the DISK_POLICY_*
+                       values defined in os_win.constants.
+        """
+        self._conn_storage.MSFT_StorageSetting.Set(
+            NewDiskPolicy=policy)
