@@ -202,9 +202,8 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
 
         vswitch = self._conn.Msvm_VirtualEthernetSwitch(
             ElementName=vswitch_name)
-        if not len(vswitch):
-            raise exceptions.HyperVException(_('VSwitch not found: %s') %
-                                             vswitch_name)
+        if not vswitch:
+            raise exceptions.HyperVvSwitchNotFound(vswitch_name=vswitch_name)
         if self._enable_cache:
             self._switches[vswitch_name] = vswitch[0]
         return vswitch[0]
