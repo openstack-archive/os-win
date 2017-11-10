@@ -24,7 +24,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'oslo_config.sphinxconfiggen',
     # 'sphinx.ext.intersphinx',
-    'oslosphinx'
+    'openstackdocstheme'
 ]
 
 # autodoc generation is a bit aggressive and a nuisance when doing heavy
@@ -43,6 +43,10 @@ master_doc = 'index'
 # General information about the project.
 project = 'os-win'
 copyright = '2015, Cloudbase Solutions Srl'
+# openstackdocstheme options
+repository_name = 'openstack/os-win'
+bug_project = 'os-win'
+bug_tag = ''
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True
@@ -59,11 +63,13 @@ pygments_style = 'sphinx'
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
 # html_theme_path = ["."]
-# html_theme = '_theme'
+html_theme = 'openstackdocs'
 html_static_path = ['_static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = '%sdoc' % project
+
+html_last_updated_fmt = '%Y-%m-%d %H:%M'
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
