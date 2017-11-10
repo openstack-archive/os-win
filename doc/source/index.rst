@@ -16,10 +16,10 @@ Contents:
    usage
    contributing
 
-Indices and tables
-==================
+Sample Configuration File
+-------------------------
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. toctree::
+   :maxdepth: 1
 
+   sample_config

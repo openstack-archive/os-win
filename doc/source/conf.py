@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'oslo_config.sphinxconfiggen',
     # 'sphinx.ext.intersphinx',
     'oslosphinx'
 ]
@@ -32,6 +33,9 @@ extensions = [
 
 # The suffix of source filenames.
 source_suffix = '.rst'
+
+config_generator_config_file = '../../etc/os-win-config-generator.conf'
+sample_config_basename = '_static/os-win'
 
 # The master toctree document.
 master_doc = 'index'
@@ -56,7 +60,7 @@ pygments_style = 'sphinx'
 # Sphinx are currently 'default' and 'sphinxdoc'.
 # html_theme_path = ["."]
 # html_theme = '_theme'
-# html_static_path = ['static']
+html_static_path = ['_static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = '%sdoc' % project
