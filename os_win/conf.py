@@ -15,6 +15,8 @@
 
 from oslo_config import cfg
 
+os_win_group = 'os_win'
+
 os_win_opts = [
     cfg.StrOpt('hbaapi_lib_path',
                default='hbaapi.dll',
@@ -30,4 +32,8 @@ os_win_opts = [
 ]
 
 CONF = cfg.CONF
-CONF.register_opts(os_win_opts, 'os_win')
+CONF.register_opts(os_win_opts, os_win_group)
+
+
+def list_opts():
+    return [(os_win_group, os_win_opts)]
