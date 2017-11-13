@@ -366,7 +366,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_vswitch_not_found(self):
         self.netutils._switches = {}
         self.netutils._conn.Msvm_VirtualEthernetSwitch.return_value = []
-        self.assertRaises(exceptions.HyperVException,
+        self.assertRaises(exceptions.HyperVvSwitchNotFound,
                           self.netutils._get_vswitch,
                           self._FAKE_VSWITCH_NAME)
 

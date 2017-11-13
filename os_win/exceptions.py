@@ -95,6 +95,10 @@ class HyperVvNicNotFound(NotFound, HyperVException):
     msg_fmt = _("vNic not found: %(vnic_name)s")
 
 
+class HyperVvSwitchNotFound(NotFound, HyperVException):
+    msg_fmt = _("vSwitch not found: %(vswitch_name)s.")
+
+
 class Invalid(OSWinException):
     pass
 
