@@ -47,11 +47,25 @@ class HostUtils(baseutils.BaseUtilsVirt):
     FEATURE_MPIO = 57
 
     _wmi_cimv2_namespace = '//./root/cimv2'
+    _wmi_standard_cimv2_namespace = '//./root/StandardCimv2'
 
     def __init__(self, host='.'):
         super(HostUtils, self).__init__(host)
         self._conn_cimv2 = self._get_wmi_conn(self._wmi_cimv2_namespace,
                                               privileges=["Shutdown"])
+        self._conn_scimv2 = self._get_wmi_conn(
+            self._wmi_standard_cimv2_namespace)
+        self._netutils_prop = None
+
+    @property
+    def _netutils(self):
+        if not self._netutils_prop:
+            # NOTE(claudiub): we're importing utilsfactory here in order to
+            # avoid circular dependencies.
+            from os_win import utilsfactory
+            self._netutils_prop = utilsfactory.get_networkutils()
+
+        return self._netutils_prop
 
     def get_cpus_info(self):
         """Returns dictionary containing information about the host's CPUs."""
@@ -166,6 +180,54 @@ class HostUtils(baseutils.BaseUtilsVirt):
     def check_server_feature(self, feature_id):
         """Checks if the given feature exists on the host."""
         return len(self._conn_cimv2.Win32_ServerFeature(ID=feature_id)) > 0
+
+    def get_nic_sriov_vfs(self):
+        """Get host's NIC SR-IOV VFs.
+
+        This method will ignore the vSwitches which do not have SR-IOV enabled,
+        or which are poorly configured (the NIC does not support SR-IOV).
+
+        :returns: a list of dictionaries, containing the following fields:
+            - 'vswitch_name': the vSwtch name.
+            - 'total_vfs': the vSwitch's maximum number of VFs. (> 0)
+            - 'used_vfs': the vSwitch's number of used VFs. (<= 'total_vfs')
+        """
+
+        vfs = []
+
+        # NOTE(claudiub): A vSwitch will have to be configured to enable
+        # SR-IOV, otherwise its IOVPreferred flag will be False.
+        vswitch_sds = self._conn.Msvm_VirtualEthernetSwitchSettingData(
+            IOVPreferred=True)
+        for vswitch_sd in vswitch_sds:
+            hw_offload = self._conn.Msvm_EthernetSwitchHardwareOffloadData(
+                SystemName=vswitch_sd.VirtualSystemIdentifier)[0]
+            if not hw_offload.IovVfCapacity:
+                LOG.warning("VSwitch %s has SR-IOV enabled, but it is not "
+                            "supported by the NIC or by the OS.",
+                            vswitch_sd.ElementName)
+                continue
+
+            nic_name = self._netutils.get_vswitch_external_network_name(
+                vswitch_sd.ElementName)
+            if not nic_name:
+                # NOTE(claudiub): This can happen if the vSwitch is not
+                # external.
+                LOG.warning("VSwitch %s is not external.",
+                            vswitch_sd.ElementName)
+                continue
+
+            nic = self._conn_scimv2.MSFT_NetAdapter(
+                InterfaceDescription=nic_name)[0]
+
+            vfs.append({
+                'vswitch_name': vswitch_sd.ElementName,
+                'device_id': nic.PnPDeviceID,
+                'total_vfs': hw_offload.IovVfCapacity,
+                'used_vfs': hw_offload.IovVfUsage,
+            })
+
+        return vfs
 
     def get_numa_nodes(self):
         """Returns the host's list of NUMA nodes.

@@ -652,17 +652,24 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         raise exceptions.HyperVvNicNotFound(vnic_name=name)
 
-    def create_nic(self, vm_name, nic_name, mac_address):
-        """Create a (synthetic) nic and attach it to the vm."""
+    def create_nic(self, vm_name, nic_name, mac_address=None):
+        """Create a (synthetic) nic and attach it to the vm.
+
+        :param vm_name: The VM name to which the NIC will be attached to.
+        :param nic_name: The name of the NIC to be attached.
+        :param mac_address: The VM NIC's MAC address. If None, a Dynamic MAC
+            address will be used instead.
+        """
         # Create a new nic
         new_nic_data = self._get_new_setting_data(
             self._SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS)
 
         # Configure the nic
         new_nic_data.ElementName = nic_name
-        new_nic_data.Address = mac_address.replace(':', '')
-        new_nic_data.StaticMacAddress = 'True'
         new_nic_data.VirtualSystemIdentifiers = ['{' + str(uuid.uuid4()) + '}']
+        if mac_address:
+            new_nic_data.Address = mac_address.replace(':', '')
+            new_nic_data.StaticMacAddress = 'True'
 
         # Add the new nic to the vm
         vmsettings = self._lookup_vm_check(vm_name)
