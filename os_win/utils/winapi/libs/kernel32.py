@@ -20,6 +20,42 @@ from os_win.utils.winapi import wintypes
 lib_handle = None
 
 
+class IO_COUNTERS(ctypes.Structure):
+    _fields_ = [
+        ('ReadOperationCount', wintypes.ULONGLONG),
+        ('WriteOperationCount', wintypes.ULONGLONG),
+        ('OtherOperationCount', wintypes.ULONGLONG),
+        ('ReadTransferCount', wintypes.ULONGLONG),
+        ('WriteTransferCount', wintypes.ULONGLONG),
+        ('OtherTransferCount', wintypes.ULONGLONG)
+    ]
+
+
+class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+    _fields_ = [
+        ('PerProcessUserTimeLimit', wintypes.LARGE_INTEGER),
+        ('PerJobUserTimeLimit', wintypes.LARGE_INTEGER),
+        ('LimitFlags', wintypes.DWORD),
+        ('MinimumWorkingSetSize', ctypes.c_size_t),
+        ('MaximumWorkingSetSize', ctypes.c_size_t),
+        ('ActiveProcessLimit', wintypes.DWORD),
+        ('Affinity', wintypes.PULONG),
+        ('PriorityClass', wintypes.DWORD),
+        ('SchedulingClass', wintypes.DWORD)
+    ]
+
+
+class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+    _fields_ = [
+        ('BasicLimitInformation', JOBOBJECT_BASIC_LIMIT_INFORMATION),
+        ('IoInfo', IO_COUNTERS),
+        ('ProcessMemoryLimit', ctypes.c_size_t),
+        ('JobMemoryLimit', ctypes.c_size_t),
+        ('PeakProcessMemoryUsed', ctypes.c_size_t),
+        ('PeakJobMemoryUsed', ctypes.c_size_t)
+    ]
+
+
 def register():
     global lib_handle
     lib_handle = ctypes.windll.kernel32
@@ -139,3 +175,38 @@ def register():
         wintypes.LPOVERLAPPED_COMPLETION_ROUTINE
     ]
     lib_handle.WriteFileEx.restype = wintypes.BOOL
+
+    lib_handle.CreateJobObjectW.argtypes = [
+        wintypes.LPCVOID,
+        wintypes.LPCWSTR
+    ]
+    lib_handle.CreateJobObjectW.restype = wintypes.HANDLE
+
+    lib_handle.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        wintypes.INT,
+        wintypes.LPVOID,
+        wintypes.DWORD
+    ]
+    lib_handle.SetInformationJobObject.restype = wintypes.BOOL
+
+    lib_handle.AssignProcessToJobObject.argtypes = [
+        wintypes.HANDLE,
+        wintypes.HANDLE
+    ]
+    lib_handle.AssignProcessToJobObject.restype = wintypes.BOOL
+
+    lib_handle.OpenProcess.argtypes = [
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD
+    ]
+    lib_handle.OpenProcess.restype = wintypes.HANDLE
+
+    lib_handle.WaitForMultipleObjects.argtypes = [
+        wintypes.DWORD,
+        wintypes.LPHANDLE,
+        wintypes.BOOL,
+        wintypes.DWORD
+    ]
+    lib_handle.WaitForMultipleObjects.restype = wintypes.DWORD

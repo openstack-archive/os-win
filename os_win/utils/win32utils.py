@@ -22,6 +22,7 @@ from os_win import _utils
 from os_win import exceptions
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import libs as w_lib
+from os_win.utils.winapi import wintypes
 
 kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
@@ -128,3 +129,19 @@ class Win32Utils(object):
 
     def close_handle(self, handle):
         kernel32.CloseHandle(handle)
+
+    def wait_for_multiple_objects(self, handles, wait_all=True,
+                                  milliseconds=w_const.INFINITE):
+        handle_array = (wintypes.HANDLE * len(handles))(*handles)
+        ret_val = self.run_and_check_output(
+            kernel32.WaitForMultipleObjects,
+            len(handles),
+            handle_array,
+            wait_all,
+            milliseconds,
+            kernel32_lib_func=True,
+            error_ret_vals=[w_const.WAIT_FAILED])
+        if ret_val == w_const.ERROR_WAIT_TIMEOUT:
+            raise exceptions.Timeout()
+
+        return ret_val
