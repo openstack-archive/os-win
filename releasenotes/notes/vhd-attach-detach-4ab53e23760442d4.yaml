@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    os-win now allows attaching/detaching VHD/x images, retrieving the
+    attached disk physical paths and changing their available and read-only
+    status.

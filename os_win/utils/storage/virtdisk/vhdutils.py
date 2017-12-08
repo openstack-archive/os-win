@@ -126,8 +126,8 @@ class VHDUtils(object):
                                    ctypes.byref(handle))
         return handle
 
-    def _close(self, handle):
-        kernel32.CloseHandle(handle)
+    def close(self, handle):
+        self._win32_utils.close_handle(handle)
 
     def create_vhd(self, new_vhd_path, new_vhd_type, src_path=None,
                    max_internal_size=0, parent_path=None):
@@ -546,3 +546,86 @@ class VHDUtils(object):
 
         os.unlink(vhd_path)
         os.rename(tmp_path, vhd_path)
+
+    def attach_virtual_disk(self, vhd_path, read_only=True,
+                            detach_on_handle_close=False):
+        """Attach a virtual disk image.
+
+        :param vhd_path: the path of the image to attach
+        :param read_only: (bool) attach the image in read only mode
+        :parma detach_on_handle_close: if set, the image will automatically be
+                                       detached when the last image handle is
+                                       closed.
+        :returns: if 'detach_on_handle_close' is set, it returns a virtual
+                  disk image handle that may be closed using the
+                  'close' method of this class.
+        """
+        open_access_mask = (w_const.VIRTUAL_DISK_ACCESS_ATTACH_RO
+                            if read_only
+                            else w_const.VIRTUAL_DISK_ACCESS_ATTACH_RW)
+        attach_virtual_disk_flag = 0
+        if not detach_on_handle_close:
+            attach_virtual_disk_flag |= (
+                w_const.ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME)
+        if read_only:
+            attach_virtual_disk_flag |= (
+                w_const.ATTACH_VIRTUAL_DISK_FLAG_READ_ONLY)
+
+        handle = self._open(
+            vhd_path,
+            open_access_mask=open_access_mask)
+
+        self._run_and_check_output(
+            virtdisk.AttachVirtualDisk,
+            handle,
+            None,  # security descriptor
+            attach_virtual_disk_flag,
+            0,  # provider specific flags
+            None,  # attach parameters
+            None,  # overlapped structure
+            cleanup_handle=handle if not detach_on_handle_close else None)
+
+        if detach_on_handle_close:
+            return handle
+
+    def detach_virtual_disk(self, vhd_path):
+        open_access_mask = w_const.VIRTUAL_DISK_ACCESS_DETACH
+        handle = self._open(vhd_path, open_access_mask=open_access_mask)
+
+        ret_val = self._run_and_check_output(
+            virtdisk.DetachVirtualDisk,
+            handle,
+            0,  # detach flags
+            0,  # provider specific flags
+            ignored_error_codes=[w_const.ERROR_NOT_READY],
+            cleanup_handle=handle)
+
+        if ret_val == w_const.ERROR_NOT_READY:
+            LOG.debug("Image %s was not attached.", vhd_path)
+
+    def get_virtual_disk_physical_path(self, vhd_path):
+        """Returns the physical disk path for an attached disk image.
+
+        :param vhd_path: an attached disk image path.
+        :returns: the mount path of the specified image, in the form of
+                  \\.\PhysicalDriveX.
+        """
+
+        open_flag = w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS
+        open_access_mask = (w_const.VIRTUAL_DISK_ACCESS_GET_INFO |
+                            w_const.VIRTUAL_DISK_ACCESS_DETACH)
+        handle = self._open(
+            vhd_path,
+            open_flag=open_flag,
+            open_access_mask=open_access_mask)
+
+        disk_path = (ctypes.c_wchar * w_const.MAX_PATH)()
+        disk_path_sz = wintypes.ULONG(w_const.MAX_PATH)
+        self._run_and_check_output(
+            virtdisk.GetVirtualDiskPhysicalPath,
+            handle,
+            ctypes.byref(disk_path_sz),
+            disk_path,
+            cleanup_handle=handle)
+
+        return disk_path.value

@@ -12,8 +12,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import ctypes
 import os
 
+import ddt
 import mock
 from oslotest import base
 import six
@@ -22,8 +24,10 @@ from os_win import constants
 from os_win import exceptions
 from os_win.utils.storage.virtdisk import vhdutils
 from os_win.utils.winapi import constants as w_const
+from os_win.utils.winapi import wintypes
 
 
+@ddt.ddt
 class VHDUtilsTestCase(base.BaseTestCase):
     """Unit tests for the Hyper-V VHDUtils class."""
 
@@ -51,8 +55,12 @@ class VHDUtilsTestCase(base.BaseTestCase):
         self._ctypes.c_wchar_p = lambda x: (x, "c_wchar_p")
         self._ctypes.c_ulong = lambda x: (x, "c_ulong")
 
+        self._ctypes_patcher = mock.patch.object(
+            vhdutils, 'ctypes', self._ctypes)
+        self._ctypes_patcher.start()
+
         mock.patch.multiple(vhdutils,
-                            ctypes=self._ctypes, kernel32=mock.DEFAULT,
+                            kernel32=mock.DEFAULT,
                             wintypes=mock.DEFAULT, virtdisk=mock.DEFAULT,
                             vdisk_struct=self._vdisk_struct,
                             create=True).start()
@@ -116,8 +124,8 @@ class VHDUtilsTestCase(base.BaseTestCase):
             **self._run_args)
 
     def test_close(self):
-        self._vhdutils._close(mock.sentinel.handle)
-        vhdutils.kernel32.CloseHandle.assert_called_once_with(
+        self._vhdutils.close(mock.sentinel.handle)
+        self._mock_close.assert_called_once_with(
             mock.sentinel.handle)
 
     @mock.patch.object(vhdutils.VHDUtils, '_get_vhd_device_id')
@@ -760,3 +768,99 @@ class VHDUtilsTestCase(base.BaseTestCase):
     def test_get_best_supported_vhd_format(self):
         fmt = self._vhdutils.get_best_supported_vhd_format()
         self.assertEqual(constants.DISK_FORMAT_VHDX, fmt)
+
+    @ddt.data({},
+              {'read_only': False, 'detach_on_handle_close': True})
+    @ddt.unpack
+    @mock.patch.object(vhdutils.VHDUtils, '_open')
+    def test_attach_virtual_disk(self, mock_open, read_only=True,
+                                 detach_on_handle_close=False):
+        ret_val = self._vhdutils.attach_virtual_disk(
+            mock.sentinel.vhd_path,
+            read_only, detach_on_handle_close)
+
+        handle = mock_open.return_value
+        self.assertEqual(handle
+                         if detach_on_handle_close else None,
+                         ret_val)
+
+        exp_access_mask = (w_const.VIRTUAL_DISK_ACCESS_ATTACH_RO
+                           if read_only
+                           else w_const.VIRTUAL_DISK_ACCESS_ATTACH_RW)
+        mock_open.assert_called_once_with(mock.sentinel.vhd_path,
+                                          open_access_mask=exp_access_mask)
+
+        self._mock_run.assert_called_once_with(
+            vhdutils.virtdisk.AttachVirtualDisk,
+            handle,
+            None,
+            mock.ANY,
+            0, None, None,
+            **self._run_args)
+
+        if not detach_on_handle_close:
+            self._mock_close.assert_called_once_with(handle)
+        else:
+            self._mock_close.assert_not_called()
+
+        mock_run_args = self._mock_run.call_args_list[0][0]
+        attach_flag = mock_run_args[3]
+
+        self.assertEqual(
+            read_only,
+            bool(attach_flag & w_const.ATTACH_VIRTUAL_DISK_FLAG_READ_ONLY))
+        self.assertEqual(
+            not detach_on_handle_close,
+            bool(attach_flag &
+                 w_const.ATTACH_VIRTUAL_DISK_FLAG_PERMANENT_LIFETIME))
+
+    @mock.patch.object(vhdutils.VHDUtils, '_open')
+    def test_detach_virtual_disk(self, mock_open):
+        self._mock_run.return_value = w_const.ERROR_NOT_READY
+
+        self._vhdutils.detach_virtual_disk(mock.sentinel.vhd_path)
+
+        mock_open.assert_called_once_with(
+            mock.sentinel.vhd_path,
+            open_access_mask=w_const.VIRTUAL_DISK_ACCESS_DETACH)
+
+        self._mock_run.assert_called_once_with(
+            vhdutils.virtdisk.DetachVirtualDisk,
+            mock_open.return_value,
+            0, 0,
+            ignored_error_codes=[w_const.ERROR_NOT_READY],
+            **self._run_args)
+        self._mock_close.assert_called_once_with(mock_open.return_value)
+
+    @mock.patch.object(vhdutils.VHDUtils, '_open')
+    def test_get_virtual_disk_physical_path(self, mock_open):
+        self._ctypes_patcher.stop()
+        vhdutils.wintypes = wintypes
+
+        fake_drive_path = r'\\.\PhysicialDrive5'
+
+        def fake_run(func, handle, disk_path_sz_p, disk_path, **kwargs):
+            disk_path_sz = ctypes.cast(
+                disk_path_sz_p, wintypes.PULONG).contents.value
+            self.assertEqual(w_const.MAX_PATH, disk_path_sz)
+
+            disk_path.value = fake_drive_path
+
+        self._mock_run.side_effect = fake_run
+
+        ret_val = self._vhdutils.get_virtual_disk_physical_path(
+            mock.sentinel.vhd_path)
+
+        self.assertEqual(fake_drive_path, ret_val)
+        mock_open.assert_called_once_with(
+            mock.sentinel.vhd_path,
+            open_flag=w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS,
+            open_access_mask=(w_const.VIRTUAL_DISK_ACCESS_GET_INFO |
+                              w_const.VIRTUAL_DISK_ACCESS_DETACH))
+
+        self._mock_run.assert_called_once_with(
+            vhdutils.virtdisk.GetVirtualDiskPhysicalPath,
+            mock_open.return_value,
+            mock.ANY,
+            mock.ANY,
+            **self._run_args)
