@@ -31,6 +31,7 @@ from os_win.utils.dns import dnsutils
 from os_win.utils import hostutils
 from os_win.utils.network import networkutils
 from os_win.utils import pathutils
+from os_win.utils import processutils
 from os_win.utils.storage import diskutils
 from os_win.utils.storage.initiator import iscsi_utils
 from os_win.utils.storage import smbutils
@@ -135,3 +136,8 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=migrationutils.MigrationUtils,
             class_type='migrationutils')
+
+    def test_get_processutils(self):
+        self._check_get_class(
+            expected_class=processutils.ProcessUtils,
+            class_type='processutils')

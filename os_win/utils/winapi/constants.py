@@ -39,6 +39,11 @@ FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
 FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
 FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
 
+JobObjectBasicLimitInformation = 2
+JobObjectExtendedLimitInformation = 9
+
+INFINITE = 0xFFFFFFFF  # Infinite timeout
+
 # FileAPI.h
 OPEN_EXISTING = 3
 
@@ -56,6 +61,20 @@ OWNER_SECURITY_INFORMATION = 0x00000001
 GROUP_SECURITY_INFORMATION = 0x00000002
 DACL_SECURITY_INFORMATION = 0x00000004
 SACL_SECURITY_INFORMATION = 0x00000008
+
+# If the following flag is set, all processes associated with
+# the job are terminated when the last job handle is closed.
+JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+
+# The following flags specify access rights that may be
+# requested when opening proccesses.
+#
+# Allows setting process limits.
+PROCESS_SET_QUOTA = 0x0100
+# Allows terminating a process.
+PROCESS_TERMINATE = 0x0001
+# Allows waiting for a process.
+SYNCHRONIZE = 0x00100000
 
 # winioctl.h
 FILE_DEVICE_DISK = 7

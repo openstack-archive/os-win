@@ -199,6 +199,10 @@ class DNSException(OSWinException):
     pass
 
 
+class Timeout(OSWinException):
+    msg_fmt = _("Timed out waiting for the specified resource.")
+
+
 class DNSZoneNotFound(NotFound, DNSException):
     msg_fmt = _("DNS Zone not found: %(zone_name)s")
 

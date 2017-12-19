@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    os-win now allows mapping processes to job objects.
