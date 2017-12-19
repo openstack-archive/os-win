@@ -171,6 +171,7 @@ class DiskUtils(baseutils.BaseUtils):
         LOG.debug("Finished rescanning disks.")
 
     def get_disk_capacity(self, path, ignore_errors=False):
+        """Returns total/free space for a given directory."""
         norm_path = os.path.abspath(path)
 
         total_bytes = ctypes.c_ulonglong(0)
@@ -194,6 +195,11 @@ class DiskUtils(baseutils.BaseUtils):
                 return 0, 0
             else:
                 raise exc
+
+    def get_disk_size(self, disk_number):
+        """Returns the disk size, given a physical disk number."""
+        disk = self._get_disk_by_number(disk_number)
+        return disk.Size
 
     def _parse_scsi_page_83(self, buff,
                             select_supported_identifiers=False):
@@ -316,3 +322,35 @@ class DiskUtils(baseutils.BaseUtils):
         """
         self._conn_storage.MSFT_StorageSetting.Set(
             NewDiskPolicy=policy)
+
+    def set_disk_online(self, disk_number):
+        disk = self._get_disk_by_number(disk_number)
+        err_code = disk.Online()[1]
+        if err_code:
+            err_msg = (_("Failed to bring disk '%(disk_number)s' online. "
+                         "Error code: %(err_code)s.") %
+                       dict(disk_number=disk_number,
+                            err_code=err_code))
+            raise exceptions.DiskUpdateError(message=err_msg)
+
+    def set_disk_offline(self, disk_number):
+        disk = self._get_disk_by_number(disk_number)
+        err_code = disk.Offline()[1]
+        if err_code:
+            err_msg = (_("Failed to bring disk '%(disk_number)s' offline. "
+                         "Error code: %(err_code)s.") %
+                       dict(disk_number=disk_number,
+                            err_code=err_code))
+            raise exceptions.DiskUpdateError(message=err_msg)
+
+    def set_disk_readonly_status(self, disk_number, read_only):
+        disk = self._get_disk_by_number(disk_number)
+        err_code = disk.SetAttributes(IsReadOnly=bool(read_only))[1]
+        if err_code:
+            err_msg = (_("Failed to set disk '%(disk_number)s' read-only "
+                         "status to '%(read_only)s'. "
+                         "Error code: %(err_code)s.") %
+                       dict(disk_number=disk_number,
+                            err_code=err_code,
+                            read_only=bool(read_only)))
+            raise exceptions.DiskUpdateError(message=err_msg)

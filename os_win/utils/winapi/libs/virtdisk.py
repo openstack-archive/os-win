@@ -246,3 +246,27 @@ def register():
         PSET_VIRTUAL_DISK_INFO
     ]
     lib_handle.SetVirtualDiskInformation.restype = wintypes.DWORD
+
+    lib_handle.AttachVirtualDisk.argtypes = [
+        wintypes.HANDLE,
+        wintypes.PVOID,
+        wintypes.INT,
+        wintypes.ULONG,
+        wintypes.PVOID,
+        wintypes.LPOVERLAPPED
+    ]
+    lib_handle.AttachVirtualDisk.restype = wintypes.DWORD
+
+    lib_handle.DetachVirtualDisk.argtypes = [
+        wintypes.HANDLE,
+        wintypes.INT,
+        wintypes.ULONG
+    ]
+    lib_handle.DetachVirtualDisk.restype = wintypes.DWORD
+
+    lib_handle.GetVirtualDiskPhysicalPath.argtypes = [
+        wintypes.HANDLE,
+        wintypes.PULONG,
+        wintypes.PWSTR
+    ]
+    lib_handle.GetVirtualDiskPhysicalPath.restype = wintypes.DWORD

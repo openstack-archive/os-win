@@ -279,3 +279,11 @@ class SCSIPageParsingError(Invalid):
 class SCSIIdDescriptorParsingError(Invalid):
     msg_fmt = _("Parsing SCSI identification descriptor failed. "
                 "Reason: %(reason)s.")
+
+
+class ResourceUpdateError(OSWinException):
+    msg_fmt = _("Failed to update the specified resource.")
+
+
+class DiskUpdateError(OSWinException):
+    msg_fmt = _("Failed to update the specified disk.")

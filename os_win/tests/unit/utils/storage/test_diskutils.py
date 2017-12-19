@@ -256,6 +256,15 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
         self._test_get_disk_capacity(
             raised_exc=exceptions.Win32Exception)
 
+    @mock.patch.object(diskutils.DiskUtils, '_get_disk_by_number')
+    def test_get_disk_size(self, mock_get_disk):
+        disk_size = self._diskutils.get_disk_size(
+            mock.sentinel.disk_number)
+
+        self.assertEqual(mock_get_disk.return_value.Size, disk_size)
+
+        mock_get_disk.assert_called_once_with(mock.sentinel.disk_number)
+
     def test_parse_scsi_id_desc(self):
         vpd_str = ('008300240103001060002AC00000000000000EA0'
                    '0000869902140004746573740115000400000001')
@@ -384,3 +393,57 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
         setting_cls = self._diskutils._conn_storage.MSFT_StorageSetting
         setting_cls.Set.assert_called_once_with(
             NewDiskPolicy=mock.sentinel.policy)
+
+    @mock.patch.object(diskutils.DiskUtils, '_get_disk_by_number')
+    @ddt.data(0, 1)
+    def test_set_disk_online(self, err_code, mock_get_disk):
+        mock_disk = mock_get_disk.return_value
+        mock_disk.Online.return_value = (mock.sentinel.ext_err_info,
+                                         err_code)
+
+        if err_code:
+            self.assertRaises(exceptions.DiskUpdateError,
+                              self._diskutils.set_disk_online,
+                              mock.sentinel.disk_number)
+        else:
+            self._diskutils.set_disk_online(mock.sentinel.disk_number)
+
+        mock_disk.Online.assert_called_once_with()
+        mock_get_disk.assert_called_once_with(mock.sentinel.disk_number)
+
+    @mock.patch.object(diskutils.DiskUtils, '_get_disk_by_number')
+    @ddt.data(0, 1)
+    def test_set_disk_offline(self, err_code, mock_get_disk):
+        mock_disk = mock_get_disk.return_value
+        mock_disk.Offline.return_value = (mock.sentinel.ext_err_info,
+                                          err_code)
+
+        if err_code:
+            self.assertRaises(exceptions.DiskUpdateError,
+                              self._diskutils.set_disk_offline,
+                              mock.sentinel.disk_number)
+        else:
+            self._diskutils.set_disk_offline(mock.sentinel.disk_number)
+
+        mock_disk.Offline.assert_called_once_with()
+        mock_get_disk.assert_called_once_with(mock.sentinel.disk_number)
+
+    @mock.patch.object(diskutils.DiskUtils, '_get_disk_by_number')
+    @ddt.data(0, 1)
+    def test_set_disk_readonly(self, err_code, mock_get_disk):
+        mock_disk = mock_get_disk.return_value
+        mock_disk.SetAttributes.return_value = (mock.sentinel.ext_err_info,
+                                                err_code)
+
+        if err_code:
+            self.assertRaises(exceptions.DiskUpdateError,
+                              self._diskutils.set_disk_readonly_status,
+                              mock.sentinel.disk_number,
+                              read_only=True)
+        else:
+            self._diskutils.set_disk_readonly_status(
+                mock.sentinel.disk_number,
+                read_only=True)
+
+        mock_disk.SetAttributes.assert_called_once_with(IsReadOnly=True)
+        mock_get_disk.assert_called_once_with(mock.sentinel.disk_number)
