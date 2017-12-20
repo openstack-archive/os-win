@@ -330,11 +330,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
     def create_vm(self, vm_name, vnuma_enabled, vm_gen, instance_path,
                   notes=None):
         LOG.debug('Creating VM %s', vm_name)
-        self._create_vm_obj(vm_name, vnuma_enabled, vm_gen, notes,
-                            instance_path)
-
-    def _create_vm_obj(self, vm_name, vnuma_enabled, vm_gen, notes,
-                       instance_path):
         vs_data = self._compat_conn.Msvm_VirtualSystemSettingData.new()
         vs_data.ElementName = vm_name
         vs_data.Notes = notes
@@ -585,34 +580,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
         diskdrive = self._get_wmi_obj(disk_res_path, True)
         diskdrive.HostResource = [mounted_disk_path]
         self._jobutils.modify_virt_resource(diskdrive)
-
-    def set_disk_host_resource(self, vm_name, controller_path, address,
-                               mounted_disk_path):
-        # TODO(lpetrut): remove this method after the patch fixing
-        # swapped disks after host reboot merges in Nova.
-        disk_found = False
-        vmsettings = self._lookup_vm_check(vm_name)
-        (disk_resources, volume_resources) = self._get_vm_disks(vmsettings)
-        for disk_resource in disk_resources + volume_resources:
-            if (disk_resource.Parent == controller_path and
-                    self._get_disk_resource_address(disk_resource) ==
-                    str(address)):
-                if (disk_resource.HostResource and
-                        disk_resource.HostResource[0] != mounted_disk_path):
-                    LOG.debug('Updating disk host resource "%(old)s" to '
-                              '"%(new)s"' %
-                              {'old': disk_resource.HostResource[0],
-                               'new': mounted_disk_path})
-                    disk_resource.HostResource = [mounted_disk_path]
-                    self._jobutils.modify_virt_resource(disk_resource)
-                disk_found = True
-                break
-        if not disk_found:
-            LOG.warning('Disk not found on controller '
-                        '"%(controller_path)s" with '
-                        'address "%(address)s"',
-                        {'controller_path': controller_path,
-                         'address': address})
 
     def _get_nic_data_by_name(self, name):
         nics = self._conn.Msvm_SyntheticEthernetPortSettingData(
@@ -872,25 +839,6 @@ class VMUtils(baseutils.BaseUtilsVirt):
                 return slot
         raise exceptions.HyperVException(
             _("Exceeded the maximum number of slots"))
-
-    def get_vm_serial_port_connection(self, vm_name, update_connection=None):
-        # TODO(lpetrut): Remove this method after the patch implementing
-        # serial console access support merges in Nova.
-        vmsettings = self._lookup_vm_check(vm_name)
-
-        rasds = _wqlutils.get_element_associated_class(
-            self._compat_conn, self._SERIAL_PORT_SETTING_DATA_CLASS,
-            element_instance_id=vmsettings.InstanceID)
-        serial_port = (
-            [r for r in rasds if
-             r.ResourceSubType == self._SERIAL_PORT_RES_SUB_TYPE][0])
-
-        if update_connection:
-            serial_port.Connection = [update_connection]
-            self._jobutils.modify_virt_resource(serial_port)
-
-        if len(serial_port.Connection) > 0:
-            return serial_port.Connection[0]
 
     def _get_vm_serial_ports(self, vmsettings):
         rasds = _wqlutils.get_element_associated_class(

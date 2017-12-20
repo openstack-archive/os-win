@@ -359,21 +359,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_modify_virtual_system.assert_called_once_with(
             mock_vmsettings)
 
-    @mock.patch.object(vmutils.VMUtils, '_set_vm_memory')
-    @mock.patch.object(vmutils.VMUtils, '_create_vm_obj')
-    def test_create_vm(self, mock_create_vm_obj, mock_set_mem):
-        self._vmutils._vs_man_svc.DefineSystem.return_value = (
-            None, self._FAKE_JOB_PATH, self._FAKE_RET_VAL)
-        self._vmutils.create_vm(self._FAKE_VM_NAME,
-                                mock.sentinel.vnuma_enabled,
-                                self._VM_GEN,
-                                mock.sentinel.instance_path)
-
-        mock_create_vm_obj.assert_called_once_with(
-            self._FAKE_VM_NAME, mock.sentinel.vnuma_enabled,
-            self._VM_GEN, None, mock.sentinel.instance_path)
-        self.assertFalse(mock_set_mem.called)
-
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_get_vm_scsi_controller(self, mock_get_element_associated_class):
         self._prepare_get_vm_controller(self._vmutils._SCSI_CTRL_RES_SUB_TYPE,
@@ -782,28 +767,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(mock_diskdrive.HostResource,
                          [self._FAKE_MOUNTED_DISK_PATH])
 
-    def test_set_disk_host_resource(self):
-        self._lookup_vm()
-        mock_rasds = self._create_mock_disks()
-
-        self._vmutils._get_vm_disks = mock.MagicMock(
-            return_value=([mock_rasds[0]], [mock_rasds[1]]))
-        self._vmutils._get_disk_resource_address = mock.MagicMock(
-            return_value=self._FAKE_ADDRESS)
-
-        self._vmutils.set_disk_host_resource(
-            self._FAKE_VM_NAME,
-            self._FAKE_CTRL_PATH,
-            self._FAKE_ADDRESS,
-            mock.sentinel.fake_new_mounted_disk_path)
-        self._vmutils._get_disk_resource_address.assert_called_with(
-            mock_rasds[0])
-        self._vmutils._jobutils.modify_virt_resource.assert_called_once_with(
-            mock_rasds[0])
-        self.assertEqual(
-            mock.sentinel.fake_new_mounted_disk_path,
-            mock_rasds[0].HostResource[0])
-
     @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
     @ddt.data(None, mock.sentinel.snap_name)
     def test_take_vm_snapshot(self, snap_name, mock_modify_virtual_system):
@@ -955,36 +918,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(['active_vm'], active_instances)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
-    def _test_get_vm_serial_port_connection(self,
-                                            mock_get_element_associated_class,
-                                            new_connection=None):
-        old_serial_connection = 'old_serial_connection'
-
-        mock_vmsettings = [self._lookup_vm()]
-
-        fake_serial_port = mock.MagicMock()
-
-        fake_serial_port.ResourceSubType = (
-            self._vmutils._SERIAL_PORT_RES_SUB_TYPE)
-        fake_serial_port.Connection = [old_serial_connection]
-        mock_rasds = [fake_serial_port]
-        mock_get_element_associated_class.return_value = mock_rasds
-        fake_modify = self._vmutils._jobutils.modify_virt_resource
-
-        ret_val = self._vmutils.get_vm_serial_port_connection(
-            self._FAKE_VM_NAME, update_connection=new_connection)
-
-        mock_get_element_associated_class.assert_called_once_with(
-            self._vmutils._conn, self._vmutils._SERIAL_PORT_SETTING_DATA_CLASS,
-            element_instance_id=mock_vmsettings[0].InstanceID)
-
-        if new_connection:
-            self.assertEqual(new_connection, ret_val)
-            fake_modify.assert_called_once_with(fake_serial_port)
-        else:
-            self.assertEqual(old_serial_connection, ret_val)
-
-    @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def test_get_vm_serial_ports(self, mock_get_element_associated_class):
         mock_vmsettings = self._lookup_vm()
 
@@ -1037,13 +970,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(expected_ret_val, ret_val)
 
-    def test_set_vm_serial_port_connection(self):
-        self._test_get_vm_serial_port_connection(
-            new_connection='new_serial_connection')
-
-    def test_get_vm_serial_port_connection(self):
-        self._test_get_vm_serial_port_connection()
-
     def test_list_instance_notes(self):
         vs = mock.MagicMock()
         attrs = {'ElementName': 'fake_name',
@@ -1075,8 +1001,9 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             fake_ret_val, fake_job_path)
 
+    @ddt.data(True, False)
     @mock.patch.object(vmutils.VMUtils, '_get_wmi_obj')
-    def _test_create_vm_obj(self, mock_get_wmi_obj, vnuma_enabled=True):
+    def test_create_vm(self, mock_get_wmi_obj, vnuma_enabled=True):
         mock_vs_man_svc = self._vmutils._vs_man_svc
         mock_vs_data = mock.MagicMock()
         fake_job_path = 'fake job path'
@@ -1090,11 +1017,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                                                      mock.sentinel.vm_path,
                                                      fake_ret_val)
 
-        self._vmutils._create_vm_obj(vm_name=fake_vm_name,
-                                     vm_gen=constants.VM_GEN_2,
-                                     notes='fake notes',
-                                     vnuma_enabled=vnuma_enabled,
-                                     instance_path=mock.sentinel.instance_path)
+        self._vmutils.create_vm(vm_name=fake_vm_name,
+                                vm_gen=constants.VM_GEN_2,
+                                notes='fake notes',
+                                vnuma_enabled=vnuma_enabled,
+                                instance_path=mock.sentinel.instance_path)
 
         _conn.new.assert_called_once_with()
         self.assertEqual(mock_vs_data.ElementName, fake_vm_name)
@@ -1121,12 +1048,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                          mock_vs_data.SuspendDataRoot)
         self.assertEqual(mock.sentinel.instance_path,
                          mock_vs_data.SwapFileDataRoot)
-
-    def test_create_vm_obj(self):
-        self._test_create_vm_obj()
-
-    def test_create_vm_obj_vnuma_disabled(self):
-        self._test_create_vm_obj(vnuma_enabled=False)
 
     def test_list_instances(self):
         vs = mock.MagicMock()
