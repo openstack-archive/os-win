@@ -69,7 +69,6 @@ class ClusterUtils(baseutils.BaseUtils):
 
         if sys.platform == 'win32':
             self._init_hyperv_conn(host)
-            self._watcher = self._get_failover_watcher()
 
     def _init_hyperv_conn(self, host):
         try:
@@ -456,8 +455,8 @@ class ClusterUtils(baseutils.BaseUtils):
         state_info['status_info'] = status_info
         return state_info
 
-    def monitor_vm_failover(self, callback,
-                            event_timeout_ms=_WMI_EVENT_TIMEOUT_MS):
+    def _monitor_vm_failover(self, watcher, callback,
+                             event_timeout_ms=_WMI_EVENT_TIMEOUT_MS):
         """Creates a monitor to check for new WMI MSCluster_Resource
 
         events.
@@ -469,19 +468,15 @@ class ClusterUtils(baseutils.BaseUtils):
         Any event object caught will then be processed.
         """
 
-        # TODO(lpetrut): mark this method as private once compute-hyperv
-        # stops using it. We should also remove the instance '_watcher'
-        # attribute since we end up spawning unused event listeners.
-
         vm_name = None
         new_host = None
         try:
             # wait for new event for _WMI_EVENT_TIMEOUT_MS milliseconds.
             if patcher.is_monkey_patched('thread'):
-                wmi_object = tpool.execute(self._watcher,
+                wmi_object = tpool.execute(watcher,
                                            event_timeout_ms)
             else:
-                wmi_object = self._watcher(event_timeout_ms)
+                wmi_object = watcher(event_timeout_ms)
 
             old_host = wmi_object.previous.OwnerNode
             new_host = wmi_object.OwnerNode
@@ -504,13 +499,16 @@ class ClusterUtils(baseutils.BaseUtils):
 
     def get_vm_owner_change_listener(self):
         def listener(callback):
+            watcher = self._get_failover_watcher()
+
             while True:
                 # We avoid setting an infinite timeout in order to let
                 # the process gracefully stop. Note that the os-win WMI
                 # event listeners are meant to be used as long running
                 # daemons, so no stop API is provided ATM.
                 try:
-                    self.monitor_vm_failover(
+                    self._monitor_vm_failover(
+                        watcher,
                         callback,
                         constants.DEFAULT_WMI_EVENT_TIMEOUT_MS)
                 except Exception:

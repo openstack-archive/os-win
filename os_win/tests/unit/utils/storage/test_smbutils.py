@@ -108,59 +108,6 @@ class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
                           self._smbutils.unmount_smb_share,
                           mock.sentinel.share_path, force=True)
 
-    @mock.patch.object(smbutils, 'ctypes')
-    @mock.patch.object(smbutils, 'kernel32', create=True)
-    @mock.patch('os.path.abspath')
-    def _test_get_share_capacity_info(self, mock_abspath,
-                                      mock_kernel32, mock_ctypes,
-                                      raised_exc=None, ignore_errors=False):
-        expected_values = ('total_bytes', 'free_bytes')
-
-        mock_params = [mock.Mock(value=value) for value in expected_values]
-        mock_ctypes.c_ulonglong.side_effect = mock_params
-        mock_ctypes.c_wchar_p = lambda x: (x, 'c_wchar_p')
-
-        self._mock_run.side_effect = raised_exc(
-            func_name='fake_func_name',
-            error_code='fake_error_code',
-            error_message='fake_error_message') if raised_exc else None
-
-        if raised_exc and not ignore_errors:
-            self.assertRaises(raised_exc,
-                              self._smbutils.get_share_capacity_info,
-                              mock.sentinel.share_path,
-                              ignore_errors=ignore_errors)
-        else:
-            ret_val = self._smbutils.get_share_capacity_info(
-                mock.sentinel.share_path,
-                ignore_errors=ignore_errors)
-            expected_ret_val = (0, 0) if raised_exc else expected_values
-
-            self.assertEqual(expected_ret_val, ret_val)
-
-        mock_abspath.assert_called_once_with(mock.sentinel.share_path)
-        mock_ctypes.pointer.assert_has_calls(
-            [mock.call(param) for param in mock_params])
-        self._mock_run.assert_called_once_with(
-            mock_kernel32.GetDiskFreeSpaceExW,
-            mock_ctypes.c_wchar_p(mock_abspath.return_value),
-            None,
-            mock_ctypes.pointer.return_value,
-            mock_ctypes.pointer.return_value,
-            kernel32_lib_func=True)
-
-    def test_get_share_capacity_info_successfully(self):
-        self._test_get_share_capacity_info()
-
-    def test_get_share_capacity_info_ignored_error(self):
-        self._test_get_share_capacity_info(
-            raised_exc=exceptions.Win32Exception,
-            ignore_errors=True)
-
-    def test_get_share_capacity_info_raised_exc(self):
-        self._test_get_share_capacity_info(
-            raised_exc=exceptions.Win32Exception)
-
     def test_get_smb_share_path(self):
         fake_share = mock.Mock(Path=mock.sentinel.share_path)
         self._smb_conn.Msft_SmbShare.return_value = [fake_share]
