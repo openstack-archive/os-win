@@ -221,6 +221,13 @@ class NamedPipeHandler(object):
         except Exception:
             self._stopped.set()
 
+    def flush_log_file(self):
+        try:
+            self._log_file_handle.flush()
+        except (AttributeError, ValueError):
+            # We'll ignore errors caused by closed handles.
+            pass
+
     def _rotate_logs(self):
         self._log_file_handle.flush()
         self._log_file_handle.close()
