@@ -193,6 +193,10 @@ class HostUtils(baseutils.BaseUtilsVirt):
             - 'used_vfs': the vSwitch's number of used VFs. (<= 'total_vfs')
         """
 
+        # TODO(claudiub): We have added a different method that returns all
+        # of the offloading capabilities available, including SR-IOV.
+        # Remove this method in S.
+
         vfs = []
 
         # NOTE(claudiub): A vSwitch will have to be configured to enable
@@ -228,6 +232,79 @@ class HostUtils(baseutils.BaseUtilsVirt):
             })
 
         return vfs
+
+    def get_nic_hardware_offload_info(self):
+        """Get host's NIC hardware offload information.
+
+        Hyper-V offers a few different hardware offloading options for VMs and
+        their vNICs, depending on the vSwitches' NICs hardware resources and
+        capabilities. These resources are managed and assigned automatically by
+        Hyper-V. These resources are: VFs, IOV queue pairs, VMQs, IPsec
+        security association offloads.
+
+        :returns: a list of dictionaries, containing the following fields:
+            - 'vswitch_name': the switch name.
+            - 'device_id': the switch's physical NIC's PnP device ID.
+            - 'total_vfs': the switch's maximum number of VFs. (>= 0)
+            - 'used_vfs': the switch's number of used VFs. (<= 'total_vfs')
+            - 'total_iov_queue_pairs': the switch's maximum number of IOV
+                queue pairs. (>= 'total_vfs')
+            - 'used_iov_queue_pairs': the switch's number of used IOV queue
+                pairs (<= 'total_iov_queue_pairs')
+            - 'total_vmqs': the switch's maximum number of VMQs. (>= 0)
+            - 'used_vmqs': the switch's number of used VMQs. (<= 'total_vmqs')
+            - 'total_ipsecsa': the maximum number of IPsec SA offloads
+                supported by the switch. (>= 0)
+            - 'used_ipsecsa': the switch's number of IPsec SA offloads
+                currently in use. (<= 'total_ipsecsa')
+        """
+
+        hw_offload_data = []
+
+        vswitch_sds = self._conn.Msvm_VirtualEthernetSwitchSettingData()
+        hw_offload_sds = self._conn.Msvm_EthernetSwitchHardwareOffloadData()
+        for vswitch_sd in vswitch_sds:
+            hw_offload = [
+                s for s in hw_offload_sds if
+                s.SystemName == vswitch_sd.VirtualSystemIdentifier][0]
+
+            vswitch_offload_data = self._get_nic_hw_offload_info(
+                vswitch_sd, hw_offload)
+            if vswitch_offload_data:
+                hw_offload_data.append(vswitch_offload_data)
+
+        return hw_offload_data
+
+    def _get_nic_hw_offload_info(self, vswitch_sd, hw_offload_sd):
+        nic_name = self._netutils.get_vswitch_external_network_name(
+            vswitch_sd.ElementName)
+        if not nic_name:
+            # NOTE(claudiub): This can happen if the vSwitch is not
+            # external.
+            LOG.warning("VSwitch %s is not external.", vswitch_sd.ElementName)
+            return
+
+        # check if the vSwitch is misconfigured.
+        if vswitch_sd.IOVPreferred and not hw_offload_sd.IovVfCapacity:
+            LOG.warning("VSwitch %s has SR-IOV enabled, but it is not "
+                        "supported by the NIC or by the OS.",
+                        vswitch_sd.ElementName)
+
+        nic = self._conn_scimv2.MSFT_NetAdapter(
+            InterfaceDescription=nic_name)[0]
+
+        return {
+            'vswitch_name': vswitch_sd.ElementName,
+            'device_id': nic.PnPDeviceID,
+            'total_vfs': hw_offload_sd.IovVfCapacity,
+            'used_vfs': hw_offload_sd.IovVfUsage,
+            'total_iov_queue_pairs': hw_offload_sd.IovQueuePairCapacity,
+            'used_iov_queue_pairs': hw_offload_sd.IovQueuePairUsage,
+            'total_vmqs': hw_offload_sd.VmqCapacity,
+            'used_vmqs': hw_offload_sd.VmqUsage,
+            'total_ipsecsa': hw_offload_sd.IPsecSACapacity,
+            'used_ipsecsa': hw_offload_sd.IPsecSAUsage,
+        }
 
     def get_numa_nodes(self):
         """Returns the host's list of NUMA nodes.
