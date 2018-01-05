@@ -324,6 +324,16 @@ class NamedPipeTestCase(base.BaseTestCase):
     def test_write_to_log_size_exceeded(self):
         self._test_write_to_log(size_exceeded=True)
 
+    def test_flush_log_file(self):
+        self._handler._log_file_handle = None
+        self._handler.flush_log_file()
+
+        self._handler._log_file_handle = mock.Mock()
+        self._handler.flush_log_file()
+
+        self._handler._log_file_handle.flush.side_effect = ValueError
+        self._handler.flush_log_file()
+
     @mock.patch.object(namedpipe.NamedPipeHandler, '_retry_if_file_in_use')
     @mock.patch.object(builtins, 'open')
     @mock.patch.object(namedpipe, 'os')
