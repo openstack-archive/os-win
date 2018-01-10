@@ -24,13 +24,16 @@ from os_win.utils.winapi import constants as w_const
 
 @ddt.ddt
 class ProcessUtilsTestCase(test_base.OsWinBaseTestCase):
+
+    _autospec_classes = [
+        processutils.win32utils.Win32Utils,
+    ]
+
     def setUp(self):
         super(ProcessUtilsTestCase, self).setUp()
         self._setup_lib_mocks()
 
         self._procutils = processutils.ProcessUtils()
-        self._procutils._win32_utils = mock.Mock()
-
         self._win32_utils = self._procutils._win32_utils
         self._mock_run = self._win32_utils.run_and_check_output
 

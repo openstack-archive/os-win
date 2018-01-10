@@ -28,6 +28,11 @@ from os_win.utils.compute import vmutils
 class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V VMUtils class."""
 
+    _autospec_classes = [
+        vmutils.jobutils.JobUtils,
+        vmutils.pathutils.PathUtils,
+    ]
+
     _FAKE_VM_NAME = 'fake_vm'
     _FAKE_MEMORY_MB = 2
     _FAKE_VCPUS_NUM = 4
@@ -71,8 +76,6 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         super(VMUtilsTestCase, self).setUp()
         self._vmutils = vmutils.VMUtils()
         self._vmutils._conn_attr = mock.MagicMock()
-        self._vmutils._jobutils = mock.MagicMock()
-        self._vmutils._pathutils = mock.MagicMock()
         self._jobutils = self._vmutils._jobutils
 
     def test_get_vm_summary_info(self):
@@ -477,22 +480,21 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                 mock_vm, self._FAKE_PATH, self._FAKE_CTRL_PATH,
                 self._FAKE_DRIVE_ADDR, constants.DISK)
 
-    @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')
+    @mock.patch.object(vmutils.VMUtils, 'attach_drive')
     @mock.patch.object(vmutils.VMUtils, '_get_vm_ide_controller')
-    def test_attach_ide_drive(self, mock_get_ide_ctrl, mock_get_new_rsd):
+    def test_attach_ide_drive(self, mock_get_ide_ctrl, mock_attach_drive):
         mock_vm = self._lookup_vm()
-        mock_rsd = mock_get_new_rsd.return_value
 
         self._vmutils.attach_ide_drive(self._FAKE_VM_NAME,
                                        self._FAKE_CTRL_PATH,
                                        self._FAKE_CTRL_ADDR,
                                        self._FAKE_DRIVE_ADDR)
 
-        self._vmutils._jobutils.add_virt_resource.assert_called_with(
-            mock_rsd, mock_vm)
-
         mock_get_ide_ctrl.assert_called_with(mock_vm, self._FAKE_CTRL_ADDR)
-        self.assertTrue(mock_get_new_rsd.called)
+        mock_attach_drive.assert_called_once_with(
+            self._FAKE_VM_NAME, self._FAKE_CTRL_PATH,
+            mock_get_ide_ctrl.return_value, self._FAKE_DRIVE_ADDR,
+            constants.DISK)
 
     @ddt.data(constants.DISK, constants.DVD)
     @mock.patch.object(vmutils.VMUtils, '_get_new_resource_setting_data')

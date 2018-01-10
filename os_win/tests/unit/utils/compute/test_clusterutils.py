@@ -32,6 +32,10 @@ from os_win.utils.winapi import wintypes
 class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ClusterUtilsBase class."""
 
+    _autospec_classes = [
+        clusterutils._clusapi_utils.ClusApiUtils,
+    ]
+
     _FAKE_RES_NAME = "fake_res_name"
     _FAKE_HOST = "fake_host"
     _FAKE_PREV_HOST = "fake_prev_host"
@@ -43,7 +47,6 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusterutils = clusterutils.ClusterUtils()
         self._clusterutils._conn_cluster = mock.MagicMock()
         self._clusterutils._cluster = mock.MagicMock()
-        self._clusterutils._clusapi_utils = mock.Mock()
         self._clusapi = self._clusterutils._clusapi_utils
 
     def test_init_hyperv_conn(self):

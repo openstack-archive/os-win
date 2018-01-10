@@ -20,15 +20,15 @@ Unit tests for the os_win._utils module.
 
 import ddt
 import mock
-from oslotest import base
 
 from os_win import _utils
 from os_win import constants
 from os_win import exceptions
+from os_win.tests.unit import test_base
 
 
 @ddt.ddt
-class UtilsTestCase(base.BaseTestCase):
+class UtilsTestCase(test_base.BaseTestCase):
 
     @mock.patch('oslo_concurrency.processutils.execute')
     def test_execute(self, mock_execute):

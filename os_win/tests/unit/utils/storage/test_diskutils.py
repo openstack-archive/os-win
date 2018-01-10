@@ -25,12 +25,16 @@ from os_win.utils.storage import diskutils
 
 @ddt.ddt
 class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
+
+    _autospec_classes = [
+        diskutils.win32utils.Win32Utils,
+    ]
+
     def setUp(self):
         super(DiskUtilsTestCase, self).setUp()
         self._diskutils = diskutils.DiskUtils()
         self._diskutils._conn_cimv2 = mock.MagicMock()
         self._diskutils._conn_storage = mock.MagicMock()
-        self._diskutils._win32_utils = mock.MagicMock()
         self._mock_run = self._diskutils._win32_utils.run_and_check_output
 
     @ddt.data(True, False)

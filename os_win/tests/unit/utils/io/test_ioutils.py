@@ -14,23 +14,27 @@
 #    under the License.import mock
 
 import mock
-from oslotest import base
 import six
 
 from os_win import constants
 from os_win import exceptions
+from os_win.tests.unit import test_base
 from os_win.utils.io import ioutils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import wintypes
 
 
-class IOUtilsTestCase(base.BaseTestCase):
+class IOUtilsTestCase(test_base.BaseTestCase):
+
+    _autospec_classes = [
+        ioutils.win32utils.Win32Utils,
+    ]
+
     def setUp(self):
         super(IOUtilsTestCase, self).setUp()
         self._setup_lib_mocks()
 
         self._ioutils = ioutils.IOUtils()
-        self._ioutils._win32_utils = mock.Mock()
 
         self._mock_run = self._ioutils._win32_utils.run_and_check_output
         self._run_args = dict(kernel32_lib_func=True,
@@ -234,7 +238,7 @@ class IOUtilsTestCase(base.BaseTestCase):
         self.assertEqual(six.b(fake_data), buff_data)
 
 
-class IOQueueTestCase(base.BaseTestCase):
+class IOQueueTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(IOQueueTestCase, self).setUp()
 

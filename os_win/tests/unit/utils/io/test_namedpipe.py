@@ -16,16 +16,16 @@
 import errno
 
 import mock
-from oslotest import base
 from six.moves import builtins
 
 from os_win import constants
 from os_win import exceptions
+from os_win.tests.unit import test_base
 from os_win.utils.io import namedpipe
 from os_win.utils.winapi import constants as w_const
 
 
-class NamedPipeTestCase(base.BaseTestCase):
+class NamedPipeTestCase(test_base.BaseTestCase):
     _FAKE_LOG_PATH = 'fake_log_path'
 
     @mock.patch.object(namedpipe.NamedPipeHandler, '_setup_io_structures')

@@ -23,11 +23,15 @@ from os_win.utils.storage import smbutils
 
 @ddt.ddt
 class SMBUtilsTestCase(test_base.OsWinBaseTestCase):
+
+    _autospec_classes = [
+        smbutils.win32utils.Win32Utils,
+    ]
+
     def setUp(self):
         super(SMBUtilsTestCase, self).setUp()
 
         self._smbutils = smbutils.SMBUtils()
-        self._smbutils._win32_utils = mock.Mock()
         self._smbutils._smb_conn = mock.Mock()
         self._mock_run = self._smbutils._win32_utils.run_and_check_output
         self._smb_conn = self._smbutils._smb_conn

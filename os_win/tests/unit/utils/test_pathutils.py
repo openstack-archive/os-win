@@ -29,13 +29,16 @@ from os_win.utils.winapi.libs import advapi32 as advapi32_def
 class PathUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V PathUtils class."""
 
+    _autospec_classes = [
+        pathutils.win32utils.Win32Utils,
+        pathutils._acl_utils.ACLUtils,
+    ]
+
     def setUp(self):
         super(PathUtilsTestCase, self).setUp()
         self._setup_lib_mocks()
 
         self._pathutils = pathutils.PathUtils()
-        self._pathutils._win32_utils = mock.Mock()
-        self._pathutils._acl_utils = mock.Mock()
         self._mock_run = self._pathutils._win32_utils.run_and_check_output
         self._acl_utils = self._pathutils._acl_utils
 

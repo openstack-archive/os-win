@@ -181,7 +181,7 @@ class IOUtils(object):
             buff[i] = struct.unpack('B', six.b(c))[0]
 
 
-class IOQueue(Queue.Queue):
+class IOQueue(Queue.Queue, object):
     def __init__(self, client_connected):
         Queue.Queue.__init__(self)
         self._client_connected = client_connected

@@ -35,15 +35,15 @@ from os_win.utils.winapi.libs import iscsidsc as iscsi_struct
 class ISCSIInitiatorUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V ISCSIInitiatorUtils class."""
 
-    @mock.patch.object(iscsi_utils.ISCSIInitiatorUtils, '__init__',
-                       lambda *args, **kwargs: None)
+    _autospec_classes = [
+        iscsi_utils.win32utils.Win32Utils,
+        iscsi_utils.diskutils.DiskUtils,
+    ]
+
     def setUp(self):
         super(ISCSIInitiatorUtilsTestCase, self).setUp()
 
         self._initiator = iscsi_utils.ISCSIInitiatorUtils()
-        self._initiator._win32utils = mock.Mock()
-        self._initiator._diskutils = mock.Mock()
-
         self._diskutils = self._initiator._diskutils
 
         self._iscsidsc = mock.patch.object(

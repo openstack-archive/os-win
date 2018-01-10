@@ -16,17 +16,22 @@
 import ctypes
 
 import mock
-from oslotest import base
 import six
 
 from os_win import _utils
 from os_win import exceptions
+from os_win.tests.unit import test_base
 from os_win.utils.storage.initiator import fc_utils
 from os_win.utils.winapi.libs import hbaapi as fc_struct
 
 
-class FCUtilsTestCase(base.BaseTestCase):
+class FCUtilsTestCase(test_base.BaseTestCase):
     """Unit tests for the Hyper-V FCUtils class."""
+
+    _autospec_classes = [
+        fc_utils.win32utils.Win32Utils,
+        fc_utils.diskutils.DiskUtils,
+    ]
 
     _FAKE_ADAPTER_NAME = 'fake_adapter_name'
     _FAKE_ADAPTER_WWN = list(range(8))
@@ -36,8 +41,6 @@ class FCUtilsTestCase(base.BaseTestCase):
         self._setup_lib_mocks()
 
         self._fc_utils = fc_utils.FCUtils()
-        self._fc_utils._diskutils = mock.Mock()
-
         self._diskutils = self._fc_utils._diskutils
 
         self._run_mocker = mock.patch.object(self._fc_utils,
@@ -61,14 +64,13 @@ class FCUtilsTestCase(base.BaseTestCase):
 
     def test_run_and_check_output(self):
         self._run_mocker.stop()
-        with mock.patch.object(fc_utils.win32utils.Win32Utils,
-                               'run_and_check_output') as mock_win32_run:
-            self._fc_utils._run_and_check_output(
-                adapter_name=self._FAKE_ADAPTER_NAME)
+        self._fc_utils._run_and_check_output(
+            adapter_name=self._FAKE_ADAPTER_NAME)
 
-            mock_win32_run.assert_called_once_with(
-                adapter_name=self._FAKE_ADAPTER_NAME,
-                failure_exc=exceptions.FCWin32Exception)
+        mock_win32_run = self._fc_utils._win32_utils.run_and_check_output
+        mock_win32_run.assert_called_once_with(
+            adapter_name=self._FAKE_ADAPTER_NAME,
+            failure_exc=exceptions.FCWin32Exception)
 
     def test_get_wwn_struct_from_hex_str(self):
         wwn_b_array = list(range(8))

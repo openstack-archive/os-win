@@ -26,14 +26,17 @@ from os_win.utils.compute import migrationutils
 class MigrationUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V MigrationUtils class."""
 
+    _autospec_classes = [
+        migrationutils.vmutils.VMUtils,
+        migrationutils.jobutils.JobUtils,
+    ]
+
     _FAKE_VM_NAME = 'fake_vm'
 
     def setUp(self):
         super(MigrationUtilsTestCase, self).setUp()
         self._migrationutils = migrationutils.MigrationUtils()
-        self._migrationutils._vmutils = mock.MagicMock()
         self._migrationutils._conn_attr = mock.MagicMock()
-        self._migrationutils._jobutils = mock.MagicMock()
 
     def test_get_export_setting_data(self):
         mock_vm = self._migrationutils._vmutils._lookup_vm.return_value
