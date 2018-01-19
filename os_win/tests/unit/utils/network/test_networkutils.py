@@ -573,14 +573,16 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             self.netutils._set_switch_port_security_settings(
                 mock.sentinel.switch_port_name,
                 VirtualSubnetId=mock.sentinel.vsid)
-            mock_remove_feature = self.netutils._jobutils.remove_virt_feature
-            mock_remove_feature.assert_called_once_with(mock_sec_settings)
 
         self.assertEqual(mock.sentinel.vsid,
                          mock_sec_settings.VirtualSubnetId)
-        mock_add_feature = self.netutils._jobutils.add_virt_feature
-        mock_add_feature.assert_called_once_with(mock_sec_settings,
-                                                 mock_port_alloc)
+        if missing_sec:
+            mock_add_feature = self.netutils._jobutils.add_virt_feature
+            mock_add_feature.assert_called_once_with(mock_sec_settings,
+                                                     mock_port_alloc)
+        else:
+            mock_modify_feature = self.netutils._jobutils.modify_virt_feature
+            mock_modify_feature.assert_called_once_with(mock_sec_settings)
 
     def test_set_switch_port_security_settings(self):
         self._check_set_switch_port_security_settings()

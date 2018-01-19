@@ -518,14 +518,12 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         sec_settings = self._get_security_setting_data_from_port_alloc(
             port_alloc)
 
-        if sec_settings:
+        exists = sec_settings is not None
+
+        if exists:
             if all(getattr(sec_settings, k) == v for k, v in kwargs.items()):
                 # All desired properties already properly set. Nothing to do.
                 return
-
-            # Removing the feature because it cannot be modified
-            # due to a wmi exception.
-            self._jobutils.remove_virt_feature(sec_settings)
         else:
             sec_settings = self._create_default_setting_data(
                 self._PORT_SECURITY_SET_DATA)
@@ -533,7 +531,10 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
         for k, v in kwargs.items():
             setattr(sec_settings, k, v)
 
-        self._jobutils.add_virt_feature(sec_settings, port_alloc)
+        if exists:
+            self._jobutils.modify_virt_feature(sec_settings)
+        else:
+            self._jobutils.add_virt_feature(sec_settings, port_alloc)
 
         # TODO(claudiub): This will help solve the missing VSID issue, but it
         # comes with a performance cost. The root cause of the problem must
