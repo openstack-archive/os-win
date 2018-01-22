@@ -27,6 +27,10 @@ from os_win.utils.network import networkutils
 class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V NetworkUtils class."""
 
+    _autospec_classes = [
+        networkutils.jobutils.JobUtils,
+    ]
+
     _FAKE_VSWITCH_NAME = "fake_vswitch_name"
     _FAKE_PORT_NAME = "fake_port_name"
     _FAKE_JOB_PATH = 'fake_job_path'
@@ -58,7 +62,6 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         super(NetworkUtilsTestCase, self).setUp()
         self.netutils = networkutils.NetworkUtils()
         self.netutils._conn_attr = mock.MagicMock()
-        self.netutils._jobutils = mock.MagicMock()
 
     def test_init_caches_disabled(self):
         self.netutils._enable_cache = False

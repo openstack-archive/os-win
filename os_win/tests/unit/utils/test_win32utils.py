@@ -16,17 +16,17 @@
 
 import ddt
 import mock
-from oslotest import base
 
 from os_win import _utils
 from os_win import exceptions
+from os_win.tests.unit import test_base
 from os_win.utils import win32utils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import wintypes
 
 
 @ddt.ddt
-class Win32UtilsTestCase(base.BaseTestCase):
+class Win32UtilsTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(Win32UtilsTestCase, self).setUp()
         self._setup_lib_mocks()

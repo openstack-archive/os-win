@@ -16,10 +16,13 @@
 
 import mock
 from oslotest import base
+from oslotest import mock_fixture
 from six.moves import builtins
 
 from os_win import exceptions
 from os_win.utils import baseutils
+
+mock_fixture.patch_mock_module()
 
 
 class TestingException(Exception):
@@ -33,7 +36,26 @@ class FakeWMIExc(exceptions.x_wmi):
         self.com_error = mock.Mock(excepinfo=excepinfo)
 
 
-class OsWinBaseTestCase(base.BaseTestCase):
+class BaseTestCase(base.BaseTestCase):
+    _autospec_classes = []
+
+    def setUp(self):
+        super(BaseTestCase, self).setUp()
+        self.useFixture(mock_fixture.MockAutospecFixture())
+        self._patch_autospec_classes()
+        self.addCleanup(mock.patch.stopall)
+
+    def _patch_autospec_classes(self):
+        for class_type in self._autospec_classes:
+            mocked_class = mock.Mock(autospec=class_type)
+            patcher = mock.patch(
+                '.'.join([class_type.__module__, class_type.__name__]),
+                mocked_class)
+            patcher.start()
+
+
+class OsWinBaseTestCase(BaseTestCase):
+
     def setUp(self):
         super(OsWinBaseTestCase, self).setUp()
 
@@ -46,4 +68,3 @@ class OsWinBaseTestCase(base.BaseTestCase):
         wmi_patcher = mock.patch.object(builtins, 'wmi', create=True,
                                         new=self._mock_wmi)
         wmi_patcher.start()
-        self.addCleanup(mock.patch.stopall)

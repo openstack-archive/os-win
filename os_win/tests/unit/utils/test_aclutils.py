@@ -23,12 +23,16 @@ from os_win.utils.winapi import constants as w_const
 
 @ddt.ddt
 class ACLUtilsTestCase(test_base.OsWinBaseTestCase):
+
+    _autospec_classes = [
+        _acl_utils.win32utils.Win32Utils,
+    ]
+
     def setUp(self):
         super(ACLUtilsTestCase, self).setUp()
         self._setup_lib_mocks()
 
         self._acl_utils = _acl_utils.ACLUtils()
-        self._acl_utils._win32_utils = mock.Mock()
         self._mock_run = self._acl_utils._win32_utils.run_and_check_output
 
     def _setup_lib_mocks(self):

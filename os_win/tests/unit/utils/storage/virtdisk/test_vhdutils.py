@@ -17,19 +17,23 @@ import os
 
 import ddt
 import mock
-from oslotest import base
 import six
 
 from os_win import constants
 from os_win import exceptions
+from os_win.tests.unit import test_base
 from os_win.utils.storage.virtdisk import vhdutils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import wintypes
 
 
 @ddt.ddt
-class VHDUtilsTestCase(base.BaseTestCase):
+class VHDUtilsTestCase(test_base.BaseTestCase):
     """Unit tests for the Hyper-V VHDUtils class."""
+
+    _autospec_classes = [
+        vhdutils.win32utils.Win32Utils,
+    ]
 
     def setUp(self):
         super(VHDUtilsTestCase, self).setUp()
@@ -38,7 +42,6 @@ class VHDUtilsTestCase(base.BaseTestCase):
         self._fake_vst_struct = self._vdisk_struct.VIRTUAL_STORAGE_TYPE
 
         self._vhdutils = vhdutils.VHDUtils()
-        self._vhdutils._win32_utils = mock.Mock()
 
         self._mock_close = self._vhdutils._win32_utils.close_handle
         self._mock_run = self._vhdutils._win32_utils.run_and_check_output

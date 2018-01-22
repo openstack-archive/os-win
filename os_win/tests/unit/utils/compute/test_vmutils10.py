@@ -21,11 +21,16 @@ from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils import _wqlutils
 from os_win.utils.compute import vmutils10
+from os_win.utils import jobutils
 
 
 @ddt.ddt
 class VMUtils10TestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V VMUtils10 class."""
+
+    _autospec_classes = [
+        jobutils.JobUtils,
+    ]
 
     _FAKE_PCI_ID = 'Microsoft:ED28B-7BDD0\\PCIP\\VEN_15B3&DEV_1007&SUBSYS_00'
     _FAKE_VENDOR_ID = '15B3'
@@ -36,7 +41,6 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
         self._vmutils = vmutils10.VMUtils10()
         self._vmutils._conn_attr = mock.MagicMock()
         self._vmutils._conn_msps_attr = mock.MagicMock()
-        self._vmutils._jobutils = mock.MagicMock()
 
     @mock.patch.object(vmutils10.VMUtils10, '_get_wmi_conn')
     def test_conn_msps(self, mock_get_wmi_conn):

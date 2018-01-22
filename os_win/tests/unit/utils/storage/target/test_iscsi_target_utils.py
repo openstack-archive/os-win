@@ -22,15 +22,20 @@ from os_win.utils.storage.target import iscsi_target_utils as tg_utils
 
 
 class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
-    @mock.patch.object(tg_utils, 'hostutils')
+
+    _autospec_classes = [
+        tg_utils.pathutils.PathUtils,
+        tg_utils.hostutils.HostUtils,
+        tg_utils.win32utils.Win32Utils,
+    ]
+
     @mock.patch.object(tg_utils.ISCSITargetUtils,
                        '_ensure_wt_provider_available')
-    def setUp(self, mock_ensure_wt_provider_available, mock_hostutils):
+    def setUp(self, mock_ensure_wt_provider_available):
         super(ISCSITargetUtilsTestCase, self).setUp()
 
         self._tgutils = tg_utils.ISCSITargetUtils()
         self._tgutils._conn_wmi = mock.Mock()
-        self._tgutils._pathutils = mock.Mock()
 
     def test_ensure_wt_provider_unavailable(self):
         self._tgutils._conn_wmi = None
@@ -212,11 +217,10 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def _test_create_iscsi_target_exception(self, target_exists=False,
                                             fail_if_exists=False):
-        fake_file_exists_hres = -0x7ff8ffb0
-        fake_hres = fake_file_exists_hres if target_exists else 1
         mock_wt_host_cls = self._tgutils._conn_wmi.WT_Host
-        mock_wt_host_cls.NewHost.side_effect = test_base.FakeWMIExc(
-            hresult=fake_hres)
+        mock_wt_host_cls.NewHost.side_effect = test_base.FakeWMIExc
+        self._tgutils._win32utils.get_com_err_code.return_value = (
+            self._tgutils._ERR_FILE_EXISTS if target_exists else 1)
 
         if target_exists and not fail_if_exists:
             self._tgutils.create_iscsi_target(mock.sentinel.target_name,
