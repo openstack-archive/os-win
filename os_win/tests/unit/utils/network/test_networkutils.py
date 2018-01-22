@@ -653,7 +653,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_set_vswitch_port_sriov_already_set(self, mock_get_hw_offload_sd):
         mock_port_alloc = self._mock_get_switch_port_alloc()
         mock_hw_offload_sd = mock_get_hw_offload_sd.return_value
-        mock_hw_offload_sd.IOVOffloadWeight = self.netutils._IOV_ENABLED
+        mock_hw_offload_sd.IOVOffloadWeight = self.netutils._OFFLOAD_ENABLED
 
         self.netutils.set_vswitch_port_sriov(mock.sentinel.port_name,
                                              True)
@@ -674,9 +674,50 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_hw_offload_sd.assert_called_once_with(mock_port_alloc)
         self.netutils._jobutils.modify_virt_feature.assert_called_with(
             mock_hw_offload_sd)
-        desired_state = (self.netutils._IOV_ENABLED if state else
-                         self.netutils._IOV_DISABLED)
+        desired_state = (self.netutils._OFFLOAD_ENABLED if state else
+                         self.netutils._OFFLOAD_DISABLED)
         self.assertEqual(desired_state, mock_hw_offload_sd.IOVOffloadWeight)
+
+    @ddt.data({'iov_queues_requested': 0},
+              {'offloaded_sa': 0})
+    @ddt.unpack
+    def test_set_vswitch_port_offload_invalid(self, iov_queues_requested=1,
+                                              offloaded_sa=1024):
+        self.assertRaises(exceptions.InvalidParameterValue,
+                          self.netutils.set_vswitch_port_offload,
+                          mock.sentinel.port_name,
+                          iov_queues_requested=iov_queues_requested,
+                          offloaded_sa=offloaded_sa)
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_hw_offload_sd_from_port_alloc')
+    def test_set_vswitch_port_offload_noop(self, mock_get_hw_offload_sd):
+        self._mock_get_switch_port_alloc()
+        self.netutils.set_vswitch_port_offload(mock.sentinel.port_name)
+        self.netutils._jobutils.modify_virt_feature.assert_not_called()
+
+    @mock.patch.object(networkutils.NetworkUtils,
+                       '_get_hw_offload_sd_from_port_alloc')
+    def test_set_vswitch_port_offload(self, mock_get_hw_offload_sd):
+        mock_port_alloc = self._mock_get_switch_port_alloc()
+        mock_hw_offload_sd = mock_get_hw_offload_sd.return_value
+        iov_queues = 1
+        offloaded_sa = 1
+
+        self.netutils.set_vswitch_port_offload(
+            mock.sentinel.port_name, True, iov_queues, True, offloaded_sa)
+
+        mock_get_hw_offload_sd.assert_called_once_with(mock_port_alloc)
+        self.netutils._jobutils.modify_virt_feature.assert_called_with(
+            mock_hw_offload_sd)
+        self.assertEqual(self.netutils._OFFLOAD_ENABLED,
+                         mock_hw_offload_sd.IOVOffloadWeight)
+        self.assertEqual(iov_queues,
+                         mock_hw_offload_sd.IOVQueuePairsRequested)
+        self.assertEqual(self.netutils._OFFLOAD_ENABLED,
+                         mock_hw_offload_sd.VMQOffloadWeight)
+        self.assertEqual(offloaded_sa,
+                         mock_hw_offload_sd.IPSecOffloadLimit)
 
     @mock.patch.object(networkutils.NetworkUtils,
                        '_get_setting_data_from_port_alloc')

@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Hyper-V can take advantage of different NIC hardware offload capabilities
+    and can assign different offloading resources to VM NICs (SR-IOV, IOV
+    queues, VMQs, IPSec).
+    hostutils can now retrieve all the different NIC hardware offloading
+    resources available to Hyper-V (depending on the physical NICs assigned).
+    networkutils can now enable / assign different NIC hardware offloading
+    resources to a given vSwitch port.

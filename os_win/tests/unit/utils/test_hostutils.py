@@ -217,6 +217,62 @@ class HostUtilsTestCase(test_base.OsWinBaseTestCase):
         self._conn_scimv2.MSFT_NetAdapter.assert_called_once_with(
             InterfaceDescription=mock.sentinel.nic_name)
 
+    @mock.patch.object(hostutils.HostUtils, '_get_nic_hw_offload_info')
+    def test_get_nic_hardware_offload_info(self, mock_get_nic_offload):
+        mock_vswitch_sd = mock.Mock(VirtualSystemIdentifier=mock.sentinel.vsid)
+        mock_hw_offload_sd = mock.Mock(SystemName=mock.sentinel.vsid)
+
+        vswitch_sds_class = self._conn.Msvm_VirtualEthernetSwitchSettingData
+        vswitch_sds_class.return_value = [mock_vswitch_sd]
+        hw_offload_class = self._conn.Msvm_EthernetSwitchHardwareOffloadData
+        hw_offload_class.return_value = [mock_hw_offload_sd]
+
+        hw_offload_info = self._hostutils.get_nic_hardware_offload_info()
+
+        self.assertEqual([mock_get_nic_offload.return_value], hw_offload_info)
+        vswitch_sds_class.assert_called_once_with()
+        hw_offload_class.assert_called_once_with()
+        mock_get_nic_offload.assert_called_once_with(mock_vswitch_sd,
+                                                     mock_hw_offload_sd)
+
+    def test_get_nic_hardware_offload_info_no_nic(self):
+        self._netutils.get_vswitch_external_network_name.return_value = None
+        mock_vswitch_sd = mock.Mock()
+
+        hw_offload_info = self._hostutils._get_nic_hw_offload_info(
+            mock_vswitch_sd, mock.sentinel.hw_offload_sd)
+
+        self.assertIsNone(hw_offload_info)
+
+    @mock.patch.object(hostutils.LOG, 'warning')
+    def test_get_nic_hw_offload_info(self, mock_warning):
+        mock_vswitch_sd = mock.Mock()
+        mock_hw_offload_sd = mock.Mock(IovVfCapacity=0)
+        mock_nic = mock.Mock()
+        self._conn_scimv2.MSFT_NetAdapter.return_value = [mock_nic]
+
+        hw_offload_info = self._hostutils._get_nic_hw_offload_info(
+            mock_vswitch_sd, mock_hw_offload_sd)
+
+        expected = {
+            'vswitch_name': mock_vswitch_sd.ElementName,
+            'device_id': mock_nic.PnPDeviceID,
+            'total_vfs': mock_hw_offload_sd.IovVfCapacity,
+            'used_vfs': mock_hw_offload_sd.IovVfUsage,
+            'total_iov_queue_pairs': mock_hw_offload_sd.IovQueuePairCapacity,
+            'used_iov_queue_pairs': mock_hw_offload_sd.IovQueuePairUsage,
+            'total_vmqs': mock_hw_offload_sd.VmqCapacity,
+            'used_vmqs': mock_hw_offload_sd.VmqUsage,
+            'total_ipsecsa': mock_hw_offload_sd.IPsecSACapacity,
+            'used_ipsecsa': mock_hw_offload_sd.IPsecSAUsage,
+        }
+        self.assertEqual(expected, hw_offload_info)
+        get_ext_net_name = self._netutils.get_vswitch_external_network_name
+        get_ext_net_name.assert_called_once_with(mock_vswitch_sd.ElementName)
+        self.assertTrue(mock_warning.called)
+        self._conn_scimv2.MSFT_NetAdapter.assert_called_once_with(
+            InterfaceDescription=get_ext_net_name.return_value)
+
     def _check_get_numa_nodes_missing_info(self):
         numa_node = mock.MagicMock()
         self._hostutils._conn.Msvm_NumaNode.return_value = [
