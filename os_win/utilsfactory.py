@@ -38,11 +38,6 @@ utils_map = {
             'max_version': None,
             'path': 'os_win.utils.hostutils10.HostUtils10'}},
     'iscsi_initiator_utils': {
-        'ISCSIInitiatorCLIUtils': {
-            'min_version': 6.0,
-            'max_version': 6.2,
-            'path': 'os_win.utils.storage.initiator.iscsi_cli_utils.'
-                    'ISCSIInitiatorCLIUtils'},
         'ISCSIInitiatorUtils': {
             'min_version': 6.2,
             'max_version': None,

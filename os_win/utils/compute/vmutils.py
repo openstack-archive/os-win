@@ -1225,6 +1225,33 @@ class VMUtils(baseutils.BaseUtilsVirt):
         # Supported on Windows Server 2016 or newer.
         pass
 
+    def populate_fsk(self, fsk_filepath, fsk_pairs):
+        """Writes the given FSK pairs into the give file.
+
+        :raises NotImplementedError: This method is required for Shielded VMs,
+            which is supported on Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('This method is supported on Windows / '
+                                    'Hyper-V Server 2016 or newer'))
+
+    def add_vtpm(self, vm_name, pdk_filepath, shielded):
+        """Adds a vtpm and enables it with encryption or shielded option.
+
+        :raises NotImplementedError: This method is required for Shielded VMs,
+            which is supported on Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('This method is supported on Windows / '
+                                    'Hyper-V Server 2016 or newer'))
+
+    def provision_vm(self, vm_name, fsk_filepath, pdk_filepath):
+        """Provisions the given VM with the given FSK and PDK files.
+
+        :raises NotImplementedError: This method is required for Shielded VMs,
+            which is supported on Windows / Hyper-V Server 2016 or newer.
+        """
+        raise NotImplementedError(_('This method is supported on Windows / '
+                                    'Hyper-V Server 2016 or newer'))
+
 
 class VMUtils6_3(VMUtils):
 

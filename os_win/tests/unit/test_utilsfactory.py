@@ -17,8 +17,11 @@
 Unit tests for the Hyper-V utils factory.
 """
 
+import inspect
+
 import mock
 from oslo_config import cfg
+from oslo_utils import importutils
 
 from os_win import exceptions
 from os_win.tests.unit import test_base
@@ -141,3 +144,45 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=processutils.ProcessUtils,
             class_type='processutils')
+
+    def test_utils_public_signatures(self):
+        for module_name in utilsfactory.utils_map.keys():
+            classes = utilsfactory.utils_map[module_name]
+            class_names = list(classes.keys())
+            if len(class_names) < 2:
+                continue
+
+            base_class_dict = classes[class_names[0]]
+            base_class = importutils.import_object(base_class_dict['path'])
+            for i in range(1, len(class_names)):
+                tested_class_dict = classes[class_names[i]]
+                tested_class = importutils.import_object(
+                    tested_class_dict['path'])
+                self.assertPublicAPISignatures(base_class, tested_class)
+                self.assertPublicAPISignatures(tested_class, base_class)
+
+    def assertPublicAPISignatures(self, baseinst, inst):
+        def get_public_apis(inst):
+            methods = {}
+            for (name, value) in inspect.getmembers(inst, inspect.ismethod):
+                if name.startswith("_"):
+                    continue
+                methods[name] = value
+            return methods
+
+        baseclass = baseinst.__class__.__name__
+        basemethods = get_public_apis(baseinst)
+        implmethods = get_public_apis(inst)
+
+        extranames = [name for name in sorted(implmethods.keys()) if
+                      name not in basemethods]
+        self.assertEqual([], extranames,
+                         "public methods not listed in class %s" % baseclass)
+
+        for name in sorted(implmethods.keys()):
+            baseargs = inspect.getargspec(basemethods[name])
+            implargs = inspect.getargspec(implmethods[name])
+
+            self.assertEqual(baseargs, implargs,
+                             "%s args don't match class %s" %
+                             (name, baseclass))
