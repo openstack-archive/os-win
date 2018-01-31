@@ -1503,6 +1503,24 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_remove_all_pci_devices(self):
         self._vmutils.remove_all_pci_devices(mock.sentinel.vm_name)
 
+    def test_populate_fsk(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.populate_fsk,
+                          mock.sentinel.fsk_filepath,
+                          mock.sentinel.fsk_pairs)
+
+    def test_add_vtpm(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.add_vtpm,
+                          mock.sentinel.vm_name, mock.sentinel.pdk_filepath,
+                          mock.sentinel.shielded)
+
+    def test_provision_vm(self):
+        self.assertRaises(NotImplementedError,
+                          self._vmutils.provision_vm,
+                          mock.sentinel.vm_name, mock.sentinel.fsk_filepath,
+                          mock.sentinel.pdk_filepath)
+
 
 class VMUtils6_3TestCase(test_base.OsWinBaseTestCase):
 
