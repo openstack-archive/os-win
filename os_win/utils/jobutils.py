@@ -20,6 +20,7 @@ Base Utility class for operations on Hyper-V.
 
 import time
 
+import monotonic
 from oslo_log import log as logging
 
 from os_win import _utils
@@ -81,7 +82,17 @@ class JobUtils(baseutils.BaseUtilsVirt):
         job_wmi_path = job_path.replace('\\', '/')
         job = self._get_wmi_obj(job_wmi_path)
 
+        # We'll log the job status from time to time.
+        last_report_time = 0
+        report_interval = 5
+
         while not self._is_job_completed(job):
+            now = monotonic.monotonic()
+            if now - last_report_time > report_interval:
+                job_details = self._get_job_details(job)
+                LOG.debug("Waiting for WMI job: %s.", job_details)
+                last_report_time = now
+
             time.sleep(0.1)
             job = self._get_wmi_obj(job_wmi_path)
 
@@ -90,24 +101,53 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
         # We'll raise an exception for killed jobs.
         job_failed = job_state not in self._successful_job_states or err_code
+        job_warnings = job_state == constants.JOB_STATE_COMPLETED_WITH_WARNINGS
+        job_details = self._get_job_details(
+            job, extended=(job_failed or job_warnings))
+
         if job_failed:
             err_sum_desc = getattr(job, 'ErrorSummaryDescription', None)
             err_desc = job.ErrorDescription
 
+            LOG.error("WMI job failed: %s.", job_details)
             raise exceptions.WMIJobFailed(job_state=job_state,
                                           error_code=err_code,
                                           error_summ_desc=err_sum_desc,
                                           error_desc=err_desc)
 
-        if job_state == constants.JOB_STATE_COMPLETED_WITH_WARNINGS:
+        if job_warnings:
             LOG.warning("WMI job completed with warnings. For detailed "
-                        "information, please check the Windows event logs.")
+                        "information, please check the Windows event logs. "
+                        "Job details: %s.", job_details)
+        else:
+            LOG.debug("WMI job succeeded: %s.", job_details)
 
-        desc = job.Description
-        elap = job.ElapsedTime
-        LOG.debug("WMI job succeeded: %(desc)s, Elapsed=%(elap)s",
-                  {'desc': desc, 'elap': elap})
         return job
+
+    @staticmethod
+    def _get_job_details(job, extended=False):
+        basic_details = [
+            "InstanceID", "Description", "ElementName", "JobStatus",
+            "ElapsedTime", "Cancellable", "JobType", "Owner",
+            "PercentComplete"]
+        extended_details = [
+            "JobState", "StatusDescriptions", "OperationalStatus",
+            "TimeSubmitted", "UntilTime", "TimeOfLastStateChange",
+            "DetailedStatus", "LocalOrUtcTime",
+            "ErrorCode", "ErrorDescription", "ErrorSummaryDescription"]
+
+        fields = list(basic_details)
+        if extended:
+            fields += extended_details
+
+        details = {}
+        for field in fields:
+            try:
+                details[field] = getattr(job, field)
+            except AttributeError:
+                continue
+
+        return details
 
     def _get_pending_jobs_affecting_element(self, element):
         # Msvm_AffectedJobElement is in fact an association between
@@ -131,10 +171,11 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def _stop_jobs(self, element):
         pending_jobs = self._get_pending_jobs_affecting_element(element)
         for job in pending_jobs:
+            job_details = self._get_job_details(job, extended=True)
             try:
                 if not job.Cancellable:
                     LOG.debug("Got request to terminate "
-                              "non-cancelable job.")
+                              "non-cancelable job: %s.", job_details)
                     continue
 
                 job.RequestStateChange(
@@ -143,15 +184,20 @@ class JobUtils(baseutils.BaseUtilsVirt):
                 # The job may had been completed right before we've
                 # attempted to kill it.
                 if not _utils._is_not_found_exc(ex):
-                    LOG.debug("Failed to stop job. Exception: %s", ex)
+                    LOG.debug("Failed to stop job. Exception: %s. "
+                              "Job details: %s.", ex, job_details)
 
         pending_jobs = self._get_pending_jobs_affecting_element(element)
         if pending_jobs:
+            pending_job_details = [self._get_job_details(job, extended=True)
+                                   for job in pending_jobs]
             LOG.debug("Attempted to terminate jobs "
                       "affecting element %(element)s but "
-                      "%(pending_count)s jobs are still pending.",
+                      "%(pending_count)s jobs are still pending: "
+                      "%(pending_jobs)s.",
                       dict(element=element,
-                           pending_count=len(pending_jobs)))
+                           pending_count=len(pending_jobs),
+                           pending_jobs=pending_job_details))
             raise exceptions.JobTerminateFailed()
 
     def _is_job_completed(self, job):
