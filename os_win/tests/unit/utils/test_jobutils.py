@@ -77,6 +77,20 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
                           self.jobutils._wait_for_job,
                           self._FAKE_JOB_PATH)
 
+    @ddt.data({"extended": False,
+               "expected_fields": ["InstanceID"]},
+              {"extended": True,
+               "expected_fields": ["InstanceID", "DetailedStatus"]})
+    @ddt.unpack
+    def test_get_job_details(self, expected_fields, extended):
+        mock_job = mock.Mock()
+
+        details = self.jobutils._get_job_details(mock_job, extended=extended)
+
+        for field in expected_fields:
+            self.assertEqual(getattr(mock_job, field),
+                             details[field])
+
     def test_get_pending_jobs(self):
         mock_killed_job = mock.Mock(JobState=constants.JOB_STATE_KILLED)
         mock_running_job = mock.Mock(JobState=constants.WMI_JOB_STATE_RUNNING)
