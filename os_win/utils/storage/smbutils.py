@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ctypes
 import os
 import socket
 
@@ -24,9 +23,6 @@ from os_win import _utils
 from os_win import exceptions
 from os_win.utils import baseutils
 from os_win.utils import win32utils
-from os_win.utils.winapi import libs as w_lib
-
-kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 
@@ -87,33 +83,6 @@ class SMBUtils(baseutils.BaseUtils):
                 if force:
                     raise exceptions.SMBException(
                         _("Could not unmount share: %s") % share_path)
-
-    # TODO(atuvenie) This method should be removed once all the callers
-    # have changed to using the get_disk_capacity method from diskutils
-    def get_share_capacity_info(self, share_path, ignore_errors=False):
-        norm_path = os.path.abspath(share_path)
-
-        total_bytes = ctypes.c_ulonglong(0)
-        free_bytes = ctypes.c_ulonglong(0)
-
-        try:
-            self._win32_utils.run_and_check_output(
-                kernel32.GetDiskFreeSpaceExW,
-                ctypes.c_wchar_p(norm_path),
-                None,
-                ctypes.pointer(total_bytes),
-                ctypes.pointer(free_bytes),
-                kernel32_lib_func=True)
-            return total_bytes.value, free_bytes.value
-        except exceptions.Win32Exception as exc:
-            LOG.error("Could not get share %(share_path)s capacity info. "
-                      "Exception: %(exc)s",
-                      dict(share_path=share_path,
-                           exc=exc))
-            if ignore_errors:
-                return 0, 0
-            else:
-                raise exc
 
     def get_smb_share_path(self, share_name):
         shares = self._smb_conn.Msft_SmbShare(Name=share_name)

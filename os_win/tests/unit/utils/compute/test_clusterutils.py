@@ -745,7 +745,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(clusterutils, 'tpool')
     @mock.patch.object(clusterutils, 'patcher')
     def test_monitor_vm_failover_no_vm(self, mock_patcher, mock_tpool):
-        self._clusterutils._watcher = mock.MagicMock()
+        mock_watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
                                          Name='Virtual Machine',
@@ -753,18 +753,19 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_tpool.execute.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
-        self._clusterutils.monitor_vm_failover(fake_callback,
-                                               mock.sentinel.event_timeout_ms)
+        self._clusterutils._monitor_vm_failover(mock_watcher,
+                                                fake_callback,
+                                                mock.sentinel.event_timeout_ms)
 
         mock_tpool.execute.assert_called_once_with(
-            self._clusterutils._watcher,
+            mock_watcher,
             mock.sentinel.event_timeout_ms)
         fake_callback.assert_not_called()
 
     @mock.patch.object(clusterutils, 'tpool')
     @mock.patch.object(clusterutils, 'patcher')
     def test_monitor_vm_failover(self, mock_patcher, mock_tpool):
-        self._clusterutils._watcher = mock.MagicMock()
+        mock_watcher = mock.MagicMock()
         fake_prev = mock.MagicMock(OwnerNode=self._FAKE_PREV_HOST)
         fake_wmi_object = mock.MagicMock(OwnerNode=self._FAKE_HOST,
                                          Name=self._FAKE_RESOURCEGROUP_NAME,
@@ -772,18 +773,20 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_tpool.execute.return_value = fake_wmi_object
         fake_callback = mock.MagicMock()
 
-        self._clusterutils.monitor_vm_failover(fake_callback)
+        self._clusterutils._monitor_vm_failover(mock_watcher, fake_callback)
 
         mock_tpool.execute.assert_called_once_with(
-            self._clusterutils._watcher,
+            mock_watcher,
             self._clusterutils._WMI_EVENT_TIMEOUT_MS)
         fake_callback.assert_called_once_with(self._FAKE_VM_NAME,
                                               self._FAKE_PREV_HOST,
                                               self._FAKE_HOST)
 
-    @mock.patch.object(clusterutils.ClusterUtils, 'monitor_vm_failover')
+    @mock.patch.object(clusterutils.ClusterUtils, '_get_failover_watcher')
+    @mock.patch.object(clusterutils.ClusterUtils, '_monitor_vm_failover')
     @mock.patch.object(clusterutils, 'time')
-    def test_get_vm_owner_change_listener(self, mock_time, mock_monitor):
+    def test_get_vm_owner_change_listener(self, mock_time,
+                                          mock_monitor, mock_get_watcher):
         mock_monitor.side_effect = [None, exceptions.OSWinException,
                                     KeyboardInterrupt]
 
@@ -793,7 +796,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
                           mock.sentinel.callback)
 
         mock_monitor.assert_has_calls(
-            [mock.call(mock.sentinel.callback,
+            [mock.call(mock_get_watcher.return_value,
+                       mock.sentinel.callback,
                        constants.DEFAULT_WMI_EVENT_TIMEOUT_MS)] * 3)
         mock_time.sleep.assert_called_once_with(
             constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
