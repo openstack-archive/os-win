@@ -22,6 +22,10 @@ where it is needed.
 * Source: http://git.openstack.org/cgit/openstack/os-win
 * Bugs: http://bugs.launchpad.net/os-win
 
+Release Notes
+-------------
+
+* https://docs.openstack.org/releasenotes/os-win
 
 How to Install
 --------------
