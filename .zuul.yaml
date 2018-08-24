@@ -1,7 +1,13 @@
 - project:
+    templates:
+      - openstack-python-jobs
+      - openstack-python35-jobs
+      - check-requirements
+      - release-notes-jobs
     check:
       jobs:
         - openstack-tox-lower-constraints
     gate:
+      queue: os-win
       jobs:
         - openstack-tox-lower-constraints
