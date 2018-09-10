@@ -24,9 +24,12 @@ import monotonic
 from oslo_log import log as logging
 
 from os_win import _utils
+import os_win.conf
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
+
+CONF = os_win.conf.CONF
 
 LOG = logging.getLogger(__name__)
 
@@ -35,7 +38,6 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
     _CONCRETE_JOB_CLASS = "Msvm_ConcreteJob"
 
-    _DEFAULT_JOB_TERMINATE_TIMEOUT = 15  # seconds
     _KILL_JOB_STATE_CHANGE_REQUEST = 5
 
     _completed_job_states = [constants.JOB_STATE_COMPLETED,
@@ -203,7 +205,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
     def _is_job_completed(self, job):
         return job.JobState in self._completed_job_states
 
-    def stop_jobs(self, element, timeout=_DEFAULT_JOB_TERMINATE_TIMEOUT):
+    def stop_jobs(self, element, timeout=None):
         """Stops the Hyper-V jobs associated with the given resource.
 
         :param element: string representing the path of the Hyper-V resource
@@ -214,6 +216,9 @@ class JobUtils(baseutils.BaseUtilsVirt):
             associated with the given resource and the given timeout amount of
             time has passed.
         """
+        if timeout is None:
+            timeout = CONF.os_win.wmi_job_terminate_timeout
+
         @_utils.retry_decorator(exceptions=exceptions.JobTerminateFailed,
                                 timeout=timeout, max_retry_count=None)
         def _stop_jobs_with_timeout():
