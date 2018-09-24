@@ -78,7 +78,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
         disks = self._get_vm_resources(vm_name,
                                        self._STORAGE_ALLOC_SETTING_DATA_CLASS)
         filtered_disks = [d for d in disks if
-                          d.ResourceSubType is not self._DVD_DISK_RES_SUB_TYPE]
+                          d.ResourceSubType != self._DVD_DISK_RES_SUB_TYPE]
 
         # enable metrics for disk.
         for disk in filtered_disks:
