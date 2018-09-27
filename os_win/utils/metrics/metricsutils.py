@@ -57,6 +57,10 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
         self._metrics_svc_obj = None
         self._metrics_defs_obj = {}
 
+        # We need to avoid a circular dependency.
+        from os_win import utilsfactory
+        self._vmutils = utilsfactory.get_vmutils(host)
+
     @property
     def _metrics_svc(self):
         if not self._metrics_svc_obj:
@@ -86,6 +90,13 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
         metrics_names = [self._CPU_METRICS, self._MEMORY_METRICS]
         self._enable_metrics(vm, metrics_names)
+
+    def enable_disk_metrics_collection(self, attached_disk_path=None,
+                                       is_physical=False,
+                                       serial=None):
+        disk = self._vmutils._get_mounted_disk_resource_from_path(
+            attached_disk_path, is_physical=is_physical, serial=serial)
+        self._enable_metrics(disk)
 
     def enable_port_metrics_collection(self, switch_port_name):
         port = self._get_switch_port(switch_port_name)
