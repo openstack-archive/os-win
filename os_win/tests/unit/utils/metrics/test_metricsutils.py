@@ -18,7 +18,9 @@ import mock
 from os_win import exceptions
 from os_win.tests.unit import test_base
 from os_win.utils import _wqlutils
+from os_win.utils.compute import vmutils
 from os_win.utils.metrics import metricsutils
+from os_win import utilsfactory
 
 
 class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
@@ -27,8 +29,16 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_RET_VAL = 0
     _FAKE_PORT = "fake's port name"
 
+    _autospec_classes = [
+        vmutils.VMUtils,
+    ]
+
     def setUp(self):
         super(MetricsUtilsTestCase, self).setUp()
+
+        mock.patch.object(utilsfactory, 'get_vmutils',
+                          mock.Mock(return_value=vmutils.VMUtils)).start()
+
         self.utils = metricsutils.MetricsUtils()
         self.utils._conn_attr = mock.MagicMock()
 
@@ -57,6 +67,22 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
                          self.utils._MEMORY_METRICS]
         mock_enable_metrics.assert_has_calls(
             [mock.call(mock_disk), mock.call(mock_vm, metrics_names)])
+
+    @mock.patch.object(metricsutils.MetricsUtils, '_enable_metrics')
+    def test_enable_disk_metrics_collection(self, mock_enable_metrics):
+        mock_get_disk = (
+            self.utils._vmutils._get_mounted_disk_resource_from_path)
+
+        self.utils.enable_disk_metrics_collection(
+            mock.sentinel.disk_path,
+            mock.sentinel.is_physical,
+            mock.sentinel.serial)
+
+        mock_get_disk.assert_called_once_with(
+            mock.sentinel.disk_path,
+            is_physical=mock.sentinel.is_physical,
+            serial=mock.sentinel.serial)
+        mock_enable_metrics.assert_called_once_with(mock_get_disk.return_value)
 
     @mock.patch.object(metricsutils.MetricsUtils, '_enable_metrics')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_switch_port')
