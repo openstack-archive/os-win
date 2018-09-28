@@ -60,6 +60,12 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_DYNAMIC_MEMORY_RATIO = 1.0
     _FAKE_MONITOR_COUNT = 1
 
+    _FAKE_MEMORY_INFO = {'DynamicMemoryEnabled': True,
+                         'Reservation': 1024,
+                         'Limit': 4096,
+                         'Weight': 5000,
+                         'MaxMemoryBlocksPerNumaNode': 2048}
+
     _FAKE_SUMMARY_INFO = {'NumberOfProcessors': 4,
                           'EnabledState': 2,
                           'MemoryUsage': 2,
@@ -143,6 +149,21 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_set_vm_memory_dynamic(self):
         self._test_set_vm_memory_dynamic(dynamic_memory_ratio=2.0)
+
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_get_vm_memory_info(self, mock_get_element_associated_class):
+        vmsetting = self._lookup_vm()
+
+        mock_s = mock.MagicMock(**self._FAKE_MEMORY_INFO)
+        mock_get_element_associated_class.return_value = [mock_s]
+
+        memory = self._vmutils.get_vm_memory_info(self._FAKE_VM_NAME)
+        self.assertEqual(self._FAKE_MEMORY_INFO, memory)
+
+        mock_get_element_associated_class.assert_called_once_with(
+            self._vmutils._compat_conn,
+            self._vmutils._MEMORY_SETTING_DATA_CLASS,
+            element_instance_id=vmsetting.InstanceID)
 
     @mock.patch.object(_wqlutils, 'get_element_associated_class')
     def _test_set_vm_memory_dynamic(self, mock_get_element_associated_class,
