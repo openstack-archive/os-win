@@ -297,7 +297,11 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
                 # the checked interval.
                 try:
                     event = listen()
-                    callback(event.ElementName)
+                    if event.ElementName:
+                        callback(event.ElementName)
+                    else:
+                        LOG.warning("Ignoring port event. "
+                                    "The port name is missing.")
                 except exceptions.x_wmi_timed_out:
                     # no new event published.
                     pass
