@@ -209,9 +209,12 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_vnic_event_listener(self, mock_get_event_query,
                                      mock_execute, mock_patcher):
         event = mock.MagicMock()
+        # This event should be ignored.
+        unnamed_port_event = mock.MagicMock(ElementName=None)
         port_class = self.netutils._conn.Msvm_SyntheticEthernetPortSettingData
         wmi_event_listener = port_class.watch_for.return_value
-        mock_execute.side_effect = [exceptions.x_wmi_timed_out, event]
+        mock_execute.side_effect = [exceptions.x_wmi_timed_out,
+                                    unnamed_port_event, event]
 
         # callback will raise an exception in order to stop iteration in the
         # listener.
@@ -229,7 +232,7 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
             mock_get_event_query.return_value)
         mock_execute.assert_has_calls(
             [mock.call(wmi_event_listener,
-                       self.netutils._VNIC_LISTENER_TIMEOUT_MS)] * 2)
+                       self.netutils._VNIC_LISTENER_TIMEOUT_MS)] * 3)
         callback.assert_called_once_with(event.ElementName)
 
     def test_get_event_wql_query(self):
