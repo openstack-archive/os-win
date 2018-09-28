@@ -34,6 +34,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
 
     _autospec_classes = [
         clusterutils._clusapi_utils.ClusApiUtils,
+        clusterutils._clusapi_utils.ClusterContextManager
     ]
 
     _FAKE_RES_NAME = "fake_res_name"
@@ -48,6 +49,11 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusterutils._conn_cluster = mock.MagicMock()
         self._clusterutils._cluster = mock.MagicMock()
         self._clusapi = self._clusterutils._clusapi_utils
+        self._cmgr = self._clusterutils._cmgr
+
+    def _cmgr_val(self, cmgr):
+        # Return the value that a mocked context manager would yield.
+        return cmgr.return_value.__enter__.return_value
 
     def test_init_hyperv_conn(self):
         fake_cluster_name = "fake_cluster"
@@ -79,34 +85,33 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(mock.sentinel.fake_node_name,
                          self._clusterutils.get_node_name())
 
-    def test_get_cluster_nodes(self):
-        fake_node1 = mock.MagicMock(Dependent=mock.sentinel.cluster_node1)
-        fake_node2 = mock.MagicMock(Dependent=mock.sentinel.cluster_node2)
-        node_list = [fake_node1, fake_node2]
-        expected = [mock.sentinel.cluster_node1, mock.sentinel.cluster_node2]
-        fake_class = self._clusterutils._conn_cluster.MSCluster_ClusterToNode
-        fake_class.return_value = node_list
+    @mock.patch.object(clusterutils.ClusterUtils, 'cluster_enum')
+    def test_get_cluster_nodes(self, mock_cluster_enum):
+        expected = mock_cluster_enum.return_value
 
         self.assertEqual(expected, self._clusterutils._get_cluster_nodes())
 
-    def test_get_vm_groups(self):
-        vm_gr1 = mock.MagicMock(GroupType=self._clusterutils._VM_GROUP_TYPE)
-        vm_gr2 = mock.MagicMock()
-        vm_gr3 = mock.MagicMock(GroupType=self._clusterutils._VM_GROUP_TYPE)
+        mock_cluster_enum.assert_called_once_with(w_const.CLUSTER_ENUM_NODE)
 
-        fake_assoc1 = mock.MagicMock(PartComponent=vm_gr1)
-        fake_assoc2 = mock.MagicMock(PartComponent=vm_gr2)
-        fake_assoc3 = mock.MagicMock(PartComponent=vm_gr3)
+    @mock.patch.object(clusterutils.ClusterUtils, 'cluster_enum')
+    @mock.patch.object(clusterutils.ClusterUtils, 'get_cluster_group_type')
+    def test_get_vm_groups(self, mock_get_type, mock_cluster_enum):
+        mock_groups = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
+        group_types = [w_const.ClusGroupTypeVirtualMachine,
+                       w_const.ClusGroupTypeVirtualMachine,
+                       mock.sentinel.some_other_group_type]
 
-        assoc_list = [fake_assoc1, fake_assoc2, fake_assoc3]
-        fake_conn = self._clusterutils._conn_cluster
-        fake_conn.MSCluster_ClusterToResourceGroup.return_value = assoc_list
+        mock_cluster_enum.return_value = mock_groups
+        mock_get_type.side_effect = group_types
 
+        exp = mock_groups[:-1]
         res = list(self._clusterutils._get_vm_groups())
 
-        self.assertIn(vm_gr1, res)
-        self.assertNotIn(vm_gr2, res)
-        self.assertIn(vm_gr3, res)
+        self.assertEqual(exp, res)
+
+        mock_cluster_enum.assert_called_once_with(w_const.CLUSTER_ENUM_GROUP)
+        mock_get_type.assert_has_calls(
+            [mock.call(r['name']) for r in mock_groups])
 
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_lookup_vm_group')
@@ -133,32 +138,6 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_lookup_res.assert_called_once_with(
             self._clusterutils._conn_cluster.MSCluster_ResourceGroup,
             self._FAKE_VM_NAME)
-
-    @mock.patch.object(clusterutils.ClusterUtils,
-                       '_lookup_vm')
-    def test_lookup_vm_check(self, mock_lookup_vm):
-        mock_lookup_vm.return_value = mock.sentinel.fake_vm
-
-        ret = self._clusterutils._lookup_vm_check(
-            self._FAKE_VM_NAME)
-        self.assertEqual(mock.sentinel.fake_vm, ret)
-
-    @mock.patch.object(clusterutils.ClusterUtils,
-                       '_lookup_vm')
-    def test_lookup_vm_check_no_vm(self, mock_lookup_vm):
-        mock_lookup_vm.return_value = None
-
-        self.assertRaises(exceptions.HyperVVMNotFoundException,
-                          self._clusterutils._lookup_vm_check,
-                          self._FAKE_VM_NAME)
-
-    @mock.patch.object(clusterutils.ClusterUtils,
-                       '_lookup_res')
-    def test_lookup_vm(self, mock_lookup_res):
-        self._clusterutils._lookup_vm(self._FAKE_VM_NAME)
-        mock_lookup_res.assert_called_once_with(
-            self._clusterutils._conn_cluster.MSCluster_Resource,
-            self._clusterutils._VM_BASE_NAME % self._FAKE_VM_NAME)
 
     def test_lookup_res_no_res(self):
         res_list = []
@@ -199,36 +178,40 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_get_cluster_nodes')
     def test_get_cluster_node_names(self, mock_get_cluster_nodes):
-        cluster_nodes = [mock.Mock(Name='node1'),
-                         mock.Mock(Name='node2')]
+        cluster_nodes = [dict(name='node1'),
+                         dict(name='node2')]
         mock_get_cluster_nodes.return_value = cluster_nodes
 
         ret = self._clusterutils.get_cluster_node_names()
 
         self.assertItemsEqual(['node1', 'node2'], ret)
 
-    @mock.patch.object(clusterutils.ClusterUtils,
-                       '_lookup_vm_group_check')
-    def test_get_vm_host(self, mock_lookup_vm_group_check):
+    @mock.patch.object(clusterutils.ClusterUtils, '_get_cluster_group_state')
+    def test_get_vm_host(self, mock_get_state):
+        # Refresh the helpers. Closures are a bit difficult to mock.
         owner_node = "fake_owner_node"
-        vm = mock.Mock(OwnerNode=owner_node)
-        mock_lookup_vm_group_check.return_value = vm
+        mock_get_state.return_value = dict(owner_node=owner_node)
 
         self.assertEqual(
             owner_node,
-            self._clusterutils.get_vm_host(self._FAKE_VM_NAME))
+            self._clusterutils.get_vm_host(mock.sentinel.vm_name))
+
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.vm_name)
+        mock_get_state.assert_called_once_with(
+            self._cmgr_val(self._cmgr.open_cluster_group))
 
     @mock.patch.object(clusterutils.ClusterUtils, '_get_vm_groups')
     def test_list_instances(self, mock_get_vm_groups):
-        mock_get_vm_groups.return_value = [mock.Mock(Name='vm1'),
-                                           mock.Mock(Name='vm2')]
+        mock_get_vm_groups.return_value = [dict(name='vm1'),
+                                           dict(name='vm2')]
         ret = self._clusterutils.list_instances()
         self.assertItemsEqual(['vm1', 'vm2'], ret)
 
     @mock.patch.object(clusterutils.ClusterUtils, '_get_vm_groups')
     def test_list_instance_uuids(self, mock_get_vm_groups):
-        mock_get_vm_groups.return_value = [mock.Mock(Id='uuid1'),
-                                           mock.Mock(Id='uuid2')]
+        mock_get_vm_groups.return_value = [dict(id='uuid1'),
+                                           dict(id='uuid2')]
         ret = self._clusterutils.list_instance_uuids()
         self.assertItemsEqual(['uuid1', 'uuid2'], ret)
 
@@ -257,21 +240,21 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
                          self._clusterutils._FAILBACK_WINDOW_MAX)
         vm_group.put.assert_called_once_with()
 
-    @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm_check')
-    def test_bring_online(self, mock_lookup_vm_check):
-        vm = mock.MagicMock()
-        mock_lookup_vm_check.return_value = vm
+    def test_bring_online(self):
+        self._clusterutils.bring_online(mock.sentinel.vm_name)
 
-        self._clusterutils.bring_online(self._FAKE_VM_NAME)
-        vm.BringOnline.assert_called_once_with()
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.vm_name)
+        self._clusapi.online_cluster_group.assert_called_once_with(
+            self._cmgr_val(self._cmgr.open_cluster_group))
 
-    @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm')
-    def test_take_offline(self, mock_lookup_vm):
-        vm = mock.MagicMock()
-        mock_lookup_vm.return_value = vm
+    def test_take_offline(self):
+        self._clusterutils.take_offline(mock.sentinel.vm_name)
 
-        self._clusterutils.take_offline(self._FAKE_VM_NAME)
-        vm.TakeOffline.assert_called_once_with()
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.vm_name)
+        self._clusapi.offline_cluster_group.assert_called_once_with(
+            self._cmgr_val(self._cmgr.open_cluster_group))
 
     @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm_group')
     def test_delete(self, mock_lookup_vm_group):
@@ -282,18 +265,41 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         vm.DestroyGroup.assert_called_once_with(
             self._clusterutils._DESTROY_GROUP)
 
-    @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm')
-    def test_vm_exists_true(self, mock_lookup_vm):
-        vm = mock.MagicMock()
-        mock_lookup_vm.return_value = vm
+    def test_cluster_enum(self):
+        cluster_objects = [mock.Mock(), mock.Mock()]
 
-        self.assertTrue(self._clusterutils.vm_exists(self._FAKE_VM_NAME))
+        self._clusapi.cluster_get_enum_count.return_value = len(
+            cluster_objects)
+        self._clusapi.cluster_enum.side_effect = cluster_objects
 
-    @mock.patch.object(clusterutils.ClusterUtils, '_lookup_vm')
-    def test_vm_exists_false(self, mock_lookup_vm):
-        mock_lookup_vm.return_value = None
+        exp_ret_val = [dict(version=item.dwVersion,
+                            type=item.dwType,
+                            id=item.lpszId,
+                            name=item.lpszName) for item in cluster_objects]
+        ret_val = list(self._clusterutils.cluster_enum(mock.sentinel.obj_type))
 
-        self.assertFalse(self._clusterutils.vm_exists(self._FAKE_VM_NAME))
+        self.assertEqual(exp_ret_val, ret_val)
+
+        enum_handle = self._cmgr_val(self._cmgr.open_cluster_enum)
+        self._cmgr.open_cluster_enum.assert_called_once_with(
+            mock.sentinel.obj_type)
+        self._clusapi.cluster_get_enum_count.assert_called_once_with(
+            enum_handle)
+        self._clusapi.cluster_enum.assert_has_calls(
+            [mock.call(enum_handle, idx)
+             for idx in range(len(cluster_objects))])
+
+    @ddt.data(True, False)
+    def test_vm_exists(self, exists):
+        self._cmgr.open_cluster_resource.side_effect = (
+            None if exists else exceptions.ClusterObjectNotFound('test'))
+
+        self.assertEqual(
+            exists,
+            self._clusterutils.vm_exists(self._FAKE_VM_NAME))
+
+        self._cmgr.open_cluster_resource.assert_called_once_with(
+            self._FAKE_RESOURCEGROUP_NAME)
 
     @mock.patch.object(clusterutils.ClusterUtils, '_migrate_vm')
     def test_live_migrate_vm(self, mock_migrate_vm):
@@ -354,15 +360,15 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             w_const.CLUSAPI_GROUP_MOVE_QUEUE_ENABLED |
             w_const.CLUSAPI_GROUP_MOVE_HIGH_PRIORITY_START)
 
-        exp_clus_h = self._clusapi.open_cluster.return_value
-        exp_clus_node_h = self._clusapi.open_cluster_node.return_value
-        exp_clus_group_h = self._clusapi.open_cluster_group.return_value
+        exp_clus_h = self._cmgr_val(self._cmgr.open_cluster)
+        exp_clus_node_h = self._cmgr_val(self._cmgr.open_cluster_node)
+        exp_clus_group_h = self._cmgr_val(self._cmgr.open_cluster_group)
 
-        self._clusapi.open_cluster.assert_called_once_with()
-        self._clusapi.open_cluster_group.assert_called_once_with(
-            exp_clus_h, self._FAKE_VM_NAME)
-        self._clusapi.open_cluster_node.assert_called_once_with(
-            exp_clus_h, self._FAKE_HOST)
+        self._cmgr.open_cluster.assert_called_once_with()
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            self._FAKE_VM_NAME, cluster_handle=exp_clus_h)
+        self._cmgr.open_cluster_node.assert_called_once_with(
+            self._FAKE_HOST, cluster_handle=exp_clus_h)
 
         self._clusapi.move_cluster_group.assert_called_once_with(
             exp_clus_group_h, exp_clus_node_h, expected_migrate_flags,
@@ -385,12 +391,6 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
                 constants.CLUSTER_GROUP_ONLINE,
                 self._FAKE_HOST)
 
-        self._clusapi.close_cluster_group.assert_called_once_with(
-            exp_clus_group_h)
-        self._clusapi.close_cluster_node.assert_called_once_with(
-            exp_clus_node_h)
-        self._clusapi.close_cluster.assert_called_once_with(exp_clus_h)
-
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_cancel_cluster_group_migration')
     @mock.patch.object(clusterutils.ClusterUtils,
@@ -409,7 +409,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             group_name=self._FAKE_VM_NAME,
             time_elapsed=10)
         mock_wait_group.side_effect = timeout_exc
-        mock_listener = mock_listener_cls.return_value.__enter__.return_value
+        mock_listener = self._cmgr_val(mock_listener_cls)
         mock_validate_migr.side_effect = (
             (None, ) if finished_after_cancel
             else exceptions.ClusterGroupMigrationFailed(
@@ -432,7 +432,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
                               self._clusterutils._migrate_vm,
                               *migrate_args)
 
-        exp_clus_group_h = self._clusapi.open_cluster_group.return_value
+        exp_clus_group_h = self._cmgr_val(self._cmgr.open_cluster_group)
         mock_cancel_migr.assert_called_once_with(
             mock_listener, self._FAKE_VM_NAME, exp_clus_group_h,
             mock.sentinel.exp_state, mock.sentinel.timeout)
@@ -478,8 +478,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_cancel_cluster_group_migration_public(self, mock_listener_cls,
                                                    mock_cancel_migr):
 
-        exp_clus_h = self._clusapi.open_cluster.return_value
-        exp_clus_group_h = self._clusapi.open_cluster_group.return_value
+        exp_clus_h = self._cmgr_val(self._cmgr.open_cluster)
+        exp_clus_group_h = self._cmgr_val(self._cmgr.open_cluster_group)
 
         mock_listener = mock_listener_cls.return_value
         mock_listener.__enter__.return_value = mock_listener
@@ -489,9 +489,9 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.expected_state,
             mock.sentinel.timeout)
 
-        self._clusapi.open_cluster.assert_called_once_with()
-        self._clusapi.open_cluster_group.assert_called_once_with(
-            exp_clus_h, mock.sentinel.group_name)
+        self._cmgr.open_cluster.assert_called_once_with()
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.group_name, cluster_handle=exp_clus_h)
 
         mock_listener.__enter__.assert_called_once_with()
         mock_listener_cls.assert_called_once_with(exp_clus_h,
@@ -502,10 +502,6 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
             exp_clus_group_h,
             mock.sentinel.expected_state,
             mock.sentinel.timeout)
-
-        self._clusapi.close_cluster.assert_called_once_with(exp_clus_h)
-        self._clusapi.close_cluster_group.assert_called_once_with(
-            exp_clus_group_h)
 
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_get_cluster_group_state')
@@ -680,6 +676,39 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_listener.get.assert_called_once_with(None)
 
+    @mock.patch.object(clusterutils.ClusterUtils, '_get_cluster_nodes')
+    def get_cluster_node_name(self, mock_get_nodes):
+        fake_node = dict(id=mock.sentinel.vm_id,
+                         name=mock.sentinel.vm_name)
+        mock_get_nodes.return_value([fake_node])
+
+        self.assertEqual(
+            mock.sentinel.vm_name,
+            self._clusterutils.get_cluster_node_name(mock.sentinel.vm_id))
+        self.assertRaises(
+            exceptions.NotFound,
+            self._clusterutils.get_cluster_node_name(mock.sentinel.missing_id))
+
+    @mock.patch('ctypes.byref')
+    def test_get_cluster_group_type(self, mock_byref):
+        mock_byref.side_effect = lambda x: ('byref', x)
+        self._clusapi.cluster_group_control.return_value = (
+            mock.sentinel.buff, mock.sentinel.buff_sz)
+
+        ret_val = self._clusterutils.get_cluster_group_type(
+            mock.sentinel.group_name)
+        self.assertEqual(
+            self._clusapi.get_cluster_group_type.return_value,
+            ret_val)
+
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.group_name)
+        self._clusapi.cluster_group_control.assert_called_once_with(
+            self._cmgr_val(self._cmgr.open_cluster_group),
+            w_const.CLUSCTL_GROUP_GET_RO_COMMON_PROPERTIES)
+        self._clusapi.get_cluster_group_type.assert_called_once_with(
+            mock_byref(mock.sentinel.buff), mock.sentinel.buff_sz)
+
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_get_cluster_group_state')
     @mock.patch.object(clusterutils.ClusterUtils,
@@ -687,8 +716,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_cluster_group_state_info(self, mock_is_migr_queued,
                                           mock_get_gr_state):
 
-        exp_clus_h = self._clusapi.open_cluster.return_value
-        exp_clus_group_h = self._clusapi.open_cluster_group.return_value
+        exp_clus_group_h = self._cmgr_val(self._cmgr.open_cluster_group)
 
         mock_get_gr_state.return_value = dict(
             state=mock.sentinel.state,
@@ -703,16 +731,11 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(exp_sts_info, sts_info)
 
-        self._clusapi.open_cluster.assert_called_once_with()
-        self._clusapi.open_cluster_group.assert_called_once_with(
-            exp_clus_h, mock.sentinel.group_name)
+        self._cmgr.open_cluster_group.assert_called_once_with(
+            mock.sentinel.group_name)
 
         mock_get_gr_state.assert_called_once_with(exp_clus_group_h)
         mock_is_migr_queued.assert_called_once_with(mock.sentinel.status_info)
-
-        self._clusapi.close_cluster.assert_called_once_with(exp_clus_h)
-        self._clusapi.close_cluster_group.assert_called_once_with(
-            exp_clus_group_h)
 
     @mock.patch('ctypes.byref')
     def test_get_cluster_group_state(self, mock_byref):
@@ -802,16 +825,48 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_time.sleep.assert_called_once_with(
             constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
 
+    @mock.patch.object(clusterutils._ClusterGroupOwnerChangeListener, 'get')
+    @mock.patch.object(clusterutils.ClusterUtils, 'get_cluster_node_name')
+    @mock.patch.object(clusterutils.ClusterUtils, 'get_cluster_group_type')
+    @mock.patch.object(clusterutils, 'time')
+    def test_get_vm_owner_change_listener_v2(self, mock_time, mock_get_type,
+                                             mock_get_node_name,
+                                             mock_get_event):
+        mock_get_type.side_effect = [
+            w_const.ClusGroupTypeVirtualMachine,
+            mock.sentinel.other_type]
+        mock_events = [mock.MagicMock(), mock.MagicMock()]
+        mock_get_event.side_effect = (
+            mock_events + [exceptions.OSWinException, KeyboardInterrupt])
+        callback = mock.Mock()
+
+        listener = self._clusterutils.get_vm_owner_change_listener_v2()
+        self.assertRaises(KeyboardInterrupt,
+                          listener,
+                          callback)
+
+        callback.assert_called_once_with(
+            mock_events[0]['cluster_object_name'],
+            mock_get_node_name.return_value)
+        mock_get_node_name.assert_called_once_with(mock_events[0]['parent_id'])
+        mock_get_type.assert_any_call(mock_events[0]['cluster_object_name'])
+        mock_time.sleep.assert_called_once_with(
+            constants.DEFAULT_WMI_EVENT_TIMEOUT_MS / 1000)
+
 
 class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(clusterutils._ClusterEventListener, '_setup')
     def setUp(self, mock_setup):
         super(ClusterEventListenerTestCase, self).setUp()
 
+        self._setup_listener()
+
+    def _setup_listener(self, stop_on_error=True):
         self._listener = clusterutils._ClusterEventListener(
             mock.sentinel.cluster_handle,
-            mock.sentinel.notif_filters_list)
+            stop_on_error=stop_on_error)
 
+        self._listener._running = True
         self._listener._clusapi_utils = mock.Mock()
         self._clusapi = self._listener._clusapi_utils
 
@@ -871,8 +926,6 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.notif_key)
 
     def test_signal_stopped(self):
-        self._listener._running = True
-
         self._listener._signal_stopped()
 
         self.assertFalse(self._listener._running)
@@ -895,7 +948,6 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
         events = [mock.sentinel.ignored_event, mock.sentinel.retrieved_event]
         self._clusapi.get_cluster_notify_v2.side_effect = events
 
-        self._listener._running = True
         self._listener._notif_port_h = mock.sentinel.notif_port_h
 
         def fake_process_event(event):
@@ -919,8 +971,6 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
             timeout_ms=-1)
 
     def test_listen_exception(self):
-        self._listener._running = True
-
         self._clusapi.get_cluster_notify_v2.side_effect = (
             test_base.TestingException)
 
@@ -928,8 +978,21 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
 
         self.assertFalse(self._listener._running)
 
+    @mock.patch.object(clusterutils._ClusterEventListener, '_setup')
+    @mock.patch.object(clusterutils.time, 'sleep')
+    def test_listen_ignore_exception(self, mock_sleep, mock_setup):
+        self._setup_listener(stop_on_error=False)
+
+        self._clusapi.get_cluster_notify_v2.side_effect = (
+            test_base.TestingException,
+            KeyboardInterrupt)
+
+        self.assertRaises(KeyboardInterrupt, self._listener._listen)
+        self.assertTrue(self._listener._running)
+        mock_sleep.assert_called_once_with(
+            self._listener._error_sleep_interval)
+
     def test_get_event(self):
-        self._listener._running = True
         self._listener._event_queue = mock.Mock()
 
         event = self._listener.get(timeout=mock.sentinel.timeout)
@@ -939,6 +1002,7 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
             timeout=mock.sentinel.timeout)
 
     def test_get_event_listener_stopped(self):
+        self._listener._running = False
         self.assertRaises(exceptions.OSWinException,
                           self._listener.get,
                           timeout=1)

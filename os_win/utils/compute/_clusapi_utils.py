@@ -13,8 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import contextlib
 import ctypes
 
+from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import win32utils
@@ -115,6 +117,14 @@ class ClusApiUtils(object):
                                             **self._open_handle_check_flags)
         return handle
 
+    def open_cluster_enum(self, cluster_handle, object_type):
+        return self._run_and_check_output(
+            clusapi.ClusterOpenEnumEx,
+            cluster_handle,
+            object_type,
+            None,  # pOptions, reserved for future use.
+            **self._open_handle_check_flags)
+
     def open_cluster_group(self, cluster_handle, group_name):
         handle = self._run_and_check_output(clusapi.OpenClusterGroup,
                                             cluster_handle,
@@ -126,6 +136,13 @@ class ClusApiUtils(object):
         handle = self._run_and_check_output(clusapi.OpenClusterNode,
                                             cluster_handle,
                                             ctypes.c_wchar_p(node_name),
+                                            **self._open_handle_check_flags)
+        return handle
+
+    def open_cluster_resource(self, cluster_handle, resource_name):
+        handle = self._run_and_check_output(clusapi.OpenClusterResource,
+                                            cluster_handle,
+                                            ctypes.c_wchar_p(resource_name),
                                             **self._open_handle_check_flags)
         return handle
 
@@ -141,6 +158,25 @@ class ClusApiUtils(object):
 
     def close_cluster_node(self, node_handle):
         clusapi.CloseClusterNode(node_handle)
+
+    def close_cluster_resource(self, resource_handle):
+        clusapi.CloseClusterResource(resource_handle)
+
+    def close_cluster_enum(self, enum_handle):
+        clusapi.ClusterCloseEnumEx(enum_handle)
+
+    def online_cluster_group(self, group_handle, destination_node_handle=None):
+        self._run_and_check_output(clusapi.OnlineClusterGroup,
+                                   group_handle,
+                                   destination_node_handle)
+
+    def destroy_cluster_group(self, group_handle):
+        self._run_and_check_output(clusapi.DestroyClusterGroup,
+                                   group_handle)
+
+    def offline_cluster_group(self, group_handle):
+        self._run_and_check_output(clusapi.OfflineClusterGroup,
+                                   group_handle)
 
     def cancel_cluster_group_operation(self, group_handle):
         """Requests a pending move operation to be canceled.
@@ -239,6 +275,9 @@ class ClusApiUtils(object):
     def get_cluster_notify_v2(self, notif_port_h, timeout_ms):
         filter_and_type = clusapi_def.NOTIFY_FILTER_AND_TYPE()
         obj_name_buff_sz = ctypes.c_ulong(w_const.MAX_PATH)
+        obj_type_buff_sz = ctypes.c_ulong(w_const.MAX_PATH)
+        obj_id_buff_sz = ctypes.c_ulong(w_const.MAX_PATH)
+        parent_id_buff_sz = ctypes.c_ulong(w_const.MAX_PATH)
         notif_key_p = wintypes.PDWORD()
         buff_sz = ctypes.c_ulong(w_const.MAX_PATH)
 
@@ -246,33 +285,53 @@ class ClusApiUtils(object):
         # on the event type and filter flags.
         buff = (wintypes.BYTE * buff_sz.value)()
         obj_name_buff = (ctypes.c_wchar * obj_name_buff_sz.value)()
+        obj_type_buff = (ctypes.c_wchar * obj_type_buff_sz.value)()
+        obj_id_buff = (ctypes.c_wchar * obj_id_buff_sz.value)()
+        parent_id_buff = (ctypes.c_wchar * parent_id_buff_sz.value)()
 
-        def get_args(buff, obj_name_buff):
-            return (clusapi.GetClusterNotifyV2,
-                    notif_port_h,
-                    ctypes.byref(notif_key_p),
-                    ctypes.byref(filter_and_type),
-                    buff,
-                    ctypes.byref(buff_sz),
-                    None,  # object id
-                    None,  # object id sz
-                    None,  # parent id
-                    None,  # parent id sz
-                    obj_name_buff,
-                    ctypes.byref(obj_name_buff_sz),
-                    None,  # object type
-                    None,  # object type sz
-                    timeout_ms)
         try:
-            self._run_and_check_output(*get_args(buff, obj_name_buff))
+            self._run_and_check_output(
+                clusapi.GetClusterNotifyV2,
+                notif_port_h,
+                ctypes.byref(notif_key_p),
+                ctypes.byref(filter_and_type),
+                buff,
+                ctypes.byref(buff_sz),
+                obj_id_buff,
+                ctypes.byref(obj_id_buff_sz),
+                parent_id_buff,
+                ctypes.byref(parent_id_buff_sz),
+                obj_name_buff,
+                ctypes.byref(obj_name_buff_sz),
+                obj_type_buff,
+                ctypes.byref(obj_type_buff_sz),
+                timeout_ms)
         except exceptions.ClusterWin32Exception as ex:
             if ex.error_code == w_const.ERROR_MORE_DATA:
                 # This function will specify the buffer sizes it needs using
                 # the references we pass.
                 buff = (wintypes.BYTE * buff_sz.value)()
                 obj_name_buff = (ctypes.c_wchar * obj_name_buff_sz.value)()
+                parent_id_buff = (ctypes.c_wchar * parent_id_buff_sz.value)()
+                obj_type_buff = (ctypes.c_wchar * obj_type_buff_sz.value)()
+                obj_id_buff = (ctypes.c_wchar * obj_id_buff_sz.value)()
 
-                self._run_and_check_output(*get_args(buff, obj_name_buff))
+                self._run_and_check_output(
+                    clusapi.GetClusterNotifyV2,
+                    notif_port_h,
+                    ctypes.byref(notif_key_p),
+                    ctypes.byref(filter_and_type),
+                    buff,
+                    ctypes.byref(buff_sz),
+                    obj_id_buff,
+                    ctypes.byref(obj_id_buff_sz),
+                    parent_id_buff,
+                    ctypes.byref(parent_id_buff_sz),
+                    obj_name_buff,
+                    ctypes.byref(obj_name_buff_sz),
+                    obj_type_buff,
+                    ctypes.byref(obj_type_buff_sz),
+                    timeout_ms)
             else:
                 raise
 
@@ -281,8 +340,11 @@ class ClusApiUtils(object):
         # the notification port.
         notif_key = notif_key_p.contents.value
         event = {'cluster_object_name': obj_name_buff.value,
+                 'object_id': obj_id_buff.value,
                  'object_type': filter_and_type.dwObjectType,
+                 'object_type_str': obj_type_buff.value,
                  'filter_flags': filter_and_type.FilterFlags,
+                 'parent_id': parent_id_buff.value,
                  'buff': buff,
                  'buff_sz': buff_sz.value,
                  'notif_key': notif_key}
@@ -354,17 +416,154 @@ class ClusApiUtils(object):
 
         return out_buff, out_buff_sz.value
 
-    def get_cluster_group_status_info(self, prop_list_p, prop_list_sz):
+    def get_prop_list_entry_value(self, prop_list_p, prop_list_sz,
+                                  entry_name, entry_type, entry_syntax):
         prop_entry = self.get_prop_list_entry_p(
-            prop_list_p, prop_list_sz,
-            w_const.CLUSREG_NAME_GRP_STATUS_INFORMATION)
+            prop_list_p, prop_list_sz, entry_name)
 
-        if (prop_entry['length'] != ctypes.sizeof(ctypes.c_ulonglong) or
-                prop_entry['syntax'] !=
-                w_const.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER):
+        if (prop_entry['length'] != ctypes.sizeof(entry_type) or
+                prop_entry['syntax'] != entry_syntax):
             raise exceptions.ClusterPropertyListParsingError()
 
-        status_info_p = prop_entry['val_p']
-        status_info = ctypes.c_ulonglong.from_address(
-            status_info_p.value).value
-        return status_info
+        return entry_type.from_address(prop_entry['val_p'].value).value
+
+    def get_cluster_group_status_info(self, prop_list_p, prop_list_sz):
+        return self.get_prop_list_entry_value(
+            prop_list_p, prop_list_sz,
+            w_const.CLUSREG_NAME_GRP_STATUS_INFORMATION,
+            ctypes.c_ulonglong,
+            w_const.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER)
+
+    def get_cluster_group_type(self, prop_list_p, prop_list_sz):
+        return self.get_prop_list_entry_value(
+            prop_list_p, prop_list_sz,
+            w_const.CLUSREG_NAME_GRP_TYPE,
+            wintypes.DWORD,
+            w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD)
+
+    def cluster_get_enum_count(self, enum_handle):
+        return self._run_and_check_output(
+            clusapi.ClusterGetEnumCountEx,
+            enum_handle,
+            error_on_nonzero_ret_val=False,
+            ret_val_is_err_code=False)
+
+    def cluster_enum(self, enum_handle, index):
+        item_sz = wintypes.DWORD(0)
+
+        self._run_and_check_output(
+            clusapi.ClusterEnumEx,
+            enum_handle,
+            index,
+            None,
+            ctypes.byref(item_sz),
+            ignored_error_codes=[w_const.ERROR_MORE_DATA])
+
+        item_buff = (ctypes.c_ubyte * item_sz.value)()
+
+        self._run_and_check_output(
+            clusapi.ClusterEnumEx,
+            enum_handle,
+            index,
+            ctypes.byref(item_buff),
+            ctypes.byref(item_sz))
+
+        return ctypes.cast(item_buff,
+                           clusapi_def.PCLUSTER_ENUM_ITEM).contents
+
+
+class ClusterContextManager(object):
+    _CLUSTER_HANDLE = 0
+    _NODE_HANDLE = 1
+    _GROUP_HANDLE = 2
+    _RESOURCE_HANDLE = 3
+    _ENUM_HANDLE = 4
+
+    _HANDLE_TYPES = [
+        _CLUSTER_HANDLE, _NODE_HANDLE, _GROUP_HANDLE, _RESOURCE_HANDLE,
+        _ENUM_HANDLE
+    ]
+
+    def __init__(self):
+        self._clusapi_utils = ClusApiUtils()
+
+    def open_cluster(self, cluster_name=None):
+        return self._open(cluster_name, self._CLUSTER_HANDLE)
+
+    def open_cluster_group(self, group_name, cluster_handle=None):
+        return self._open(group_name, self._GROUP_HANDLE, cluster_handle)
+
+    def open_cluster_resource(self, resource_name, cluster_handle=None):
+        return self._open(resource_name, self._RESOURCE_HANDLE, cluster_handle)
+
+    def open_cluster_node(self, node_name, cluster_handle=None):
+        return self._open(node_name, self._NODE_HANDLE, cluster_handle)
+
+    def open_cluster_enum(self, object_type, cluster_handle=None):
+        return self._open(object_type, self._ENUM_HANDLE, cluster_handle)
+
+    def _check_handle_type(self, handle_type):
+        if handle_type not in self._HANDLE_TYPES:
+            err_msg = _("Invalid cluster handle type: %(handle_type)s. "
+                        "Allowed handle types: %(allowed_types)s.")
+            raise exceptions.Invalid(
+                err_msg % dict(handle_type=handle_type,
+                               allowed_types=self._HANDLE_TYPES))
+
+    def _close(self, handle, handle_type):
+        self._check_handle_type(handle_type)
+
+        if not handle:
+            return
+
+        cutils = self._clusapi_utils
+        helper_map = {
+            self._CLUSTER_HANDLE: cutils.close_cluster,
+            self._RESOURCE_HANDLE: cutils.close_cluster_resource,
+            self._GROUP_HANDLE: cutils.close_cluster_group,
+            self._NODE_HANDLE: cutils.close_cluster_node,
+            self._ENUM_HANDLE: cutils.close_cluster_enum,
+        }
+        helper_map[handle_type](handle)
+
+    @contextlib.contextmanager
+    def _open(self, name=None, handle_type=_CLUSTER_HANDLE,
+              cluster_handle=None):
+        self._check_handle_type(handle_type)
+
+        ext_cluster_handle = cluster_handle is not None
+        handle = None
+        try:
+            # We accept a cluster handle, avoiding opening it again.
+            if not cluster_handle:
+                cluster_name = (name if handle_type == self._CLUSTER_HANDLE
+                                else None)
+                cluster_handle = self._clusapi_utils.open_cluster(cluster_name)
+
+            cutils = self._clusapi_utils
+            helper_map = {
+                self._CLUSTER_HANDLE: lambda x, y: x,
+                self._RESOURCE_HANDLE: cutils.open_cluster_resource,
+                self._GROUP_HANDLE: cutils.open_cluster_group,
+                self._NODE_HANDLE: cutils.open_cluster_node,
+                self._ENUM_HANDLE: cutils.open_cluster_enum,
+            }
+            handle = helper_map[handle_type](cluster_handle, name)
+
+            yield handle
+        except exceptions.ClusterWin32Exception as win32_ex:
+            if win32_ex.error_code in w_const.CLUSTER_NOT_FOUND_ERROR_CODES:
+                err_msg = _("Could not find the specified cluster object. "
+                            "Object type: %(obj_type)s. "
+                            "Object name: %(name)s.")
+                raise exceptions.ClusterObjectNotFound(
+                    err_msg % dict(obj_type=handle_type,
+                                   name=name))
+            else:
+                raise
+        finally:
+            if handle_type != self._CLUSTER_HANDLE:
+                self._close(handle, handle_type)
+
+            if not ext_cluster_handle:
+                self._close(cluster_handle, self._CLUSTER_HANDLE)
