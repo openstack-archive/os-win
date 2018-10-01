@@ -72,6 +72,7 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def _check_enable_metrics(self, metrics=None, definition=None):
         mock_element = mock.MagicMock()
+        self.utils._metrics_svc.ControlMetrics.return_value = [0]
 
         self.utils._enable_metrics(mock_element, metrics)
 
@@ -89,6 +90,17 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
         self.utils._metrics_defs_obj = {metrics_name: metrics_def}
         self._check_enable_metrics([metrics_name, mock.sentinel.metrics_name],
                                    metrics_def.path_.return_value)
+
+    def test_enable_metrics_exception(self):
+        metric_name = self.utils._CPU_METRICS
+        metric_def = mock.MagicMock()
+        self.utils._metrics_defs_obj = {metric_name: metric_def}
+
+        self.utils._metrics_svc.ControlMetrics.return_value = [1]
+        self.assertRaises(exceptions.OSWinException,
+                          self.utils._enable_metrics,
+                          mock.MagicMock(),
+                          [metric_name])
 
     @mock.patch.object(metricsutils.MetricsUtils, '_get_metrics')
     @mock.patch.object(metricsutils.MetricsUtils, '_get_vm_resources')
@@ -376,7 +388,7 @@ class MetricsUtilsTestCase(test_base.OsWinBaseTestCase):
         result = self.utils._get_switch_port(mock.sentinel.port_name)
 
         self.assertEqual(mock_unique_result.return_value, result)
-        conn_class = self.utils._conn.Msvm_SyntheticEthernetPortSettingData
+        conn_class = self.utils._conn.Msvm_EthernetPortAllocationSettingData
         conn_class.assert_called_once_with(ElementName=mock.sentinel.port_name)
         mock_unique_result.assert_called_once_with(conn_class.return_value,
                                                    mock.sentinel.port_name)
