@@ -645,6 +645,18 @@ class VMUtils(baseutils.BaseUtilsVirt):
                       "to remove vm nic: '%s'. It may have been already "
                       "deleted.", nic_name)
 
+    def _get_vm_nics(self, vm_name):
+        vmsettings = self._lookup_vm_check(vm_name)
+        nics = _wqlutils.get_element_associated_class(
+            self._compat_conn,
+            self._SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS,
+            element_instance_id=vmsettings.InstanceId)
+        return nics
+
+    def get_vm_nic_names(self, vm_name):
+        nics = self._get_vm_nics(vm_name)
+        return [nic.ElementName for nic in nics]
+
     def soft_shutdown_vm(self, vm_name):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)
         shutdown_component = self._conn.Msvm_ShutdownComponent(

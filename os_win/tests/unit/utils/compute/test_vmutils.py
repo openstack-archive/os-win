@@ -736,6 +736,30 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.remove_virt_resource.assert_called_once_with(
             mock_nic_data)
 
+    @mock.patch.object(vmutils.VMUtils, '_lookup_vm_check')
+    @mock.patch.object(_wqlutils, 'get_element_associated_class')
+    def test_get_vm_nics(self, mock_get_assoc, mock_lookup_vm):
+        vnics = self._vmutils._get_vm_nics(mock.sentinel.vm_name)
+
+        self.assertEqual(mock_get_assoc.return_value, vnics)
+        mock_lookup_vm.assert_called_once_with(mock.sentinel.vm_name)
+        mock_get_assoc.assert_called_once_with(
+            self._vmutils._compat_conn,
+            self._vmutils._SYNTHETIC_ETHERNET_PORT_SETTING_DATA_CLASS,
+            element_instance_id=mock_lookup_vm.return_value.InstanceId)
+
+    @mock.patch.object(vmutils.VMUtils, '_get_vm_nics')
+    def test_get_vm_nic_names(self, mock_get_vm_nics):
+        exp_nic_names = ['port1', 'port2']
+
+        mock_get_vm_nics.return_value = [
+            mock.Mock(ElementName=nic_name)
+            for nic_name in exp_nic_names]
+        nic_names = self._vmutils.get_vm_nic_names(mock.sentinel.vm_name)
+
+        self.assertEqual(exp_nic_names, nic_names)
+        mock_get_vm_nics.assert_called_once_with(mock.sentinel.vm_name)
+
     def test_set_vm_state(self):
         mock_vm = self._lookup_vm()
         mock_vm.RequestStateChange.return_value = (
