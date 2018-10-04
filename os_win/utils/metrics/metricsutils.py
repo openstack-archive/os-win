@@ -106,10 +106,17 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
 
         element_path = element.path_()
         for definition_path in definition_paths:
-            self._metrics_svc.ControlMetrics(
+            ret_val = self._metrics_svc.ControlMetrics(
                 Subject=element_path,
                 Definition=definition_path,
-                MetricCollectionEnabled=self._METRICS_ENABLED)
+                MetricCollectionEnabled=self._METRICS_ENABLED)[0]
+            if ret_val:
+                err_msg = _("Failed to enable metrics for resource "
+                            "%(resource_name)s. "
+                            "Return code: %(ret_val)s.") % dict(
+                                resource_name=element.ElementName,
+                                ret_val=ret_val)
+                raise exceptions.OSWinException(err_msg)
 
     def get_cpu_metrics(self, vm_name):
         vm = self._get_vm(vm_name)
@@ -264,7 +271,7 @@ class MetricsUtils(baseutils.BaseUtilsVirt):
         return self._unique_result(vms, vm_name)
 
     def _get_switch_port(self, port_name):
-        ports = self._conn.Msvm_SyntheticEthernetPortSettingData(
+        ports = self._conn.Msvm_EthernetPortAllocationSettingData(
             ElementName=port_name)
         return self._unique_result(ports, port_name)
 
