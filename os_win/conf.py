@@ -29,6 +29,11 @@ os_win_opts = [
                      'almost all operations require a reference to a '
                      'switch port. The cached objects are no longer valid '
                      'if the VM they are associated with is destroyed.'),
+    cfg.IntOpt('wmi_job_terminate_timeout',
+               default=120,
+               help='The default amount of seconds to wait when stopping '
+                    'pending WMI jobs. Setting this value to 0 will '
+                    'disable the timeout.'),
 ]
 
 CONF = cfg.CONF
