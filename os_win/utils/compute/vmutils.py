@@ -997,9 +997,9 @@ class VMUtils(baseutils.BaseUtilsVirt):
             pass
         return constants.VM_GEN_1
 
-    def stop_vm_jobs(self, vm_name):
+    def stop_vm_jobs(self, vm_name, timeout=None):
         vm = self._lookup_vm_check(vm_name, as_vssd=False)
-        self._jobutils.stop_jobs(vm)
+        self._jobutils.stop_jobs(vm, timeout)
 
     def enable_secure_boot(self, vm_name, msft_ca_required):
         """Enables Secure Boot for the instance with the given name.

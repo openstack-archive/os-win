@@ -1225,7 +1225,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._vmutils.stop_vm_jobs(mock.sentinel.vm_name)
 
-        self._vmutils._jobutils.stop_jobs.assert_called_once_with(mock_vm)
+        self._vmutils._jobutils.stop_jobs.assert_called_once_with(
+            mock_vm, None)
 
     def test_set_secure_boot(self):
         vs_data = mock.MagicMock()
