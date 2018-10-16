@@ -716,7 +716,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             raise exceptions.HyperVException(_('Cannot get VM summary data '
                                                'for: %s') % port.ElementName)
 
-        return summary_info[0].EnabledState is self._HYPERV_VM_STATE_ENABLED
+        return summary_info[0].EnabledState == self._HYPERV_VM_STATE_ENABLED
 
     def create_security_rules(self, switch_port_name, sg_rules):
         port = self._get_switch_port_allocation(switch_port_name)[0]
@@ -748,7 +748,7 @@ class NetworkUtils(baseutils.BaseUtilsVirt):
             self._conn, self._PORT_EXT_ACL_SET_DATA,
             element_instance_id=port.InstanceID)
         filtered_acls = [a for a in acls if
-                         a.Action is not self._ACL_ACTION_METER]
+                         a.Action != self._ACL_ACTION_METER]
 
         if filtered_acls:
             self._jobutils.remove_multiple_virt_features(filtered_acls)
