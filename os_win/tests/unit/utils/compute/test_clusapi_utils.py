@@ -155,6 +155,20 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(self._mock_run.return_value, handle)
 
+    def test_open_cluster_enum(self):
+        handle = self._clusapi_utils.open_cluster_enum(
+            mock.sentinel.cluster_handle,
+            mock.sentinel.object_type)
+
+        self._mock_run.assert_called_once_with(
+            self._clusapi.ClusterOpenEnumEx,
+            mock.sentinel.cluster_handle,
+            mock.sentinel.object_type,
+            None,
+            **self._clusapi_utils._open_handle_check_flags)
+
+        self.assertEqual(self._mock_run.return_value, handle)
+
     def test_open_cluster_group(self):
         self._mock_ctypes()
 
@@ -185,6 +199,21 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self.assertEqual(self._mock_run.return_value, handle)
 
+    def test_open_cluster_resource(self):
+        self._mock_ctypes()
+
+        handle = self._clusapi_utils.open_cluster_resource(
+            mock.sentinel.cluster_handle,
+            mock.sentinel.resource_name)
+
+        self._mock_run.assert_called_once_with(
+            self._clusapi.OpenClusterResource,
+            mock.sentinel.cluster_handle,
+            self._ctypes.c_wchar_p(mock.sentinel.resource_name),
+            **self._clusapi_utils._open_handle_check_flags)
+
+        self.assertEqual(self._mock_run.return_value, handle)
+
     def test_close_cluster(self):
         self._clusapi_utils.close_cluster(mock.sentinel.handle)
         self._clusapi.CloseCluster.assert_called_once_with(
@@ -199,6 +228,36 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusapi_utils.close_cluster_node(mock.sentinel.handle)
         self._clusapi.CloseClusterNode.assert_called_once_with(
             mock.sentinel.handle)
+
+    def test_close_cluster_resource(self):
+        self._clusapi_utils.close_cluster_resource(mock.sentinel.handle)
+        self._clusapi.CloseClusterResource.assert_called_once_with(
+            mock.sentinel.handle)
+
+    def test_close_cluster_enum(self):
+        self._clusapi_utils.close_cluster_enum(mock.sentinel.handle)
+        self._clusapi.ClusterCloseEnumEx.assert_called_once_with(
+            mock.sentinel.handle)
+
+    def test_online_cluster_group(self):
+        self._clusapi_utils.online_cluster_group(mock.sentinel.group_handle,
+                                                 mock.sentinel.dest_handle)
+        self._mock_run.assert_called_once_with(
+            self._clusapi.OnlineClusterGroup,
+            mock.sentinel.group_handle,
+            mock.sentinel.dest_handle)
+
+    def test_destroy_cluster_group(self):
+        self._clusapi_utils.destroy_cluster_group(mock.sentinel.group_handle)
+        self._mock_run.assert_called_once_with(
+            self._clusapi.DestroyClusterGroup,
+            mock.sentinel.group_handle)
+
+    def test_offline_cluster_group(self):
+        self._clusapi_utils.offline_cluster_group(mock.sentinel.group_handle)
+        self._mock_run.assert_called_once_with(
+            self._clusapi.OfflineClusterGroup,
+            mock.sentinel.group_handle)
 
     @ddt.data(0, w_const.ERROR_IO_PENDING)
     def test_cancel_cluster_group_operation(self, cancel_ret_val):
@@ -323,6 +382,9 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         fake_filter_flags = 4
         fake_clus_obj_name = 'fake-changed-clus-object'
         fake_event_buff = 'fake-event-buff'
+        fake_obj_type = 'fake-object-type'
+        fake_obj_id = 'fake-obj-id'
+        fake_parent_id = 'fake-parent-id'
 
         notif_key = ctypes.c_ulong(fake_notif_key)
         requested_buff_sz = 1024
@@ -344,16 +406,31 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             buff_sz = ctypes.cast(
                 p_buff_sz,
                 wintypes.PDWORD).contents
+            obj_type_sz = ctypes.cast(
+                p_obj_type_sz,
+                wintypes.PDWORD).contents
+            obj_id_sz = ctypes.cast(
+                p_obj_id_buff_sz,
+                wintypes.PDWORD).contents
+            parent_id_buff_sz = ctypes.cast(
+                p_parent_id_buff_sz,
+                wintypes.PDWORD).contents
 
             # We'll just request the tested method to pass us
             # a buffer this large.
             if (buff_sz.value < requested_buff_sz or
-                    obj_name_buff_sz.value < requested_buff_sz):
+                    obj_name_buff_sz.value < requested_buff_sz or
+                    parent_id_buff_sz.value < requested_buff_sz or
+                    obj_type_sz.value < requested_buff_sz or
+                    obj_id_sz.value < requested_buff_sz):
                 buff_sz.value = requested_buff_sz
                 obj_name_buff_sz.value = requested_buff_sz
+                parent_id_buff_sz.value = requested_buff_sz
+                obj_type_sz.value = requested_buff_sz
+                obj_id_sz.value = requested_buff_sz
                 raise exceptions.ClusterWin32Exception(
                     error_code=w_const.ERROR_MORE_DATA,
-                    func_name='GetClusterNotify',
+                    func_name='GetClusterNotifyV2',
                     error_message='error more data')
 
             pp_notif_key = ctypes.cast(pp_notif_key, ctypes.c_void_p)
@@ -366,23 +443,23 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             filter_and_type.dwObjectType = fake_notif_type
             filter_and_type.FilterFlags = fake_filter_flags
 
-            obj_name_buff = ctypes.cast(
-                p_obj_name_buff,
-                ctypes.POINTER(
-                    ctypes.c_wchar *
-                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
-            obj_name_buff = obj_name_buff.contents
-            ctypes.memset(obj_name_buff, 0, obj_name_buff_sz.value)
-            obj_name_buff.value = fake_clus_obj_name
+            def set_wchar_buff(p_wchar_buff, wchar_buff_sz, value):
+                wchar_buff = ctypes.cast(
+                    p_wchar_buff,
+                    ctypes.POINTER(
+                        ctypes.c_wchar *
+                        (wchar_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
+                wchar_buff = wchar_buff.contents
+                ctypes.memset(wchar_buff, 0, wchar_buff_sz)
+                wchar_buff.value = value
+                return wchar_buff
 
-            buff = ctypes.cast(
-                p_buff,
-                ctypes.POINTER(
-                    ctypes.c_wchar *
-                    (requested_buff_sz // ctypes.sizeof(ctypes.c_wchar))))
-            buff = buff.contents
-            ctypes.memset(buff, 0, buff_sz.value)
-            buff.value = fake_event_buff
+            set_wchar_buff(p_obj_name_buff, requested_buff_sz,
+                           fake_clus_obj_name)
+            set_wchar_buff(p_buff, requested_buff_sz, fake_event_buff)
+            set_wchar_buff(p_parent_id_buff, requested_buff_sz, fake_parent_id)
+            set_wchar_buff(p_obj_type, requested_buff_sz, fake_obj_type)
+            set_wchar_buff(p_obj_id_buff, requested_buff_sz, fake_obj_id)
 
             self.assertEqual(mock.sentinel.timeout_ms, timeout_ms)
 
@@ -399,8 +476,11 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         event['buff'] = w_event_buff.split('\x00')[0]
 
         expected_event = dict(cluster_object_name=fake_clus_obj_name,
+                              object_id=fake_obj_id,
                               object_type=fake_notif_type,
+                              object_type_str=fake_obj_type,
                               filter_flags=fake_filter_flags,
+                              parent_id=fake_parent_id,
                               buff=fake_event_buff,
                               buff_sz=requested_buff_sz,
                               notif_key=fake_notif_key)
@@ -419,7 +499,11 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
                 w_const.CLUSREG_NAME_GRP_STATUS_INFORMATION,
                 w_const.CLUSPROP_SYNTAX_LIST_VALUE_ULARGE_INTEGER,
                 ctypes.c_ulonglong(w_const.
-                    CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE))  # noqa
+                    CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE)),  # noqa
+            self._clusapi_utils.get_property_list_entry(
+                w_const.CLUSREG_NAME_GRP_TYPE,
+                w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
+                ctypes.c_ulonglong(w_const.ClusGroupTypeVirtualMachine)),
         ]
 
         prop_list = self._clusapi_utils.get_property_list(prop_entries)
@@ -527,3 +611,180 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(
             w_const.CLUSGRP_STATUS_WAITING_IN_QUEUE_FOR_MOVE,
             status_info)
+
+    def test_get_cluster_group_type(self):
+        prop_list = self._get_fake_prop_list()
+
+        status_info = self._clusapi_utils.get_cluster_group_type(
+            ctypes.byref(prop_list), ctypes.sizeof(prop_list))
+        self.assertEqual(
+            w_const.ClusGroupTypeVirtualMachine,
+            status_info)
+
+    def test_cluster_get_enum_count(self):
+        ret_val = self._clusapi_utils.cluster_get_enum_count(
+            mock.sentinel.enum_handle)
+
+        self.assertEqual(self._mock_run.return_value, ret_val)
+        self._mock_run.assert_called_once_with(
+            self._clusapi.ClusterGetEnumCountEx,
+            mock.sentinel.enum_handle,
+            error_on_nonzero_ret_val=False,
+            ret_val_is_err_code=False)
+
+    def test_cluster_enum(self):
+        obj_id = 'fake_obj_id'
+        obj_id_wchar_p = ctypes.c_wchar_p(obj_id)
+
+        requested_buff_sz = 1024
+
+        def fake_cluster_enum(func, enum_handle, index, buff_p, buff_sz_p,
+                              ignored_error_codes=tuple()):
+            self.assertEqual(self._clusapi.ClusterEnumEx, func)
+            self.assertEqual(mock.sentinel.enum_handle, enum_handle)
+            self.assertEqual(mock.sentinel.index, index)
+
+            buff_sz = ctypes.cast(
+                buff_sz_p,
+                wintypes.PDWORD).contents
+            # We'll just request the tested method to pass us
+            # a buffer this large.
+            if (buff_sz.value < requested_buff_sz):
+                buff_sz.value = requested_buff_sz
+                if w_const.ERROR_MORE_DATA not in ignored_error_codes:
+                    raise exceptions.ClusterWin32Exception(
+                        error_code=w_const.ERROR_MORE_DATA)
+                return
+
+            item = ctypes.cast(
+                buff_p,
+                clusapi_def.PCLUSTER_ENUM_ITEM).contents
+            item.lpszId = obj_id_wchar_p
+            item.cbId = len(obj_id)
+
+        self._mock_run.side_effect = fake_cluster_enum
+
+        item = self._clusapi_utils.cluster_enum(
+            mock.sentinel.enum_handle, mock.sentinel.index)
+        self.assertEqual(obj_id, item.lpszId)
+
+
+@ddt.ddt
+class TestClusterContextManager(test_base.OsWinBaseTestCase):
+    _autospec_classes = [_clusapi_utils.ClusApiUtils]
+
+    def setUp(self):
+        super(TestClusterContextManager, self).setUp()
+
+        self._cmgr = _clusapi_utils.ClusterContextManager()
+        self._clusapi_utils = self._cmgr._clusapi_utils
+
+    @ddt.data(None, mock.sentinel.cluster_name)
+    def test_open_cluster(self, cluster_name):
+        with self._cmgr.open_cluster(cluster_name) as f:
+            self._clusapi_utils.open_cluster.assert_called_once_with(
+                cluster_name)
+            self.assertEqual(f, self._clusapi_utils.open_cluster.return_value)
+
+        self._clusapi_utils.close_cluster.assert_called_once_with(
+            self._clusapi_utils.open_cluster.return_value)
+
+    def test_open_cluster_group(self):
+        with self._cmgr.open_cluster_group(mock.sentinel.group_name) as f:
+            self._clusapi_utils.open_cluster.assert_called_once_with(None)
+            self._clusapi_utils.open_cluster_group.assert_called_once_with(
+                self._clusapi_utils.open_cluster.return_value,
+                mock.sentinel.group_name)
+
+            self.assertEqual(
+                f,
+                self._clusapi_utils.open_cluster_group.return_value)
+
+        self._clusapi_utils.close_cluster_group.assert_called_once_with(
+            self._clusapi_utils.open_cluster_group.return_value)
+        self._clusapi_utils.close_cluster.assert_called_once_with(
+            self._clusapi_utils.open_cluster.return_value)
+
+    def test_open_missing_cluster_group(self):
+        exc = exceptions.ClusterWin32Exception(
+            func_name='OpenClusterGroup',
+            message='expected exception',
+            error_code=w_const.ERROR_GROUP_NOT_FOUND)
+        self._clusapi_utils.open_cluster_group.side_effect = exc
+
+        self.assertRaises(
+            exceptions.ClusterObjectNotFound,
+            self._cmgr.open_cluster_group(mock.sentinel.group_name).__enter__)
+
+    def test_open_cluster_group_with_handle(self):
+        with self._cmgr.open_cluster_group(
+                mock.sentinel.group_name,
+                cluster_handle=mock.sentinel.cluster_handle) as f:
+            self._clusapi_utils.open_cluster.assert_not_called()
+            self._clusapi_utils.open_cluster_group.assert_called_once_with(
+                mock.sentinel.cluster_handle, mock.sentinel.group_name)
+
+            self.assertEqual(
+                f,
+                self._clusapi_utils.open_cluster_group.return_value)
+
+        self._clusapi_utils.close_cluster_group.assert_called_once_with(
+            self._clusapi_utils.open_cluster_group.return_value)
+        # If we pass our own handle, we don't want the tested method to
+        # close it.
+        self._clusapi_utils.close_cluster.assert_not_called()
+
+    def test_open_cluster_resource(self):
+        with self._cmgr.open_cluster_resource(mock.sentinel.res_name) as f:
+            self._clusapi_utils.open_cluster.assert_called_once_with(None)
+            self._clusapi_utils.open_cluster_resource.assert_called_once_with(
+                self._clusapi_utils.open_cluster.return_value,
+                mock.sentinel.res_name)
+
+            self.assertEqual(
+                f,
+                self._clusapi_utils.open_cluster_resource.return_value)
+
+        self._clusapi_utils.close_cluster_resource.assert_called_once_with(
+            self._clusapi_utils.open_cluster_resource.return_value)
+        self._clusapi_utils.close_cluster.assert_called_once_with(
+            self._clusapi_utils.open_cluster.return_value)
+
+    def test_open_cluster_node(self):
+        with self._cmgr.open_cluster_node(mock.sentinel.node_name) as f:
+            self._clusapi_utils.open_cluster.assert_called_once_with(None)
+            self._clusapi_utils.open_cluster_node.assert_called_once_with(
+                self._clusapi_utils.open_cluster.return_value,
+                mock.sentinel.node_name)
+
+            self.assertEqual(
+                f,
+                self._clusapi_utils.open_cluster_node.return_value)
+
+        self._clusapi_utils.close_cluster_node.assert_called_once_with(
+            self._clusapi_utils.open_cluster_node.return_value)
+        self._clusapi_utils.close_cluster.assert_called_once_with(
+            self._clusapi_utils.open_cluster.return_value)
+
+    def test_open_cluster_enum(self):
+        with self._cmgr.open_cluster_enum(mock.sentinel.object_type) as f:
+            self._clusapi_utils.open_cluster.assert_called_once_with(None)
+            self._clusapi_utils.open_cluster_enum.assert_called_once_with(
+                self._clusapi_utils.open_cluster.return_value,
+                mock.sentinel.object_type)
+
+            self.assertEqual(
+                f,
+                self._clusapi_utils.open_cluster_enum.return_value)
+
+        self._clusapi_utils.close_cluster_enum.assert_called_once_with(
+            self._clusapi_utils.open_cluster_enum.return_value)
+        self._clusapi_utils.close_cluster.assert_called_once_with(
+            self._clusapi_utils.open_cluster.return_value)
+
+    def test_invalid_handle_type(self):
+        self.assertRaises(exceptions.Invalid,
+                          self._cmgr._open(handle_type=None).__enter__)
+        self.assertRaises(exceptions.Invalid,
+                          self._cmgr._close, mock.sentinel.handle,
+                          handle_type=None)

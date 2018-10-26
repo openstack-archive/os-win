@@ -27,6 +27,18 @@ class NOTIFY_FILTER_AND_TYPE(ctypes.Structure):
     ]
 
 
+class CLUSTER_ENUM_ITEM(ctypes.Structure):
+    _fields_ = [
+        ('dwVersion', wintypes.DWORD),
+        ('dwType', wintypes.DWORD),
+        ('cbId', wintypes.DWORD),
+        ('lpszId', wintypes.LPWSTR),
+        ('cbName', wintypes.DWORD),
+        ('lpszName', wintypes.LPWSTR)
+    ]
+
+
+PCLUSTER_ENUM_ITEM = ctypes.POINTER(CLUSTER_ENUM_ITEM)
 PNOTIFY_FILTER_AND_TYPE = ctypes.POINTER(NOTIFY_FILTER_AND_TYPE)
 
 
@@ -49,8 +61,27 @@ def register():
     lib_handle.CloseClusterNode.argtypes = [wintypes.HANDLE]
     lib_handle.CloseClusterNode.restype = wintypes.BOOL
 
+    lib_handle.CloseClusterResource.argtypes = [wintypes.HANDLE]
+    lib_handle.CloseClusterResource.restype = wintypes.BOOL
+
     lib_handle.CloseClusterNotifyPort.argtypes = [wintypes.HANDLE]
     lib_handle.CloseClusterNotifyPort.restype = wintypes.BOOL
+
+    lib_handle.ClusterCloseEnumEx.argtypes = [wintypes.HANDLE]
+    lib_handle.ClusterCloseEnumEx.restype = wintypes.BOOL
+
+    lib_handle.ClusterEnumEx.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.PVOID,
+        wintypes.LPDWORD
+    ]
+    lib_handle.ClusterEnumEx.restype = wintypes.DWORD
+
+    lib_handle.ClusterGetEnumCountEx.argtypes = [
+        wintypes.HANDLE,
+    ]
+    lib_handle.ClusterGetEnumCountEx.restype = wintypes.DWORD
 
     lib_handle.ClusterGroupControl.argtypes = [
         wintypes.HANDLE,
@@ -63,6 +94,18 @@ def register():
         wintypes.LPVOID
     ]
     lib_handle.ClusterGroupControl.restype = wintypes.DWORD
+
+    lib_handle.ClusterOpenEnumEx.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.PVOID
+    ]
+    lib_handle.ClusterOpenEnumEx.restype = wintypes.HANDLE
+
+    lib_handle.DestroyClusterGroup.argtypes = [
+        wintypes.HANDLE
+    ]
+    lib_handle.DestroyClusterGroup.restype = wintypes.DWORD
 
     lib_handle.GetClusterGroupState.argtypes = [
         wintypes.HANDLE,
@@ -107,6 +150,17 @@ def register():
     ]
     lib_handle.MoveClusterGroupEx.restype = wintypes.DWORD
 
+    lib_handle.OfflineClusterGroup.argtypes = [
+        wintypes.HANDLE
+    ]
+    lib_handle.OfflineClusterGroup.restype = wintypes.DWORD
+
+    lib_handle.OnlineClusterGroup.argtypes = [
+        wintypes.HANDLE,
+        wintypes.HANDLE,
+    ]
+    lib_handle.OnlineClusterGroup.restype = wintypes.DWORD
+
     lib_handle.OpenCluster.argtypes = [wintypes.LPCWSTR]
     lib_handle.OpenCluster.restype = wintypes.HANDLE
 
@@ -121,3 +175,9 @@ def register():
         wintypes.LPCWSTR
     ]
     lib_handle.OpenClusterNode.restype = wintypes.HANDLE
+
+    lib_handle.OpenClusterResource.argtypes = [
+        wintypes.HANDLE,
+        wintypes.LPCWSTR
+    ]
+    lib_handle.OpenClusterResource.restype = wintypes.HANDLE

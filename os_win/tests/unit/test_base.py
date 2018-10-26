@@ -47,7 +47,7 @@ class BaseTestCase(base.BaseTestCase):
 
     def _patch_autospec_classes(self):
         for class_type in self._autospec_classes:
-            mocked_class = mock.Mock(autospec=class_type)
+            mocked_class = mock.MagicMock(autospec=class_type)
             patcher = mock.patch(
                 '.'.join([class_type.__module__, class_type.__name__]),
                 mocked_class)
