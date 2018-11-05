@@ -72,6 +72,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual({}, self.netutils._switches)
 
     def test_init_caches(self):
+        self.netutils._enable_cache = True
+
         self.netutils._switches = {}
         self.netutils._switch_ports = {}
         self.netutils._vlan_sds = {}
@@ -125,6 +127,8 @@ class NetworkUtilsTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual({}, self.netutils._switch_ports)
 
     def test_update_cache(self):
+        self.netutils._enable_cache = True
+
         self.netutils._switch_ports[mock.sentinel.other] = mock.sentinel.port
         conn = self.netutils._conn
         mock_port = mock.MagicMock(ElementName=mock.sentinel.port_name)

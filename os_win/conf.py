@@ -23,12 +23,14 @@ os_win_opts = [
                help='Fibre Channel hbaapi library path. If no custom hbaapi '
                     'library is requested, the default one will be used.'),
     cfg.BoolOpt('cache_temporary_wmi_objects',
-                default=True,
+                default=False,
                 help='Caches temporary WMI objects in order to increase '
                      'performance. This only affects networkutils, where '
                      'almost all operations require a reference to a '
                      'switch port. The cached objects are no longer valid '
-                     'if the VM they are associated with is destroyed.'),
+                     'if the VM they are associated with is destroyed. '
+                     'WARNING: use with caution, the cache may become '
+                     'invalid when certain resources are recreated.'),
     cfg.IntOpt('wmi_job_terminate_timeout',
                default=120,
                help='The default amount of seconds to wait when stopping '
