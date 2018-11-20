@@ -82,14 +82,31 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
               {"extended": True,
                "expected_fields": ["InstanceID", "DetailedStatus"]})
     @ddt.unpack
-    def test_get_job_details(self, expected_fields, extended):
+    @mock.patch.object(jobutils.JobUtils, '_get_job_error_details')
+    def test_get_job_details(self, mock_get_job_err, expected_fields,
+                             extended):
         mock_job = mock.Mock()
-
         details = self.jobutils._get_job_details(mock_job, extended=extended)
+
+        if extended:
+            mock_get_job_err.assert_called_once_with(mock_job)
+            self.assertEqual(details['RawErrors'],
+                             mock_get_job_err.return_value)
 
         for field in expected_fields:
             self.assertEqual(getattr(mock_job, field),
                              details[field])
+
+    def test_get_job_error_details(self):
+        mock_job = mock.Mock()
+        error_details = self.jobutils._get_job_error_details(mock_job)
+        mock_job.GetErrorEx.assert_called_once_with()
+        self.assertEqual(mock_job.GetErrorEx.return_value, error_details)
+
+    def test_get_job_error_details_exception(self):
+        mock_job = mock.Mock()
+        mock_job.GetErrorEx.side_effect = Exception
+        self.assertIsNone(self.jobutils._get_job_error_details(mock_job))
 
     def test_get_pending_jobs(self):
         mock_killed_job = mock.Mock(JobState=constants.JOB_STATE_KILLED)
