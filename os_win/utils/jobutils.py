@@ -126,8 +126,13 @@ class JobUtils(baseutils.BaseUtilsVirt):
 
         return job
 
-    @staticmethod
-    def _get_job_details(job, extended=False):
+    def _get_job_error_details(self, job):
+        try:
+            return job.GetErrorEx()
+        except Exception:
+            LOG.error("Could not get job '%s' error details.", job.InstanceID)
+
+    def _get_job_details(self, job, extended=False):
         basic_details = [
             "InstanceID", "Description", "ElementName", "JobStatus",
             "ElapsedTime", "Cancellable", "JobType", "Owner",
@@ -139,10 +144,13 @@ class JobUtils(baseutils.BaseUtilsVirt):
             "ErrorCode", "ErrorDescription", "ErrorSummaryDescription"]
 
         fields = list(basic_details)
+        details = {}
+
         if extended:
             fields += extended_details
+            err_details = self._get_job_error_details(job)
+            details['RawErrors'] = err_details
 
-        details = {}
         for field in fields:
             try:
                 details[field] = getattr(job, field)
