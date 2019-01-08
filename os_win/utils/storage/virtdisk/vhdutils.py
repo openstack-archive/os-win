@@ -589,6 +589,11 @@ class VHDUtils(object):
             return handle
 
     def detach_virtual_disk(self, vhd_path):
+        if not os.path.exists(vhd_path):
+            LOG.debug("Image %s could not be found. Skipping detach.",
+                      vhd_path)
+            return
+
         open_access_mask = w_const.VIRTUAL_DISK_ACCESS_DETACH
         handle = self._open(vhd_path, open_access_mask=open_access_mask)
 
