@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.import mock
 
+import ddt
 import mock
 import six
 
@@ -24,6 +25,7 @@ from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import wintypes
 
 
+@ddt.ddt
 class IOUtilsTestCase(test_base.BaseTestCase):
 
     _autospec_classes = [
@@ -62,6 +64,40 @@ class IOUtilsTestCase(test_base.BaseTestCase):
                                                mock.sentinel.arg,
                                                **self._run_args)
         self.assertEqual(self._mock_run.return_value, ret_val)
+
+    @ddt.data({},
+              {'inherit_handle': True},
+              {'sec_attr': mock.sentinel.sec_attr})
+    @ddt.unpack
+    @mock.patch.object(wintypes, 'HANDLE')
+    @mock.patch.object(wintypes, 'SECURITY_ATTRIBUTES')
+    def test_create_pipe(self, mock_sec_attr_cls, mock_handle_cls,
+                         inherit_handle=False, sec_attr=None):
+        r, w = self._ioutils.create_pipe(
+            sec_attr, mock.sentinel.size, inherit_handle)
+
+        exp_sec_attr = None
+        if sec_attr:
+            exp_sec_attr = sec_attr
+        elif inherit_handle:
+            exp_sec_attr = mock_sec_attr_cls.return_value
+
+        self.assertEqual(mock_handle_cls.return_value.value, r)
+        self.assertEqual(mock_handle_cls.return_value.value, w)
+
+        self._mock_run.assert_called_once_with(
+            ioutils.kernel32.CreatePipe,
+            self._ctypes.byref(mock_handle_cls.return_value),
+            self._ctypes.byref(mock_handle_cls.return_value),
+            self._ctypes.byref(exp_sec_attr) if exp_sec_attr else None,
+            mock.sentinel.size,
+            **self._run_args)
+
+        if not sec_attr and exp_sec_attr:
+            self.assertEqual(inherit_handle, exp_sec_attr.bInheritHandle)
+            self.assertEqual(self._ctypes.sizeof.return_value,
+                             exp_sec_attr.nLength)
+            self._ctypes.sizeof.assert_called_once_with(exp_sec_attr)
 
     def test_wait_named_pipe(self):
         fake_timeout_s = 10
@@ -206,6 +242,26 @@ class IOUtilsTestCase(test_base.BaseTestCase):
                                                **self._run_args)
         mock_wait_io_completion.assert_called_once_with(mock_event)
 
+    @mock.patch.object(wintypes, 'DWORD')
+    def test_read_file(self, mock_dword):
+        num_bytes_read = mock_dword.return_value
+
+        ret_val = self._ioutils.read_file(
+            mock.sentinel.handle,
+            mock.sentinel.buff,
+            mock.sentinel.num_bytes,
+            mock.sentinel.overlapped_struct)
+
+        self.assertEqual(num_bytes_read.value, ret_val)
+        self._mock_run.assert_called_once_with(
+            ioutils.kernel32.ReadFile,
+            mock.sentinel.handle,
+            mock.sentinel.buff,
+            mock.sentinel.num_bytes,
+            self._ctypes.byref(num_bytes_read),
+            self._ctypes.byref(mock.sentinel.overlapped_struct),
+            **self._run_args)
+
     @mock.patch.object(ioutils.IOUtils, '_reset_event')
     @mock.patch.object(ioutils.IOUtils, '_wait_io_completion')
     def test_write(self, mock_wait_io_completion, mock_reset_event):
@@ -226,6 +282,25 @@ class IOUtilsTestCase(test_base.BaseTestCase):
                                                mock.sentinel.compl_routine,
                                                **self._run_args)
         mock_wait_io_completion.assert_called_once_with(mock_event)
+
+    @mock.patch.object(wintypes, 'DWORD')
+    def test_write_file(self, mock_dword):
+        num_bytes_written = mock_dword.return_value
+        ret_val = self._ioutils.write_file(
+            mock.sentinel.handle,
+            mock.sentinel.buff,
+            mock.sentinel.num_bytes,
+            mock.sentinel.overlapped_struct)
+
+        self.assertEqual(num_bytes_written.value, ret_val)
+        self._mock_run.assert_called_once_with(
+            ioutils.kernel32.WriteFile,
+            mock.sentinel.handle,
+            mock.sentinel.buff,
+            mock.sentinel.num_bytes,
+            self._ctypes.byref(num_bytes_written),
+            self._ctypes.byref(mock.sentinel.overlapped_struct),
+            **self._run_args)
 
     def test_buffer_ops(self):
         mock.patch.stopall()

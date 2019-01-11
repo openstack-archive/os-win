@@ -101,3 +101,11 @@ if sys.platform == 'win32':
         None, DWORD, DWORD, LPOVERLAPPED)
 else:
     LPOVERLAPPED_COMPLETION_ROUTINE = PVOID
+
+
+class SECURITY_ATTRIBUTES(ctypes.Structure):
+    _fields_ = [
+        ('nLength', DWORD),
+        ('lpSecurityDescriptor', LPVOID),
+        ('bInheritHandle', BOOL)
+    ]

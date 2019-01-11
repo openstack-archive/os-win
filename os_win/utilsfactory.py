@@ -132,7 +132,15 @@ utils_map = {
         'ProcessUtils': {
             'min_version': 6.2,
             'max_version': None,
-            'path': 'os_win.utils.processutils.ProcessUtils'}}
+            'path': 'os_win.utils.processutils.ProcessUtils'},
+    },
+    'ioutils': {
+        'IOUtils': {
+            'min_version': 6.2,
+            'max_version': None,
+            'path': 'os_win.utils.io.ioutils.IOUtils'
+        }
+    }
 }
 
 
@@ -234,3 +242,7 @@ def get_migrationutils():
 
 def get_processutils():
     return _get_class(class_type='processutils')
+
+
+def get_ioutils():
+    return _get_class(class_type='ioutils')
