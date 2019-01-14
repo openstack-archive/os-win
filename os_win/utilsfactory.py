@@ -22,125 +22,80 @@ from os_win.utils.io import namedpipe
 
 utils = hostutils.HostUtils()
 
+DEFAULT_MIN_VERSION = 6.2
+DEFAULT_MAX_VERSION = None
+
+
 utils_map = {
-    'diskutils': {
-        'DiskUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.diskutils.DiskUtils'}},
-    'hostutils': {
-        'HostUtils': {
-            'min_version': 6.2,
-            'max_version': 10,
-            'path': 'os_win.utils.hostutils.HostUtils'},
-        'HostUtils10': {
-            'min_version': 10,
-            'max_version': None,
-            'path': 'os_win.utils.hostutils10.HostUtils10'}},
-    'iscsi_initiator_utils': {
-        'ISCSIInitiatorUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.initiator.iscsi_utils.'
-                    'ISCSIInitiatorUtils'}},
-    'iscsi_target_utils': {
-        'ISCSITargetUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.target.iscsi_target_utils.'
-                    'ISCSITargetUtils'}},
-    'fc_utils': {
-        'FCUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.initiator.fc_utils.'
-                    'FCUtils'}},
-    'livemigrationutils': {
-        'LiveMigrationUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.compute.livemigrationutils.'
-                    'LiveMigrationUtils'}},
-    'metricsutils': {
-        'MetricsUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.metrics.metricsutils.MetricsUtils'}},
-    'migrationutils': {
-        'MigrationUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.compute.migrationutils.MigrationUtils'}},
-    'networkutils': {
-        'NetworkUtils': {
-            'min_version': 6.2,
-            'max_version': 6.3,
-            'path': 'os_win.utils.network.networkutils.NetworkUtils'},
-        'NetworkUtilsR2': {
-            'min_version': 6.3,
-            'max_version': None,
-            'path': 'os_win.utils.network.networkutils.NetworkUtilsR2'}},
-    'nvgreutils': {
-        'NvgreUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.network.nvgreutils.NvgreUtils'}},
-    'pathutils': {
-        'PathUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.pathutils.PathUtils'}},
-    'rdpconsoleutils': {
-        'RDPConsoleUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.compute.rdpconsoleutils.RDPConsoleUtils'}},
-    'smbutils': {
-        'SMBUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.smbutils.SMBUtils'}},
-    'vhdutils': {
-        'VHDUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.storage.virtdisk.vhdutils.VHDUtils'}},
-    'vmutils': {
-        'VMUtils': {
-            'min_version': 6.2,
-            'max_version': 6.3,
-            'path': 'os_win.utils.compute.vmutils.VMUtils'},
-        'VMUtils6_3': {
-            'min_version': 6.3,
-            'max_version': 10,
-            'path': 'os_win.utils.compute.vmutils.VMUtils6_3'},
-        'VMUtils10': {
-            'min_version': 10,
-            'max_version': None,
-            'path': 'os_win.utils.compute.vmutils10.VMUtils10'}},
-    'clusterutils': {
-        'ClusterUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.compute.clusterutils.ClusterUtils'}},
-    'dnsutils': {
-        'DNSUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.dns.dnsutils.DNSUtils'}},
-    'processutils': {
-        'ProcessUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.processutils.ProcessUtils'},
-    },
-    'ioutils': {
-        'IOUtils': {
-            'min_version': 6.2,
-            'max_version': None,
-            'path': 'os_win.utils.io.ioutils.IOUtils'
-        }
-    }
+    'diskutils': [
+        {'path': 'os_win.utils.storage.diskutils.DiskUtils'}
+    ],
+    'hostutils': [
+        {'max_version': 10,
+         'path': 'os_win.utils.hostutils.HostUtils'},
+        {'min_version': 10,
+         'path': 'os_win.utils.hostutils10.HostUtils10'},
+    ],
+    'iscsi_initiator_utils': [
+        {'path': 'os_win.utils.storage.initiator.iscsi_utils.'
+                 'ISCSIInitiatorUtils'},
+    ],
+    'iscsi_target_utils': [
+        {'path': 'os_win.utils.storage.target.iscsi_target_utils.'
+                 'ISCSITargetUtils'}],
+    'fc_utils': [
+        {'path': 'os_win.utils.storage.initiator.fc_utils.FCUtils'},
+    ],
+    'livemigrationutils': [
+        {'path': 'os_win.utils.compute.livemigrationutils.LiveMigrationUtils'}
+    ],
+    'metricsutils': [
+        {'path': 'os_win.utils.metrics.metricsutils.MetricsUtils'},
+    ],
+    'migrationutils': [
+        {'path': 'os_win.utils.compute.migrationutils.MigrationUtils'},
+    ],
+    'networkutils': [
+        {'max_version': 6.3,
+         'path': 'os_win.utils.network.networkutils.NetworkUtils'},
+        {'min_version': 6.3,
+         'path': 'os_win.utils.network.networkutils.NetworkUtilsR2'},
+    ],
+    'nvgreutils': [
+        {'path': 'os_win.utils.network.nvgreutils.NvgreUtils'},
+    ],
+    'pathutils': [
+        {'path': 'os_win.utils.pathutils.PathUtils'},
+    ],
+    'rdpconsoleutils': [
+        {'path': 'os_win.utils.compute.rdpconsoleutils.RDPConsoleUtils'},
+    ],
+    'smbutils': [
+        {'path': 'os_win.utils.storage.smbutils.SMBUtils'},
+    ],
+    'vhdutils': [
+        {'path': 'os_win.utils.storage.virtdisk.vhdutils.VHDUtils'},
+    ],
+    'vmutils': [
+        {'max_version': 6.3,
+         'path': 'os_win.utils.compute.vmutils.VMUtils'},
+        {'min_version': 6.3,
+         'max_version': 10,
+         'path': 'os_win.utils.compute.vmutils.VMUtils6_3'},
+        {'min_version': 10,
+         'path': 'os_win.utils.compute.vmutils10.VMUtils10'}],
+    'clusterutils': [
+        {'path': 'os_win.utils.compute.clusterutils.ClusterUtils'},
+    ],
+    'dnsutils': [
+        {'path': 'os_win.utils.dns.dnsutils.DNSUtils'},
+    ],
+    'processutils': [
+        {'path': 'os_win.utils.processutils.ProcessUtils'},
+    ],
+    'ioutils': [
+        {'path': 'os_win.utils.io.ioutils.IOUtils'},
+    ],
 }
 
 
@@ -153,14 +108,14 @@ def _get_class(class_type, *args, **kwargs):
     build = list(map(int, windows_version.split('.')))
     windows_version = float("%i.%i" % (build[0], build[1]))
 
-    existing_classes = utils_map.get(class_type)
-    for class_variant in existing_classes.keys():
-        utils_class = existing_classes.get(class_variant)
-        if (utils_class['min_version'] <= windows_version and
-                (utils_class['max_version'] is None or
-                 windows_version < utils_class['max_version'])):
-            return importutils.import_object(utils_class['path'],
-                                             *args, **kwargs)
+    existing_classes = utils_map.get(class_type, [])
+    for class_variant in existing_classes:
+        min_version = class_variant.get('min_version', DEFAULT_MIN_VERSION)
+        max_version = class_variant.get('max_version', DEFAULT_MAX_VERSION)
+        class_path = class_variant['path']
+        if (min_version <= windows_version and
+                (max_version is None or windows_version < max_version)):
+            return importutils.import_object(class_path, *args, **kwargs)
 
     raise exceptions.HyperVException(_('Could not find any %(class)s class for'
                                        'this Windows version: %(win_version)s')

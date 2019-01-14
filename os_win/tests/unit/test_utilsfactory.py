@@ -154,14 +154,13 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
     def test_utils_public_signatures(self):
         for module_name in utilsfactory.utils_map.keys():
             classes = utilsfactory.utils_map[module_name]
-            class_names = list(classes.keys())
-            if len(class_names) < 2:
+            if len(classes) < 2:
                 continue
 
-            base_class_dict = classes[class_names[0]]
+            base_class_dict = classes[0]
             base_class = importutils.import_object(base_class_dict['path'])
-            for i in range(1, len(class_names)):
-                tested_class_dict = classes[class_names[i]]
+            for i in range(1, len(classes)):
+                tested_class_dict = classes[i]
                 tested_class = importutils.import_object(
                     tested_class_dict['path'])
                 self.assertPublicAPISignatures(base_class, tested_class)
