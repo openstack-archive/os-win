@@ -61,6 +61,31 @@ class IOUtils(object):
                       eventlet_nonblocking_mode=eventlet_blocking_mode)
         return self._win32_utils.run_and_check_output(*args, **kwargs)
 
+    def create_pipe(self, security_attributes=None, size=0,
+                    inherit_handle=False):
+        """Create an anonymous pipe.
+
+        The main advantage of this method over os.pipe is that it allows
+        creating inheritable pipe handles (which is flawed on most Python
+        versions).
+        """
+        r = wintypes.HANDLE()
+        w = wintypes.HANDLE()
+
+        if inherit_handle and not security_attributes:
+            security_attributes = wintypes.SECURITY_ATTRIBUTES()
+            security_attributes.bInheritHandle = inherit_handle
+            security_attributes.nLength = ctypes.sizeof(security_attributes)
+
+        self._run_and_check_output(
+            kernel32.CreatePipe,
+            ctypes.byref(r),
+            ctypes.byref(w),
+            ctypes.byref(security_attributes) if security_attributes else None,
+            size)
+
+        return r.value, w.value
+
     @_utils.retry_decorator(exceptions=exceptions.Win32IOException,
                             max_sleep_time=2)
     def wait_named_pipe(self, pipe_name, timeout=WAIT_PIPE_DEFAULT_TIMEOUT):
@@ -155,6 +180,18 @@ class IOUtils(object):
                                    completion_routine)
         self._wait_io_completion(overlapped_structure.hEvent)
 
+    def read_file(self, handle, buff, num_bytes, overlapped_structure=None):
+        # Similar to IOUtils.read, but intended for synchronous operations.
+        num_bytes_read = wintypes.DWORD(0)
+        overlapped_structure_ref = (
+            ctypes.byref(overlapped_structure) if overlapped_structure
+            else None)
+        self._run_and_check_output(kernel32.ReadFile,
+                                   handle, buff, num_bytes,
+                                   ctypes.byref(num_bytes_read),
+                                   overlapped_structure_ref)
+        return num_bytes_read.value
+
     def write(self, handle, buff, num_bytes,
               overlapped_structure, completion_routine):
         self._reset_event(overlapped_structure.hEvent)
@@ -163,6 +200,18 @@ class IOUtils(object):
                                    ctypes.byref(overlapped_structure),
                                    completion_routine)
         self._wait_io_completion(overlapped_structure.hEvent)
+
+    def write_file(self, handle, buff, num_bytes, overlapped_structure=None):
+        # Similar to IOUtils.write, but intended for synchronous operations.
+        num_bytes_written = wintypes.DWORD(0)
+        overlapped_structure_ref = (
+            ctypes.byref(overlapped_structure) if overlapped_structure
+            else None)
+        self._run_and_check_output(kernel32.WriteFile,
+                                   handle, buff, num_bytes,
+                                   ctypes.byref(num_bytes_written),
+                                   overlapped_structure_ref)
+        return num_bytes_written.value
 
     @classmethod
     def get_buffer(cls, buff_size, data=None):

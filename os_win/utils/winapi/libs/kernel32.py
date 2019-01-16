@@ -95,6 +95,14 @@ def register():
     ]
     lib_handle.CreateFileW.restype = wintypes.HANDLE
 
+    lib_handle.CreatePipe.argtypes = [
+        wintypes.PHANDLE,
+        wintypes.PHANDLE,
+        wintypes.PVOID,
+        wintypes.DWORD
+    ]
+    lib_handle.CreatePipe.restype = wintypes.BOOL
+
     lib_handle.CreateSymbolicLinkW.argtypes = [
         wintypes.LPCWSTR,
         wintypes.LPCWSTR,
@@ -136,6 +144,15 @@ def register():
     lib_handle.LocalFree.argtypes = [wintypes.HANDLE]
     lib_handle.LocalFree.restype = wintypes.HANDLE
 
+    lib_handle.ReadFile.argtypes = [
+        wintypes.HANDLE,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.LPDWORD,
+        wintypes.LPOVERLAPPED
+    ]
+    lib_handle.ReadFile.restype = wintypes.BOOL
+
     lib_handle.ReadFileEx.argtypes = [
         wintypes.HANDLE,
         wintypes.LPVOID,
@@ -166,6 +183,15 @@ def register():
         wintypes.DWORD
     ]
     lib_handle.WaitNamedPipeW.restype = wintypes.BOOL
+
+    lib_handle.WriteFile.argtypes = [
+        wintypes.HANDLE,
+        wintypes.LPCVOID,
+        wintypes.DWORD,
+        wintypes.LPDWORD,
+        wintypes.LPOVERLAPPED,
+    ]
+    lib_handle.WriteFile.restype = wintypes.BOOL
 
     lib_handle.WriteFileEx.argtypes = [
         wintypes.HANDLE,

@@ -32,6 +32,7 @@ from os_win.utils.compute import rdpconsoleutils
 from os_win.utils.compute import vmutils
 from os_win.utils.dns import dnsutils
 from os_win.utils import hostutils
+from os_win.utils.io import ioutils
 from os_win.utils.network import networkutils
 from os_win.utils import pathutils
 from os_win.utils import processutils
@@ -144,6 +145,11 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
         self._check_get_class(
             expected_class=processutils.ProcessUtils,
             class_type='processutils')
+
+    def test_get_ioutils(self):
+        self._check_get_class(
+            expected_class=ioutils.IOUtils,
+            class_type='ioutils')
 
     def test_utils_public_signatures(self):
         for module_name in utilsfactory.utils_map.keys():
