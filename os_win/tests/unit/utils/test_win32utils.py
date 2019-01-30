@@ -241,3 +241,26 @@ class Win32UtilsTestCase(test_base.BaseTestCase):
             self._win32_utils.wait_for_multiple_objects,
             fake_handles, mock.sentinel.wait_all,
             mock.sentinel.milliseconds)
+
+    @mock.patch.object(win32utils.Win32Utils, 'run_and_check_output')
+    def test_wait_for_single_object(self, mock_helper):
+        ret_val = self._win32_utils.wait_for_single_object(
+            mock.sentinel.handle, mock.sentinel.milliseconds)
+
+        mock_helper.assert_called_once_with(
+            win32utils.kernel32.WaitForSingleObject,
+            mock.sentinel.handle,
+            mock.sentinel.milliseconds,
+            kernel32_lib_func=True,
+            error_ret_vals=[w_const.WAIT_FAILED])
+        self.assertEqual(mock_helper.return_value, ret_val)
+
+    @mock.patch.object(win32utils.Win32Utils, 'run_and_check_output')
+    def test_wait_for_single_object_timeout(self, mock_helper):
+        mock_helper.return_value = w_const.ERROR_WAIT_TIMEOUT
+
+        self.assertRaises(
+            exceptions.Timeout,
+            self._win32_utils.wait_for_single_object,
+            mock.sentinel.timeout,
+            mock.sentinel.milliseconds)

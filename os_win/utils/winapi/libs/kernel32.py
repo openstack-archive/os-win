@@ -95,6 +95,12 @@ def register():
     ]
     lib_handle.CreateFileW.restype = wintypes.HANDLE
 
+    lib_handle.CreateMutexW.argtypes = [
+        wintypes.LPCVOID,
+        wintypes.BOOL,
+        wintypes.LPCWSTR]
+    lib_handle.CreateMutexW.restype = wintypes.HANDLE
+
     lib_handle.CreatePipe.argtypes = [
         wintypes.PHANDLE,
         wintypes.PHANDLE,
@@ -162,6 +168,9 @@ def register():
     ]
     lib_handle.ReadFileEx.restype = wintypes.BOOL
 
+    lib_handle.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    lib_handle.ReleaseMutex.restype = wintypes.BOOL
+
     lib_handle.ResetEvent.argtypes = [wintypes.HANDLE]
     lib_handle.ResetEvent.restype = wintypes.BOOL
 
@@ -170,6 +179,12 @@ def register():
 
     lib_handle.SetLastError.argtypes = [wintypes.DWORD]
     lib_handle.SetLastError.restype = None
+
+    lib_handle.WaitForSingleObject.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD
+    ]
+    lib_handle.WaitForSingleObject.restype = wintypes.DWORD
 
     lib_handle.WaitForSingleObjectEx.argtypes = [
         wintypes.HANDLE,

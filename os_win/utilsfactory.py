@@ -19,6 +19,7 @@ from os_win._i18n import _  # noqa
 from os_win import exceptions
 from os_win.utils import hostutils
 from os_win.utils.io import namedpipe
+from os_win.utils import processutils
 
 utils = hostutils.HostUtils()
 
@@ -201,3 +202,7 @@ def get_processutils():
 
 def get_ioutils():
     return _get_class(class_type='ioutils')
+
+
+def get_mutex(*args, **kwargs):
+    return processutils.Mutex(*args, **kwargs)
