@@ -196,3 +196,24 @@ class ProcessUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_wait.assert_called_once_with(phandles,
                                           mock.sentinel.wait_all,
                                           mock.sentinel.milliseconds)
+
+    def test_create_mutex(self):
+        handle = self._procutils.create_mutex(
+            mock.sentinel.name, mock.sentinel.owner,
+            mock.sentinel.sec_attr)
+
+        self.assertEqual(self._mock_run.return_value, handle)
+        self._mock_run.assert_called_once_with(
+            self._mock_kernel32.CreateMutexW,
+            self._ctypes.byref(mock.sentinel.sec_attr),
+            mock.sentinel.owner,
+            mock.sentinel.name,
+            kernel32_lib_func=True)
+
+    def test_release_mutex(self):
+        self._procutils.release_mutex(mock.sentinel.handle)
+
+        self._mock_run.assert_called_once_with(
+            self._mock_kernel32.ReleaseMutex,
+            mock.sentinel.handle,
+            kernel32_lib_func=True)

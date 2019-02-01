@@ -18,6 +18,7 @@ import ctypes
 
 from oslo_log import log as logging
 
+from os_win import exceptions
 from os_win.utils import win32utils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import libs as w_lib
@@ -128,3 +129,58 @@ class ProcessUtils(object):
         finally:
             for handle in handles:
                 self._win32_utils.close_handle(handle)
+
+    def create_mutex(self, name=None, initial_owner=False,
+                     security_attributes=None):
+        sec_attr_ref = (ctypes.byref(security_attributes)
+                        if security_attributes else None)
+        return self._run_and_check_output(
+            kernel32.CreateMutexW,
+            sec_attr_ref,
+            initial_owner,
+            name)
+
+    def release_mutex(self, handle):
+        return self._run_and_check_output(
+            kernel32.ReleaseMutex,
+            handle)
+
+
+class Mutex(object):
+    def __init__(self, name=None):
+        self.name = name
+
+        self._processutils = ProcessUtils()
+        self._win32_utils = win32utils.Win32Utils()
+
+        # This is supposed to be a simple interface.
+        # We're not exposing the "initial_owner" flag,
+        # nor are we informing the caller if the mutex
+        # already exists.
+        self._handle = self._processutils.create_mutex(
+            self.name)
+
+    def acquire(self, timeout_ms=w_const.INFINITE):
+        try:
+            self._win32_utils.wait_for_single_object(
+                self._handle, timeout_ms)
+            return True
+        except exceptions.Timeout:
+            return False
+
+    def release(self):
+        self._processutils.release_mutex(self._handle)
+
+    def close(self):
+        if self._handle:
+            self._win32_utils.close_handle(self._handle)
+        self._handle = None
+
+    __del__ = close
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
