@@ -23,11 +23,11 @@ import sys
 import threading
 import time
 
-if sys.platform == 'win32':
-    import wmi
-
 from oslo_log import log as logging
 from oslo_utils import reflection
+
+if sys.platform == 'win32':
+    import wmi
 
 LOG = logging.getLogger(__name__)
 

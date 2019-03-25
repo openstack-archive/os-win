@@ -18,7 +18,7 @@ import os
 import textwrap
 
 import mock
-import pep8
+import pycodestyle
 
 from os_win._hacking import checks
 from os_win.tests.unit import test_base
@@ -58,20 +58,20 @@ class HackingTestCase(test_base.OsWinBaseTestCase):
     """
 
     def _run_check(self, code, checker, filename=None):
-        # We are patching pep8 so that only the check under test is actually
-        # installed.
+        # We are patching pycodestyle (pep8) so that only the check under test
+        # is actually installed.
         mock_checks = {'physical_line': {}, 'logical_line': {}, 'tree': {}}
-        with mock.patch('pep8._checks', mock_checks):
-            pep8.register_check(checker)
+        with mock.patch('pycodestyle._checks', mock_checks):
+            pycodestyle.register_check(checker)
 
             lines = textwrap.dedent(code).strip().splitlines(True)
 
-            checker = pep8.Checker(filename=filename, lines=lines)
+            checker = pycodestyle.Checker(filename=filename, lines=lines)
             # NOTE(sdague): the standard reporter has printing to stdout
             # as a normal part of check_all, which bleeds through to the
             # test output stream in an unhelpful way. This blocks that
             # printing.
-            with mock.patch('pep8.StandardReport.get_file_results'):
+            with mock.patch('pycodestyle.StandardReport.get_file_results'):
                 checker.check_all()
             checker.report._deferred_print.sort()
             return checker.report._deferred_print
