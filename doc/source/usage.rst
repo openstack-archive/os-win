@@ -1,6 +1,6 @@
-========
+=====
 Usage
-========
+=====
 
 To use os-win in a project::
 
