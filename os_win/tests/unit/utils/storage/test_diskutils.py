@@ -27,6 +27,7 @@ from os_win.utils.storage import diskutils
 class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
 
     _autospec_classes = [
+        diskutils.pathutils.PathUtils,
         diskutils.win32utils.Win32Utils,
     ]
 
@@ -36,6 +37,7 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
         self._diskutils._conn_cimv2 = mock.MagicMock()
         self._diskutils._conn_storage = mock.MagicMock()
         self._mock_run = self._diskutils._win32_utils.run_and_check_output
+        self._pathutils = self._diskutils._pathutils
 
     @ddt.data(True, False)
     def test_get_disk_by_number(self, msft_disk_cls):
@@ -63,6 +65,47 @@ class DiskUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_msft_disk_cls.assert_called_once_with(
             Number=mock.sentinel.disk_number)
+
+    def test_get_attached_virtual_disk_files(self):
+        disks = [mock.Mock(), mock.Mock()]
+        disk_cls = self._diskutils._conn_storage.Msft_Disk
+        disk_cls.return_value = disks
+
+        ret_val = self._diskutils.get_attached_virtual_disk_files()
+        exp_ret_val = [
+            dict(location=disk.Location,
+                 number=disk.Number,
+                 offline=disk.IsOffline,
+                 readonly=disk.IsReadOnly)
+            for disk in disks]
+        self.assertEqual(exp_ret_val, ret_val)
+
+        disk_cls.assert_called_once_with(
+            BusType=diskutils.BUS_FILE_BACKED_VIRTUAL)
+
+    @ddt.data({},
+              {'exists': False},
+              {'same_file': False})
+    @ddt.unpack
+    @mock.patch('os.path.exists')
+    @mock.patch.object(diskutils.DiskUtils, 'get_attached_virtual_disk_files')
+    def test_is_virtual_disk_file_attached(self, mock_get_disks, mock_exists,
+                                           exists=True, same_file=True):
+        mock_get_disks.return_value = [dict(location=mock.sentinel.other_path)]
+        mock_exists.return_value = exists
+        self._pathutils.is_same_file.return_value = same_file
+
+        attached = self._diskutils.is_virtual_disk_file_attached(
+            mock.sentinel.path)
+        self.assertEqual(exists and same_file, attached)
+
+        if exists:
+            mock_get_disks.assert_called_once_with()
+            self._pathutils.is_same_file.assert_called_once_with(
+                mock.sentinel.path, mock.sentinel.other_path)
+        else:
+            mock_get_disks.assert_not_called()
+            self._pathutils.is_same_file.assert_not_called()
 
     def test_get_disk_by_unique_id(self):
         disk_cls = self._diskutils._conn_storage.Msft_Disk

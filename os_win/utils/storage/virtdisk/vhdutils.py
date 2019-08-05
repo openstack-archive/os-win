@@ -28,11 +28,13 @@ import os
 import struct
 
 from oslo_log import log as logging
+from oslo_utils import excutils
 from oslo_utils import units
 
 from os_win._i18n import _
 from os_win import constants
 from os_win import exceptions
+from os_win.utils.storage import diskutils
 from os_win.utils import win32utils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import libs as w_lib
@@ -79,6 +81,7 @@ CREATE_VIRTUAL_DISK_FLAGS = {
 class VHDUtils(object):
     def __init__(self):
         self._win32_utils = win32utils.Win32Utils()
+        self._disk_utils = diskutils.DiskUtils()
 
         self._vhd_info_members = {
             w_const.GET_VIRTUAL_DISK_INFO_SIZE: 'Size',
@@ -87,7 +90,8 @@ class VHDUtils(object):
             w_const.GET_VIRTUAL_DISK_INFO_VIRTUAL_STORAGE_TYPE:
                 'VirtualStorageType',
             w_const.GET_VIRTUAL_DISK_INFO_PROVIDER_SUBTYPE:
-                'ProviderSubtype'}
+                'ProviderSubtype',
+            w_const.GET_VIRTUAL_DISK_INFO_IS_LOADED: 'IsLoaded'}
 
         # Describes the way error handling is performed
         # for virtdisk.dll functions.
@@ -595,7 +599,24 @@ class VHDUtils(object):
             return
 
         open_access_mask = w_const.VIRTUAL_DISK_ACCESS_DETACH
-        handle = self._open(vhd_path, open_access_mask=open_access_mask)
+
+        try:
+            handle = self._open(vhd_path, open_access_mask=open_access_mask)
+        except Exception as exc:
+            # File locks from different hosts may prevent us from opening this
+            # image, which may not even be used by the local host.
+            #
+            # Note that listing disks can be a time consuming operation, for
+            # which reason we'll try to avoid it by default.
+            with excutils.save_and_reraise_exception() as ctxt:
+                if not self.is_virtual_disk_file_attached(vhd_path):
+                    LOG.info("The following image is not currently attached "
+                             "to the local host: '%(vhd_path)s'. Ignoring "
+                             "exception encountered while attempting to "
+                             "open and disconnect it: %(exc)s",
+                             dict(vhd_path=vhd_path, exc=exc))
+                    ctxt.reraise = False
+                    return
 
         ret_val = self._run_and_check_output(
             virtdisk.DetachVirtualDisk,
@@ -634,3 +655,22 @@ class VHDUtils(object):
             cleanup_handle=handle)
 
         return disk_path.value
+
+    def is_virtual_disk_file_attached(self, vhd_path):
+        if not os.path.exists(vhd_path):
+            LOG.debug("Image %s could not be found.", vhd_path)
+            return False
+
+        try:
+            vhd_info = self.get_vhd_info(
+                vhd_path,
+                [w_const.GET_VIRTUAL_DISK_INFO_IS_LOADED])
+            return bool(vhd_info['IsLoaded'])
+        except Exception as exc:
+            # We may fail to open the image due to file locks. We'll try
+            # an alternative, much slower approach.
+            LOG.info("Could not get virtual disk information: %(vhd_path)s. "
+                     "Trying an alternative approach. Error: %(exc)s",
+                     dict(vhd_path=vhd_path,
+                          exc=exc))
+            return self._disk_utils.is_virtual_disk_file_attached(vhd_path)

@@ -94,8 +94,8 @@ class IOUtils(object):
                                    ctypes.c_wchar_p(pipe_name),
                                    timeout * units.k)
 
-    def open(self, path, desired_access=None, share_mode=None,
-             creation_disposition=None, flags_and_attributes=None):
+    def open(self, path, desired_access=0, share_mode=0,
+             creation_disposition=0, flags_and_attributes=0):
         error_ret_vals = [w_const.INVALID_HANDLE_VALUE]
         handle = self._run_and_check_output(kernel32.CreateFileW,
                                             ctypes.c_wchar_p(path),

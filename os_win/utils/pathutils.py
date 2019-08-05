@@ -28,10 +28,12 @@ from os_win._i18n import _
 from os_win import _utils
 from os_win import exceptions
 from os_win.utils import _acl_utils
+from os_win.utils.io import ioutils
 from os_win.utils import win32utils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi import libs as w_lib
 from os_win.utils.winapi.libs import advapi32 as advapi32_def
+from os_win.utils.winapi.libs import kernel32 as kernel32_def
 from os_win.utils.winapi import wintypes
 
 kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
@@ -44,6 +46,7 @@ class PathUtils(object):
     def __init__(self):
         self._win32_utils = win32utils.Win32Utils()
         self._acl_utils = _acl_utils.ACLUtils()
+        self._io_utils = ioutils.IOUtils()
 
     def open(self, path, mode):
         """Wrapper on __builtin__.open used to simplify unit testing."""
@@ -248,3 +251,38 @@ class PathUtils(object):
         finally:
             for p in p_to_free:
                 self._win32_utils.local_free(p)
+
+    def is_same_file(self, path_a, path_b):
+        """Check if two paths point to the same file."""
+
+        file_a_id = self.get_file_id(path_a)
+        file_b_id = self.get_file_id(path_b)
+
+        return file_a_id == file_b_id
+
+    def get_file_id(self, path):
+        """Return a dict containing the file id and volume id."""
+        handle = None
+        info = kernel32_def.FILE_ID_INFO()
+
+        try:
+            handle = self._io_utils.open(
+                path,
+                desired_access=0,
+                share_mode=(w_const.FILE_SHARE_READ |
+                            w_const.FILE_SHARE_WRITE |
+                            w_const.FILE_SHARE_DELETE),
+                creation_disposition=w_const.OPEN_EXISTING)
+            self._win32_utils.run_and_check_output(
+                kernel32.GetFileInformationByHandleEx,
+                handle,
+                w_const.FileIdInfo,
+                ctypes.byref(info),
+                ctypes.sizeof(info),
+                kernel32_lib_func=True)
+        finally:
+            if handle:
+                self._io_utils.close_handle(handle)
+
+        return dict(volume_serial_number=info.VolumeSerialNumber,
+                    file_id=bytearray(info.FileId.Identifier))

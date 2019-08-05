@@ -56,6 +56,19 @@ class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
     ]
 
 
+class FILE_ID_128(ctypes.Structure):
+    _fields_ = [
+        ('Identifier', wintypes.BYTE * 16)
+    ]
+
+
+class FILE_ID_INFO(ctypes.Structure):
+    _fields_ = [
+        ('VolumeSerialNumber', wintypes.ULONGLONG),
+        ('FileId', FILE_ID_128)
+    ]
+
+
 def register():
     global lib_handle
     lib_handle = ctypes.windll.kernel32
@@ -120,6 +133,15 @@ def register():
         wintypes.PVOID
     ]
     lib_handle.FormatMessageA.restype = wintypes.DWORD
+
+    lib_handle.GetFileInformationByHandleEx.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD
+
+    ]
+    lib_handle.GetFileInformationByHandleEx.restype = wintypes.BOOL
 
     lib_handle.GetDiskFreeSpaceExW.argtypes = [
         wintypes.LPCWSTR,
