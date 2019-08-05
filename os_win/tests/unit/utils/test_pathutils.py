@@ -16,6 +16,7 @@ import ctypes
 import os
 import shutil
 
+import ddt
 import mock
 
 from os_win import constants
@@ -24,12 +25,16 @@ from os_win.tests.unit import test_base
 from os_win.utils import pathutils
 from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi.libs import advapi32 as advapi32_def
+from os_win.utils.winapi.libs import kernel32 as kernel32_def
+from os_win.utils.winapi import wintypes
 
 
+@ddt.ddt
 class PathUtilsTestCase(test_base.OsWinBaseTestCase):
     """Unit tests for the Hyper-V PathUtils class."""
 
     _autospec_classes = [
+        pathutils.ioutils.IOUtils,
         pathutils.win32utils.Win32Utils,
         pathutils._acl_utils.ACLUtils,
     ]
@@ -41,6 +46,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
         self._pathutils = pathutils.PathUtils()
         self._mock_run = self._pathutils._win32_utils.run_and_check_output
         self._acl_utils = self._pathutils._acl_utils
+        self._io_utils = self._pathutils._io_utils
 
     def _setup_lib_mocks(self):
         self._ctypes = mock.Mock()
@@ -351,3 +357,96 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
         self._pathutils._win32_utils.local_free.assert_called_once_with(
             mock_sec_info['pp_sec_desc'].contents)
+
+    def _get_file_id_info(self, volume_id, file_id, as_dict=False):
+        identifier = (wintypes.BYTE * 16)()
+        assert file_id < 1 << 128
+
+        idx = 0
+        while file_id:
+            identifier[idx] = file_id & 0xffff
+            file_id >>= 8
+            idx += 1
+
+        file_id_info = kernel32_def.FILE_ID_INFO(
+            VolumeSerialNumber=volume_id,
+            FileId=kernel32_def.FILE_ID_128(Identifier=identifier))
+
+        if as_dict:
+            return dict(volume_serial_number=file_id_info.VolumeSerialNumber,
+                        file_id=bytearray(file_id_info.FileId.Identifier))
+        return file_id_info
+
+    @ddt.data((1, 2, 1, 2),  # same file
+              (1, 2, 1, 3),  # same volume id, different file id
+              (1, 2, 2, 2))  # same file id, different volume id
+    @ddt.unpack
+    @mock.patch.object(pathutils.PathUtils, 'get_file_id')
+    def test_is_same_file(self, volume_id_a, file_id_a,
+                          volume_id_b, file_id_b, mock_get_file_id):
+        file_info_a = self._get_file_id_info(volume_id_a, file_id_a,
+                                             as_dict=True)
+        file_info_b = self._get_file_id_info(volume_id_b, file_id_b,
+                                             as_dict=True)
+
+        mock_get_file_id.side_effect = [file_info_a, file_info_b]
+
+        same_file = self._pathutils.is_same_file(
+            mock.sentinel.path_a,
+            mock.sentinel.path_b)
+
+        self.assertEqual(volume_id_a == volume_id_b and file_id_a == file_id_b,
+                         same_file)
+
+        mock_get_file_id.assert_has_calls(
+            [mock.call(mock.sentinel.path_a),
+             mock.call(mock.sentinel.path_b)])
+
+    def test_get_file_id(self):
+        self._ctypes_patcher.stop()
+
+        fake_file_id = 1 << 64
+        fake_volume_id = 1 << 31
+
+        def fake_get_file_id(func, handle, file_info_class, file_info,
+                             buffer_size, kernel32_lib_func):
+            self.assertEqual(func,
+                             pathutils.kernel32.GetFileInformationByHandleEx)
+            self.assertTrue(kernel32_lib_func)
+            self.assertEqual(self._io_utils.open.return_value, handle)
+            self.assertEqual(w_const.FileIdInfo, file_info_class)
+            self.assertLessEqual(ctypes.sizeof(kernel32_def.FILE_ID_INFO),
+                                 buffer_size)
+
+            file_id = self._get_file_id_info(fake_volume_id, fake_file_id)
+            ctypes.memmove(file_info, ctypes.byref(file_id),
+                           ctypes.sizeof(kernel32_def.FILE_ID_INFO))
+
+        self._mock_run.side_effect = fake_get_file_id
+
+        file_id = self._pathutils.get_file_id(mock.sentinel.path)
+        exp_identifier = [0] * 16
+        exp_identifier[8] = 1
+        exp_file_id = dict(volume_serial_number=fake_volume_id,
+                           file_id=bytearray(exp_identifier))
+        self.assertEqual(exp_file_id, file_id)
+
+        self._io_utils.open.assert_called_once_with(
+            mock.sentinel.path,
+            desired_access=0,
+            share_mode=(w_const.FILE_SHARE_READ |
+                        w_const.FILE_SHARE_WRITE |
+                        w_const.FILE_SHARE_DELETE),
+            creation_disposition=w_const.OPEN_EXISTING)
+        self._io_utils.close_handle.assert_called_once_with(
+            self._io_utils.open.return_value)
+
+    def test_get_file_id_exc(self):
+        self._mock_run.side_effect = exceptions.Win32Exception(
+            message="fake exc")
+
+        self.assertRaises(exceptions.Win32Exception,
+                          self._pathutils.get_file_id,
+                          mock.sentinel.path)
+        self._io_utils.close_handle.assert_called_once_with(
+            self._io_utils.open.return_value)
