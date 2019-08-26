@@ -26,6 +26,7 @@ from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
+from os_win.utils import pathutils
 from os_win.utils import win32utils
 from os_win.utils.winapi import libs as w_lib
 
@@ -63,6 +64,8 @@ SCSI_ID_ASSOC_TYPE_DEVICE = 0
 SCSI_ID_CODE_SET_BINARY = 1
 SCSI_ID_CODE_SET_ASCII = 2
 
+BUS_FILE_BACKED_VIRTUAL = 15
+
 _RESCAN_LOCK = threading.Lock()
 
 
@@ -78,6 +81,7 @@ class DiskUtils(baseutils.BaseUtils):
 
         # Physical device names look like \\.\PHYSICALDRIVE1
         self._phys_dev_name_regex = re.compile(r'\\\\.*\\[a-zA-Z]*([\d]+)')
+        self._pathutils = pathutils.PathUtils()
 
     def _get_disk_by_number(self, disk_number, msft_disk_cls=True):
         if msft_disk_cls:
@@ -105,6 +109,41 @@ class DiskUtils(baseutils.BaseUtils):
                 unique_id=unique_id,
                 unique_id_format=unique_id_format))
         return disks
+
+    def get_attached_virtual_disk_files(self):
+        """Retrieve a list of virtual disks attached to the host.
+
+        This doesn't include disks attached to Hyper-V VMs directly.
+        """
+        disks = self._conn_storage.Msft_Disk(BusType=BUS_FILE_BACKED_VIRTUAL)
+        return [
+            dict(location=disk.Location,
+                 number=disk.Number,
+                 offline=disk.IsOffline,
+                 readonly=disk.IsReadOnly)
+            for disk in disks]
+
+    def is_virtual_disk_file_attached(self, path):
+        # There are multiple ways of checking this. The easiest way would be to
+        # query the disk using virtdisk.dll:GetVirtualDiskInformation and look
+        # for the IsLoaded attribute. The issue with that is that in some
+        # cases, it won't be able to open in-use images.
+        #
+        # Instead, we'll get a list of attached virtual disks and see if the
+        # path we got points to any of those, thus properly handling the
+        # situation in which multiple paths can point to the same file
+        # (e.g. when having symlinks, shares, UNC paths, etc). We still have
+        # to open the files but at least we have better control over the open
+        # flags.
+        if not os.path.exists(path):
+            LOG.debug("Image %s could not be found.", path)
+            return False
+
+        attached_disks = self.get_attached_virtual_disk_files()
+        for disk in attached_disks:
+            if self._pathutils.is_same_file(path, disk['location']):
+                return True
+        return False
 
     def get_disk_numbers_by_unique_id(self, unique_id, unique_id_format):
         disks = self._get_disks_by_unique_id(unique_id, unique_id_format)

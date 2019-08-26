@@ -32,6 +32,7 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
     """Unit tests for the Hyper-V VHDUtils class."""
 
     _autospec_classes = [
+        vhdutils.diskutils.DiskUtils,
         vhdutils.win32utils.Win32Utils,
     ]
 
@@ -46,6 +47,8 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
         self._mock_close = self._vhdutils._win32_utils.close_handle
         self._mock_run = self._vhdutils._win32_utils.run_and_check_output
         self._run_args = self._vhdutils._virtdisk_run_args
+
+        self._disk_utils = self._vhdutils._disk_utils
 
         self.addCleanup(mock.patch.stopall)
 
@@ -842,6 +845,27 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
         else:
             mock_open.assert_not_called()
 
+    @ddt.data(True, False)
+    @mock.patch('os.path.exists')
+    @mock.patch.object(vhdutils.VHDUtils, '_open')
+    @mock.patch.object(vhdutils.VHDUtils, 'is_virtual_disk_file_attached')
+    def test_detach_virtual_disk_exc(self, is_attached, mock_is_attached,
+                                     mock_open, mock_exists):
+        # We'll try another approach before erroring out if the image cannot
+        # be opened (e.g. attached on a different host).
+        mock_exists.return_value = True
+        mock_is_attached.return_value = is_attached
+        mock_open.side_effect = exceptions.Win32Exception(message='fake exc')
+
+        if is_attached:
+            self.assertRaises(exceptions.Win32Exception,
+                              self._vhdutils.detach_virtual_disk,
+                              mock.sentinel.vhd_path)
+        else:
+            self._vhdutils.detach_virtual_disk(mock.sentinel.vhd_path)
+
+        mock_is_attached.assert_called_once_with(mock.sentinel.vhd_path)
+
     @mock.patch.object(vhdutils.VHDUtils, '_open')
     def test_get_virtual_disk_physical_path(self, mock_open):
         self._ctypes_patcher.stop()
@@ -874,3 +898,40 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
             mock.ANY,
             mock.ANY,
             **self._run_args)
+
+    @ddt.data({},
+              {'exists': False},
+              {'open_fails': True})
+    @ddt.unpack
+    @mock.patch('os.path.exists')
+    @mock.patch.object(vhdutils.VHDUtils, 'get_vhd_info')
+    def test_is_virtual_disk_file_attached(self, mock_get_vhd_info,
+                                           mock_exists,
+                                           exists=True, open_fails=False):
+        mock_exists.return_value = exists
+        if open_fails:
+            mock_get_vhd_info.side_effect = exceptions.Win32Exception(
+                message="fake exc")
+        else:
+            mock_get_vhd_info.return_value = {
+                'IsLoaded': mock.sentinel.attached}
+
+        fallback = self._disk_utils.is_virtual_disk_file_attached
+        fallback.return_value = True
+
+        ret_val = self._vhdutils.is_virtual_disk_file_attached(
+            mock.sentinel.vhd_path)
+        exp_ret_val = True if exists else False
+
+        self.assertEqual(exp_ret_val, ret_val)
+        if exists:
+            mock_get_vhd_info.assert_called_once_with(
+                mock.sentinel.vhd_path,
+                [w_const.GET_VIRTUAL_DISK_INFO_IS_LOADED])
+        else:
+            mock_get_vhd_info.assert_not_called()
+
+        if exists and open_fails:
+            fallback.assert_called_once_with(mock.sentinel.vhd_path)
+        else:
+            fallback.assert_not_called()
