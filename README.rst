@@ -19,8 +19,8 @@ where it is needed.
 
 * Free software: Apache license
 * Documentation: http://docs.openstack.org/developer/os-win
-* Source: http://opendev.org/openstack/os-win
-* Bugs: http://bugs.launchpad.net/os-win
+* Source: https://opendev.org/openstack/os-win
+* Bugs: https://bugs.launchpad.net/os-win
 
 Release Notes
 -------------
