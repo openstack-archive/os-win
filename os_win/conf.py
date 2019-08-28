@@ -36,6 +36,10 @@ os_win_opts = [
                help='The default amount of seconds to wait when stopping '
                     'pending WMI jobs. Setting this value to 0 will '
                     'disable the timeout.'),
+    cfg.IntOpt('connect_cluster_timeout',
+               default=0,
+               help='The amount of time to wait for the Failover Cluster '
+                    'service to be available.')
 ]
 
 CONF = cfg.CONF

@@ -179,25 +179,6 @@ class Win32UtilsTestCase(test_base.BaseTestCase):
                          last_err)
         win32utils.kernel32.SetLastError.assert_called_once_with(0)
 
-    def test_hresult_to_err_code(self):
-        # This could differ based on the error source.
-        # Only the last 2 bytes of the hresult the error code.
-        fake_file_exists_hres = -0x7ff8ffb0
-        file_exists_err_code = 0x50
-
-        ret_val = self._win32_utils.hresult_to_err_code(fake_file_exists_hres)
-        self.assertEqual(file_exists_err_code, ret_val)
-
-    @mock.patch.object(win32utils._utils, 'get_com_error_hresult')
-    @mock.patch.object(win32utils.Win32Utils, 'hresult_to_err_code')
-    def test_get_com_err_code(self, mock_hres_to_err_code, mock_get_hresult):
-        ret_val = self._win32_utils.get_com_err_code(mock.sentinel.com_err)
-
-        self.assertEqual(mock_hres_to_err_code.return_value, ret_val)
-        mock_get_hresult.assert_called_once_with(mock.sentinel.com_err)
-        mock_hres_to_err_code.assert_called_once_with(
-            mock_get_hresult.return_value)
-
     @ddt.data(0, 1)
     @mock.patch.object(win32utils.LOG, 'exception')
     def test_local_free(self, ret_val, mock_log_exc):

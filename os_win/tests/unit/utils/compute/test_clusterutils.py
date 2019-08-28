@@ -66,13 +66,14 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         self._clusterutils._get_wmi_conn = mock.MagicMock()
         self._clusterutils._get_wmi_conn.return_value = mock_conn
 
-        self._clusterutils._init_hyperv_conn("fake_host")
+        self._clusterutils._init_hyperv_conn("fake_host", timeout=1)
 
     def test_init_hyperv_conn_exception(self):
         self._clusterutils._get_wmi_conn = mock.MagicMock()
         self._clusterutils._get_wmi_conn.side_effect = AttributeError
         self.assertRaises(exceptions.HyperVClusterException,
-                          self._clusterutils._init_hyperv_conn, "fake_host")
+                          self._clusterutils._init_hyperv_conn, "fake_host",
+                          timeout=1)
 
     @mock.patch.object(clusterutils.ClusterUtils,
                        '_get_cluster_nodes')
