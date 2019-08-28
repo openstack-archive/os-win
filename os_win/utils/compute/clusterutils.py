@@ -31,6 +31,7 @@ from six.moves import queue
 
 from os_win._i18n import _
 from os_win import _utils
+import os_win.conf
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -39,6 +40,7 @@ from os_win.utils.winapi import constants as w_const
 from os_win.utils.winapi.libs import clusapi as clusapi_def
 from os_win.utils.winapi import wintypes
 
+CONF = os_win.conf.CONF
 LOG = logging.getLogger(__name__)
 
 
@@ -62,27 +64,39 @@ class ClusterUtils(baseutils.BaseUtils):
     _WMI_EVENT_TIMEOUT_MS = 100
     _WMI_EVENT_CHECK_INTERVAL = 2
 
-    def __init__(self, host='.'):
+    def __init__(self, host='.', timeout=CONF.os_win.connect_cluster_timeout):
         self._instance_name_regex = re.compile('Virtual Machine (.*)')
         self._clusapi_utils = _clusapi_utils.ClusApiUtils()
         self._cmgr = _clusapi_utils.ClusterContextManager()
 
         if sys.platform == 'win32':
-            self._init_hyperv_conn(host)
+            self._init_hyperv_conn(host, timeout)
 
-    def _init_hyperv_conn(self, host):
-        try:
-            self._conn_cluster = self._get_wmi_conn(
-                self._MS_CLUSTER_NAMESPACE % host)
-            self._cluster = self._conn_cluster.MSCluster_Cluster()[0]
+    def _init_hyperv_conn(self, host, timeout):
 
-            # extract this node name from cluster's path
-            path = self._cluster.path_()
-            self._this_node = re.search(r'\\\\(.*)\\root', path,
-                                        re.IGNORECASE).group(1)
-        except AttributeError:
-            raise exceptions.HyperVClusterException(
-                _("Could not initialize cluster wmi connection."))
+        # The Failover Cluster WMI provider may be unavailable after a reboot.
+        # Let's wait for it.
+        @_utils.wmi_retry_decorator(
+            error_codes=(w_const.ERROR_SHARING_PAUSED,
+                         w_const.EPT_S_NOT_REGISTERED),
+            max_sleep_time=5,
+            max_retry_count=None,
+            timeout=timeout)
+        def init():
+            try:
+                self._conn_cluster = self._get_wmi_conn(
+                    self._MS_CLUSTER_NAMESPACE % host)
+                self._cluster = self._conn_cluster.MSCluster_Cluster()[0]
+
+                # extract this node name from cluster's path
+                path = self._cluster.path_()
+                self._this_node = re.search(r'\\\\(.*)\\root', path,
+                                            re.IGNORECASE).group(1)
+            except AttributeError:
+                raise exceptions.HyperVClusterException(
+                    _("Could not initialize cluster wmi connection."))
+
+        init()
 
     def _get_failover_watcher(self):
         raw_query = ("SELECT * FROM __InstanceModificationEvent "

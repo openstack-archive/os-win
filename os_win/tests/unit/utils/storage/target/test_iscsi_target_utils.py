@@ -215,11 +215,13 @@ class ISCSITargetUtilsTestCase(test_base.OsWinBaseTestCase):
     def test_get_wt_idmethod_not_found(self):
         self._test_get_wt_idmethod(idmeth_found=False)
 
-    def _test_create_iscsi_target_exception(self, target_exists=False,
+    @mock.patch('os_win._utils.get_com_error_code')
+    def _test_create_iscsi_target_exception(self, mock_get_com_err_code,
+                                            target_exists=False,
                                             fail_if_exists=False):
         mock_wt_host_cls = self._tgutils._conn_wmi.WT_Host
         mock_wt_host_cls.NewHost.side_effect = test_base.FakeWMIExc
-        self._tgutils._win32utils.get_com_err_code.return_value = (
+        mock_get_com_err_code.return_value = (
             self._tgutils._ERR_FILE_EXISTS if target_exists else 1)
 
         if target_exists and not fail_if_exists:
