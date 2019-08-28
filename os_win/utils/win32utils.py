@@ -110,16 +110,6 @@ class Win32Utils(object):
         kernel32.SetLastError(0)
         return error_code
 
-    @staticmethod
-    def hresult_to_err_code(hresult):
-        # The last 2 bytes of the hresult store the error code.
-        return hresult & 0xFFFF
-
-    def get_com_err_code(self, com_error):
-        hres = _utils.get_com_error_hresult(com_error)
-        if hres is not None:
-            return self.hresult_to_err_code(hres)
-
     def local_free(self, handle):
         try:
             self._run_and_check_output(kernel32.LocalFree, handle)
