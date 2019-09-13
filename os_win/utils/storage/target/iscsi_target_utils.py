@@ -17,6 +17,7 @@ from oslo_log import log as logging
 import six
 
 from os_win._i18n import _
+from os_win import _utils
 from os_win import constants
 from os_win import exceptions
 from os_win.utils import baseutils
@@ -117,7 +118,7 @@ class ISCSITargetUtils(baseutils.BaseUtils):
         try:
             self._conn_wmi.WT_Host.NewHost(HostName=target_name)
         except exceptions.x_wmi as wmi_exc:
-            err_code = self._win32utils.get_com_err_code(wmi_exc.com_error)
+            err_code = _utils.get_com_error_code(wmi_exc.com_error)
             target_exists = err_code == self._ERR_FILE_EXISTS
 
             if not target_exists or fail_if_exists:

@@ -102,7 +102,8 @@ def get_wrapped_function(function):
 
 def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                     max_sleep_time=1, exceptions=(), error_codes=(),
-                    pass_retry_context=False):
+                    pass_retry_context=False,
+                    extract_err_code_func=None):
     """Retries invoking the decorated method in case of expected exceptions.
 
     :param max_retry_count: The maximum number of retries performed. If 0, no
@@ -126,6 +127,8 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                                include a dict containing the 'prevent_retry'
                                field. If this field is set, no further retries
                                will be performed.
+    :param extract_err_code_func: Optional helper function that extracts the
+                                  error code from the exception.
     """
 
     if isinstance(error_codes, six.integer_types):
@@ -146,7 +149,11 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
                     return f(*args, **kwargs)
                 except exceptions as exc:
                     with excutils.save_and_reraise_exception() as ctxt:
-                        err_code = getattr(exc, 'error_code', None)
+                        if extract_err_code_func:
+                            err_code = extract_err_code_func(exc)
+                        else:
+                            err_code = getattr(exc, 'error_code', None)
+
                         expected_err_code = (err_code in error_codes or not
                                              error_codes)
 
@@ -191,6 +198,37 @@ def retry_decorator(max_retry_count=5, timeout=None, inc_sleep_time=1,
     return wrapper
 
 
+def wmi_retry_decorator(exceptions=exceptions.x_wmi, **kwargs):
+    """Retry decorator that can be used for specific WMI error codes.
+
+    This function will extract the error code from the hresult. Use
+    wmi_retry_decorator_hresult if you want the original hresult to
+    be checked.
+    """
+
+    def err_code_func(exc):
+        com_error = getattr(exc, 'com_error', None)
+        if com_error:
+            return get_com_error_code(com_error)
+
+    return retry_decorator(extract_err_code_func=err_code_func,
+                           exceptions=exceptions,
+                           **kwargs)
+
+
+def wmi_retry_decorator_hresult(exceptions=exceptions.x_wmi, **kwargs):
+    """Retry decorator that can be used for specific WMI HRESULTs"""
+
+    def err_code_func(exc):
+        com_error = getattr(exc, 'com_error', None)
+        if com_error:
+            return get_com_error_hresult(com_error)
+
+    return retry_decorator(extract_err_code_func=err_code_func,
+                           exceptions=exceptions,
+                           **kwargs)
+
+
 def get_ips(addr):
     addr_info = socket.getaddrinfo(addr, None, 0, 0, 0)
     # Returns IPv4 and IPv6 addresses, ordered by protocol family
@@ -219,11 +257,22 @@ def avoid_blocking_call_decorator(f):
     return wrapper
 
 
+def hresult_to_err_code(hresult):
+    # The last 2 bytes of the hresult store the error code.
+    return hresult & 0xFFFF
+
+
 def get_com_error_hresult(com_error):
     try:
         return ctypes.c_uint(com_error.excepinfo[5]).value
     except Exception:
         LOG.debug("Unable to retrieve COM error hresult: %s", com_error)
+
+
+def get_com_error_code(com_error):
+    hres = get_com_error_hresult(com_error)
+    if hres is not None:
+        return hresult_to_err_code(hres)
 
 
 def _is_not_found_exc(exc):

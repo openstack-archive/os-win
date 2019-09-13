@@ -34,6 +34,7 @@ class FakeWMIExc(exceptions.x_wmi):
         super(FakeWMIExc, self).__init__()
         excepinfo = [None] * 5 + [hresult]
         self.com_error = mock.Mock(excepinfo=excepinfo)
+        self.com_error.hresult = hresult
 
 
 class BaseTestCase(base.BaseTestCase):

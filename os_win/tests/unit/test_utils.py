@@ -62,10 +62,11 @@ class UtilsTestCase(test_base.BaseTestCase):
         self.assertEqual(('', ''), result)
 
     def _get_fake_func_with_retry_decorator(self, side_effect,
+                                            decorator=_utils.retry_decorator,
                                             *args, **kwargs):
         func_side_effect = mock.Mock(side_effect=side_effect)
 
-        @_utils.retry_decorator(*args, **kwargs)
+        @decorator(*args, **kwargs)
         def fake_func(*_args, **_kwargs):
             return func_side_effect(*_args, **_kwargs)
 
@@ -228,6 +229,38 @@ class UtilsTestCase(test_base.BaseTestCase):
         else:
             self.assertFalse(mock_execute.called)
 
+    @mock.patch.object(_utils, 'time')
+    @ddt.data(True, False)
+    def test_wmi_retry_decorator(self, expect_hres, mock_time):
+        expected_hres = 0x8007beef
+        expected_err_code = expected_hres if expect_hres else 0xbeef
+        other_hres = 0x80070001
+        max_retry_count = 5
+        # The second exception will contain an unexpected error code,
+        # in which case we expect the function to propagate the error.
+        expected_try_count = 2
+
+        side_effect = [test_base.FakeWMIExc(hresult=expected_hres),
+                       test_base.FakeWMIExc(hresult=other_hres)]
+
+        decorator = (_utils.wmi_retry_decorator_hresult if expect_hres
+                     else _utils.wmi_retry_decorator)
+        (fake_func,
+         fake_func_side_effect) = self._get_fake_func_with_retry_decorator(
+            error_codes=expected_err_code,
+            max_retry_count=max_retry_count,
+            decorator=decorator,
+            side_effect=side_effect)
+
+        self.assertRaises(test_base.FakeWMIExc,
+                          fake_func,
+                          mock.sentinel.arg,
+                          kwarg=mock.sentinel.kwarg)
+
+        fake_func_side_effect.assert_has_calls(
+            [mock.call(mock.sentinel.arg, kwarg=mock.sentinel.kwarg)] *
+            expected_try_count)
+
     def test_get_com_error_hresult(self):
         fake_hres = -5
         expected_hres = (1 << 32) + fake_hres
@@ -242,17 +275,33 @@ class UtilsTestCase(test_base.BaseTestCase):
         ret_val = _utils.get_com_error_hresult(None)
         self.assertIsNone(ret_val)
 
-    @ddt.data(_utils._WBEM_E_NOT_FOUND, mock.sentinel.wbem_error)
+    def test_hresult_to_err_code(self):
+        # This could differ based on the error source.
+        # Only the last 2 bytes of the hresult the error code.
+        fake_file_exists_hres = -0x7ff8ffb0
+        file_exists_err_code = 0x50
+
+        ret_val = _utils.hresult_to_err_code(fake_file_exists_hres)
+        self.assertEqual(file_exists_err_code, ret_val)
+
     @mock.patch.object(_utils, 'get_com_error_hresult')
-    def test_is_not_found_exc(self, hresult, mock_get_com_error_hresult):
-        mock_get_com_error_hresult.return_value = hresult
-        exc = mock.MagicMock()
+    @mock.patch.object(_utils, 'hresult_to_err_code')
+    def test_get_com_error_code(self, mock_hres_to_err_code, mock_get_hresult):
+        ret_val = _utils.get_com_error_code(mock.sentinel.com_err)
+
+        self.assertEqual(mock_hres_to_err_code.return_value, ret_val)
+        mock_get_hresult.assert_called_once_with(mock.sentinel.com_err)
+        mock_hres_to_err_code.assert_called_once_with(
+            mock_get_hresult.return_value)
+
+    @ddt.data(_utils._WBEM_E_NOT_FOUND, mock.sentinel.wbem_error)
+    def test_is_not_found_exc(self, hresult):
+        exc = test_base.FakeWMIExc(hresult=hresult)
 
         result = _utils._is_not_found_exc(exc)
 
         expected = hresult == _utils._WBEM_E_NOT_FOUND
         self.assertEqual(expected, result)
-        mock_get_com_error_hresult.assert_called_once_with(exc.com_error)
 
     @mock.patch.object(_utils, 'get_com_error_hresult')
     def test_not_found_decorator(self, mock_get_com_error_hresult):
