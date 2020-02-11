@@ -22,10 +22,10 @@ import tempfile
 
 from oslo_log import log as logging
 from oslo_utils import fileutils
-import six
 
 from os_win._i18n import _
 from os_win import _utils
+import os_win.conf
 from os_win import exceptions
 from os_win.utils import _acl_utils
 from os_win.utils.io import ioutils
@@ -38,7 +38,16 @@ from os_win.utils.winapi import wintypes
 
 kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
+CONF = os_win.conf.CONF
 LOG = logging.getLogger(__name__)
+
+file_in_use_retry_decorator = _utils.retry_decorator(
+    exceptions=exceptions.WindowsError,
+    extract_err_code_func=lambda x: x.winerror,
+    error_codes=[w_const.ERROR_SHARING_VIOLATION,
+                 w_const.ERROR_DIR_IS_NOT_EMPTY],
+    timeout=CONF.os_win.file_in_use_timeout,
+    max_retry_count=None)
 
 
 class PathUtils(object):
@@ -59,9 +68,11 @@ class PathUtils(object):
     def makedirs(self, path):
         os.makedirs(path)
 
+    @file_in_use_retry_decorator
     def remove(self, path):
         os.remove(path)
 
+    @file_in_use_retry_decorator
     def rename(self, src, dest):
         os.rename(src, dest)
 
@@ -127,16 +138,9 @@ class PathUtils(object):
             if os.path.isfile(src):
                 self.rename(src, os.path.join(dest_dir, fname))
 
-    @_utils.retry_decorator(exceptions=exceptions.OSWinException,
-                            error_codes=[w_const.ERROR_DIR_IS_NOT_EMPTY])
+    @file_in_use_retry_decorator
     def rmtree(self, path):
-        try:
-            shutil.rmtree(path)
-        except exceptions.WindowsError as ex:
-            # NOTE(claudiub): convert it to an OSWinException in order to use
-            # the retry_decorator.
-            raise exceptions.OSWinException(six.text_type(ex),
-                                            error_code=ex.winerror)
+        shutil.rmtree(path)
 
     def check_create_dir(self, path):
         if not self.exists(path):

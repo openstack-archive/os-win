@@ -120,16 +120,18 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(pathutils.shutil, 'rmtree')
     def _check_rmtree(self, mock_rmtree, mock_sleep, side_effect):
         mock_rmtree.side_effect = side_effect
-        self.assertRaises(exceptions.OSWinException, self._pathutils.rmtree,
+        self.assertRaises(exceptions.WindowsError, self._pathutils.rmtree,
                           mock.sentinel.FAKE_PATH)
 
     def test_rmtree_unexpected(self):
         self._check_rmtree(side_effect=exceptions.WindowsError)
 
-    def test_rmtree_exceeded(self):
+    @mock.patch('time.time')
+    def test_rmtree_exceeded(self, mock_time):
+        mock_time.side_effect = range(1, 100, 10)
         exc = exceptions.WindowsError()
         exc.winerror = w_const.ERROR_DIR_IS_NOT_EMPTY
-        self._check_rmtree(side_effect=[exc] * 6)
+        self._check_rmtree(side_effect=exc)
 
     @mock.patch.object(pathutils.PathUtils, 'makedirs')
     @mock.patch.object(pathutils.PathUtils, 'exists')
