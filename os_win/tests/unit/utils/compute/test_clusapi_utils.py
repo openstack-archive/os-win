@@ -503,7 +503,7 @@ class ClusApiUtilsTestCase(test_base.OsWinBaseTestCase):
             self._clusapi_utils.get_property_list_entry(
                 w_const.CLUSREG_NAME_GRP_TYPE,
                 w_const.CLUSPROP_SYNTAX_LIST_VALUE_DWORD,
-                ctypes.c_ulonglong(w_const.ClusGroupTypeVirtualMachine)),
+                ctypes.c_ulong(w_const.ClusGroupTypeVirtualMachine)),
         ]
 
         prop_list = self._clusapi_utils.get_property_list(prop_entries)
