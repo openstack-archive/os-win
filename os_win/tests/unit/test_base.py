@@ -19,6 +19,8 @@ from oslotest import base
 from oslotest import mock_fixture
 from six.moves import builtins
 
+import os
+
 from os_win import exceptions
 from os_win.utils import baseutils
 
@@ -66,6 +68,13 @@ class OsWinBaseTestCase(BaseTestCase):
         mock_os = mock.MagicMock(Version='6.3.0')
         self._mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = (
             [mock_os])
-        wmi_patcher = mock.patch.object(builtins, 'wmi', create=True,
-                                        new=self._mock_wmi)
+
+        if os.name == 'nt':
+            # The wmi module is expected to exist and by the time this runs,
+            # the tested module will have imported it already.
+            wmi_patcher = mock.patch('wmi.WMI', new=self._mock_wmi.WMI)
+        else:
+            # The wmi module doesn't exist, we'll have to "create" it.
+            wmi_patcher = mock.patch.object(builtins, 'wmi', create=True,
+                                            new=self._mock_wmi)
         wmi_patcher.start()
