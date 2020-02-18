@@ -15,6 +15,8 @@
 import mock
 import six
 
+import imp
+
 from os_win.tests.unit import test_base
 from os_win.utils import baseutils
 
@@ -26,6 +28,7 @@ class BaseUtilsTestCase(test_base.OsWinBaseTestCase):
         super(BaseUtilsTestCase, self).setUp()
         self.utils = baseutils.BaseUtils()
         self.utils._conn = mock.MagicMock()
+        mock.patch.object(imp, 'load_source').start()
 
     @mock.patch.object(baseutils, 'wmi', create=True)
     def test_get_wmi_obj(self, mock_wmi):
@@ -80,6 +83,7 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
         self.utils = baseutils.BaseUtilsVirt()
         self.utils._conn_attr = mock.MagicMock()
         baseutils.BaseUtilsVirt._os_version = None
+        mock.patch.object(imp, 'load_source').start()
 
     @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_conn')
     def test_conn(self, mock_get_wmi_conn):
@@ -97,21 +101,20 @@ class BaseUtilsVirtTestCase(test_base.OsWinBaseTestCase):
         self.assertEqual(expected, self.utils._vs_man_svc)
         self.assertEqual(expected, self.utils._vs_man_svc_attr)
 
-    @mock.patch.object(baseutils, 'imp')
     @mock.patch.object(baseutils, 'wmi', create=True)
-    def test_vs_man_svc_2012(self, mock_wmi, mock_imp):
+    def test_vs_man_svc_2012(self, mock_wmi):
         baseutils.BaseUtilsVirt._old_wmi = None
         mock_os = mock.MagicMock(Version='6.2.0')
         mock_wmi.WMI.return_value.Win32_OperatingSystem.return_value = [
             mock_os]
         fake_module_path = '/fake/path/to/module'
         mock_wmi.__path__ = [fake_module_path]
-        old_conn = mock_imp.load_source.return_value.WMI.return_value
+        old_conn = imp.load_source.return_value.WMI.return_value
 
         expected = old_conn.Msvm_VirtualSystemManagementService()[0]
         self.assertEqual(expected, self.utils._vs_man_svc)
         self.assertIsNone(self.utils._vs_man_svc_attr)
-        mock_imp.load_source.assert_called_once_with(
+        imp.load_source.assert_called_once_with(
             'old_wmi', '%s.py' % fake_module_path)
 
     @mock.patch.object(baseutils.BaseUtilsVirt, '_get_wmi_compat_conn')

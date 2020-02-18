@@ -43,7 +43,8 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
     _FAKE_VM_NAME = 'instance-00000001'
     _FAKE_RESOURCEGROUP_NAME = 'Virtual Machine %s' % _FAKE_VM_NAME
 
-    def setUp(self):
+    @mock.patch.object(clusterutils.ClusterUtils, '_init_hyperv_conn')
+    def setUp(self, mock_get_wmi_conn):
         super(ClusterUtilsTestCase, self).setUp()
         self._clusterutils = clusterutils.ClusterUtils()
         self._clusterutils._conn_cluster = mock.MagicMock()

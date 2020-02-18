@@ -126,7 +126,8 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
             expected_class=diskutils.DiskUtils,
             class_type='diskutils')
 
-    def test_get_clusterutils(self):
+    @mock.patch.object(clusterutils.ClusterUtils, '_init_hyperv_conn')
+    def test_get_clusterutils(self, mock_init_conn):
         self._check_get_class(
             expected_class=clusterutils.ClusterUtils,
             class_type='clusterutils')
