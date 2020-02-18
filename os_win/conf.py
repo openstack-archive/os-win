@@ -39,7 +39,13 @@ os_win_opts = [
     cfg.IntOpt('connect_cluster_timeout',
                default=0,
                help='The amount of time to wait for the Failover Cluster '
-                    'service to be available.')
+                    'service to be available.'),
+    cfg.IntOpt('file_in_use_timeout',
+               default=15,
+               help='The amount of seconds to wait for in-use files when '
+                    'performing moves or deletions. This can help mitigate '
+                    'issues occurring due to Hyper-V locks or even 3rd party '
+                    'backup tools.'),
 ]
 
 CONF = cfg.CONF
