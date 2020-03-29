@@ -37,7 +37,7 @@ class PathUtilsTestCase(test_base.OsWinBaseFunctionalTestCase):
         # The flags will be matched regardless of
         # other flags and their order.
         escaped_access_flags = access_flags.replace(
-            "(", "(?=.*\(").replace(")", r"\))")
+            "(", r"(?=.*\(").replace(")", r"\))")
         pattern = "%s:%s.*" % (access_to, escaped_access_flags)
 
         match = re.findall(pattern, raw_out,

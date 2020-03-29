@@ -13,11 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ast
-import os
-import re
-
-from os_win.utils.winapi import libs as w_lib
 
 """
 Guidelines for writing new hacking checks
@@ -31,15 +26,23 @@ Guidelines for writing new hacking checks
  - List the new rule in the top level HACKING.rst file
 """
 
+import ast
+import os
+import re
+
+from hacking import core
+from os_win.utils.winapi import libs as w_lib
+
+
 UNDERSCORE_IMPORT_FILES = []
 
 cfg_re = re.compile(r".*\scfg\.")
 asse_trueinst_re = re.compile(
     r"(.)*assertTrue\(isinstance\((\w|\.|\'|\"|\[|\])+, "
-    "(\w|\.|\'|\"|\[|\])+\)\)")
+    r"(\w|\.|\'|\"|\[|\])+\)\)")
 asse_equal_type_re = re.compile(
     r"(.)*assertEqual\(type\((\w|\.|\'|\"|\[|\])+\), "
-    "(\w|\.|\'|\"|\[|\])+\)")
+    r"(\w|\.|\'|\"|\[|\])+\)")
 asse_equal_in_end_with_true_or_false_re = re.compile(
     r"assertEqual\("
     r"(\w|[][.'\"])+ in (\w|[][.'\", ])+, (True|False)\)")
@@ -127,6 +130,7 @@ class BaseASTChecker(ast.NodeVisitor):
         return False
 
 
+@core.flake8ext
 def use_timeutils_utcnow(logical_line, filename):
     # tools are OK to use the standard datetime module
     if "/tools/" in filename:
@@ -141,6 +145,7 @@ def use_timeutils_utcnow(logical_line, filename):
             yield (pos, msg % f)
 
 
+@core.flake8ext
 def capital_cfg_help(logical_line, tokens):
     msg = "N313: capitalize help string"
 
@@ -149,9 +154,10 @@ def capital_cfg_help(logical_line, tokens):
             if tokens[t][1] == "help":
                 txt = tokens[t + 2][1]
                 if len(txt) > 1 and txt[1].islower():
-                        yield(0, msg)
+                    yield(0, msg)
 
 
+@core.flake8ext
 def assert_true_instance(logical_line):
     """Check for assertTrue(isinstance(a, b)) sentences
 
@@ -161,6 +167,7 @@ def assert_true_instance(logical_line):
         yield (0, "N316: assertTrue(isinstance(a, b)) sentences not allowed")
 
 
+@core.flake8ext
 def assert_equal_type(logical_line):
     """Check for assertEqual(type(A), B) sentences
 
@@ -170,6 +177,7 @@ def assert_equal_type(logical_line):
         yield (0, "N317: assertEqual(type(A), B) sentences not allowed")
 
 
+@core.flake8ext
 def assert_equal_none(logical_line):
     """Check for assertEqual(A, None) or assertEqual(None, A) sentences
 
@@ -182,6 +190,7 @@ def assert_equal_none(logical_line):
                "sentences not allowed")
 
 
+@core.flake8ext
 def no_translate_logs(logical_line):
     """Check for 'LOG.*(_('
 
@@ -198,6 +207,7 @@ def no_translate_logs(logical_line):
         yield(0, "C312: Log messages should not be translated!")
 
 
+@core.flake8ext
 def no_import_translation_in_tests(logical_line, filename):
     """Check for 'from os_win._i18n import _'
 
@@ -210,6 +220,7 @@ def no_import_translation_in_tests(logical_line, filename):
             yield(0, "N337 Don't import translation in tests")
 
 
+@core.flake8ext
 def no_setting_conf_directly_in_tests(logical_line, filename):
     """Check for setting CONF.* attributes directly in tests
 
@@ -227,12 +238,14 @@ def no_setting_conf_directly_in_tests(logical_line, filename):
                       "forbidden. Use self.flags(option=value) instead")
 
 
+@core.flake8ext
 def no_mutable_default_args(logical_line):
     msg = "N322: Method's default argument shouldn't be mutable!"
     if mutable_default_args.match(logical_line):
         yield (0, msg)
 
 
+@core.flake8ext
 def check_explicit_underscore_import(logical_line, filename):
     """Check for explicit import of the _ function
 
@@ -253,6 +266,7 @@ def check_explicit_underscore_import(logical_line, filename):
         yield(0, "N323: Found use of _() without explicit import of _ !")
 
 
+@core.flake8ext
 def use_jsonutils(logical_line, filename):
     # tools are OK to use the standard json module
     if "/tools/" in filename:
@@ -277,6 +291,9 @@ class CheckForStrUnicodeExc(BaseASTChecker):
     used on an exception created in the same scope, this does not
     catch it.
     """
+
+    name = "check_for_str_unicode_exc"
+    version = "1.0"
 
     CHECK_DESC = ('N325 str() and unicode() cannot be used on an '
                   'exception.  Remove or use six.text_type()')
@@ -313,6 +330,9 @@ class CheckForTransAdd(BaseASTChecker):
     string to give the translators the most information.
     """
 
+    name = "check_for_trans_add"
+    version = "1.0"
+
     CHECK_DESC = ('N326 Translated messages cannot be concatenated.  '
                   'String should be included in translated message.')
 
@@ -327,6 +347,7 @@ class CheckForTransAdd(BaseASTChecker):
         super(CheckForTransAdd, self).generic_visit(node)
 
 
+@core.flake8ext
 def assert_true_or_false_with_in(logical_line):
     """Check for assertTrue/False(A in B), assertTrue/False(A not in B),
 
@@ -344,6 +365,7 @@ def assert_true_or_false_with_in(logical_line):
                   "contents.")
 
 
+@core.flake8ext
 def assert_raises_regexp(logical_line):
     """Check for usage of deprecated assertRaisesRegexp
 
@@ -356,6 +378,7 @@ def assert_raises_regexp(logical_line):
                   "of assertRaisesRegexp")
 
 
+@core.flake8ext
 def dict_constructor_with_list_copy(logical_line):
     msg = ("N336: Must use a dict comprehension instead of a dict constructor"
            " with a sequence of key-value pairs."
@@ -364,6 +387,7 @@ def dict_constructor_with_list_copy(logical_line):
         yield (0, msg)
 
 
+@core.flake8ext
 def assert_equal_in(logical_line):
     """Check for assertEqual(A in B, True), assertEqual(True, A in B),
 
@@ -380,6 +404,7 @@ def assert_equal_in(logical_line):
                   "contents.")
 
 
+@core.flake8ext
 def assert_ctypes_libs_not_used_directly(logical_line, filename):
     # We allow this only for the modules containing the library definitions.
     w_lib_path = os.path.join(*w_lib.__name__.split('.'))
@@ -403,6 +428,7 @@ def _get_module_src(path):
     return _module_src_cache[path]
 
 
+@core.flake8ext
 def assert_ctypes_foreign_func_argtypes_defined(logical_line):
     res = ctypes_func_typedefs_re.findall(logical_line)
 
@@ -418,25 +444,3 @@ def assert_ctypes_foreign_func_argtypes_defined(logical_line):
             yield (0, "O302: Foreign function called using ctypes without "
                       "having its argument and return value types declared "
                       "in %s.%s.py." % (w_lib.__name__, lib_name))
-
-
-def factory(register):
-    register(use_timeutils_utcnow)
-    register(capital_cfg_help)
-    register(no_import_translation_in_tests)
-    register(assert_true_instance)
-    register(assert_equal_type)
-    register(assert_equal_none)
-    register(assert_raises_regexp)
-    register(no_translate_logs)
-    register(no_setting_conf_directly_in_tests)
-    register(no_mutable_default_args)
-    register(check_explicit_underscore_import)
-    register(use_jsonutils)
-    register(CheckForStrUnicodeExc)
-    register(CheckForTransAdd)
-    register(assert_true_or_false_with_in)
-    register(dict_constructor_with_list_copy)
-    register(assert_equal_in)
-    register(assert_ctypes_libs_not_used_directly)
-    register(assert_ctypes_foreign_func_argtypes_defined)

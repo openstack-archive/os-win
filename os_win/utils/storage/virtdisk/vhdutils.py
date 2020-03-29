@@ -634,7 +634,7 @@ class VHDUtils(object):
 
         :param vhd_path: an attached disk image path.
         :returns: the mount path of the specified image, in the form of
-                  \\.\PhysicalDriveX.
+                  \\\\.\\PhysicalDriveX.
         """
 
         open_flag = w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS

@@ -1027,8 +1027,8 @@ class ClusterEventListenerTestCase(test_base.OsWinBaseTestCase):
     @mock.patch.object(clusterutils._ClusterEventListener,
                        'stop')
     def test_context_manager(self, mock_stop, mock_ensure_running):
-        with self._listener as l:
-            self.assertIs(self._listener, l)
+        with self._listener as li:
+            self.assertIs(self._listener, li)
             mock_ensure_running.assert_called_once_with()
 
         mock_stop.assert_called_once_with()
