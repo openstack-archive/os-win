@@ -17,7 +17,6 @@ import contextlib
 import ctypes
 import os
 import shutil
-import sys
 import tempfile
 
 from oslo_log import log as logging
@@ -153,17 +152,7 @@ class PathUtils(object):
             self.rmtree(path)
 
     def is_symlink(self, path):
-        if sys.version_info >= (3, 2):
-            return os.path.islink(path)
-
-        file_attr = self._win32_utils.run_and_check_output(
-            kernel32.GetFileAttributesW,
-            path,
-            error_ret_vals=[w_const.INVALID_FILE_ATTRIBUTES],
-            kernel32_lib_func=True)
-
-        return bool(os.path.isdir(path) and (
-            file_attr & w_const.FILE_ATTRIBUTE_REPARSE_POINT))
+        return os.path.islink(path)
 
     def create_sym_link(self, link, target, target_is_dir=True):
         """If target_is_dir is True, a junction will be created.
