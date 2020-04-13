@@ -15,7 +15,6 @@
 
 import ctypes
 import struct
-import sys
 
 from eventlet import patcher
 from oslo_log import log as logging
@@ -34,11 +33,7 @@ kernel32 = w_lib.get_shared_lib_handle(w_lib.KERNEL32)
 
 LOG = logging.getLogger(__name__)
 
-# Avoid using six.moves.queue as we need a non monkey patched class
-if sys.version_info > (3, 0):
-    Queue = patcher.original('queue')
-else:
-    Queue = patcher.original('Queue')
+Queue = patcher.original('queue')
 
 WAIT_PIPE_DEFAULT_TIMEOUT = 5  # seconds
 WAIT_IO_COMPLETION_TIMEOUT = 2 * units.k

@@ -155,8 +155,7 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
     @mock.patch('os.path.isdir')
     @mock.patch('os.path.islink')
     def _test_check_symlink(self, mock_is_symlink, mock_is_dir,
-                            is_symlink=True, python_version=(2, 7),
-                            is_dir=True):
+                            is_symlink=True, is_dir=True):
         fake_path = r'c:\\fake_path'
         if is_symlink:
             f_attr = 0x400
@@ -167,17 +166,8 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_is_symlink.return_value = is_symlink
         self._mock_run.return_value = f_attr
 
-        with mock.patch('sys.version_info', python_version):
-            ret_value = self._pathutils.is_symlink(fake_path)
-
-        if python_version >= (3, 2):
-            mock_is_symlink.assert_called_once_with(fake_path)
-        else:
-            self._mock_run.assert_called_once_with(
-                pathutils.kernel32.GetFileAttributesW,
-                fake_path,
-                error_ret_vals=[w_const.INVALID_FILE_ATTRIBUTES],
-                kernel32_lib_func=True)
+        ret_value = self._pathutils.is_symlink(fake_path)
+        mock_is_symlink.assert_called_once_with(fake_path)
 
         self.assertEqual(is_symlink, ret_value)
 
@@ -186,9 +176,6 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
 
     def test_is_not_symlink(self):
         self._test_check_symlink(is_symlink=False)
-
-    def test_is_symlink_python_gt_3_2(self):
-        self._test_check_symlink(python_version=(3, 3))
 
     def test_create_sym_link(self):
         tg_is_dir = False
