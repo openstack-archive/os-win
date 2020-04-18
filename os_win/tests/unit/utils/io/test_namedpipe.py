@@ -14,8 +14,8 @@
 #    under the License.
 
 import errno
+from unittest import mock
 
-import mock
 from six.moves import builtins
 
 from os_win import constants

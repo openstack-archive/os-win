@@ -17,7 +17,7 @@
 Unit tests for the Hyper-V NVGRE support.
 """
 
-import mock
+from unittest import mock
 
 from os_win import constants
 from os_win import exceptions

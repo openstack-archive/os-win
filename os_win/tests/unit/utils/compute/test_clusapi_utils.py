@@ -14,9 +14,9 @@
 #    under the License.
 
 import ctypes
+from unittest import mock
 
 import ddt
-import mock
 
 from os_win import constants
 from os_win import exceptions

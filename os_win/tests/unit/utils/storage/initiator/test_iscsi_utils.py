@@ -16,9 +16,9 @@
 
 import collections
 import ctypes
+from unittest import mock
 
 import ddt
-import mock
 import six
 
 from os_win import _utils

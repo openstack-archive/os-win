@@ -13,8 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.import mock
 
+from unittest import mock
+
 import ddt
-import mock
 import six
 
 from os_win import constants

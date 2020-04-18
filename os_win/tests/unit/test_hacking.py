@@ -16,8 +16,8 @@
 
 import os
 import textwrap
+from unittest import mock
 
-import mock
 import pycodestyle
 
 from os_win._hacking import checks

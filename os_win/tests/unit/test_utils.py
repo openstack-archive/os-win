@@ -18,8 +18,9 @@
 Unit tests for the os_win._utils module.
 """
 
+from unittest import mock
+
 import ddt
-import mock
 
 from os_win import _utils
 from os_win import constants

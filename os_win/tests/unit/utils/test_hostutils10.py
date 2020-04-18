@@ -14,8 +14,8 @@
 #    under the License.
 
 import re
+from unittest import mock
 
-import mock
 
 from os_win import exceptions
 from os_win.tests.unit import test_base

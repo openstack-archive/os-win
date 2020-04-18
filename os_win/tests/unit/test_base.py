@@ -14,7 +14,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import mock
+from unittest import mock
+
 from oslotest import base
 from oslotest import mock_fixture
 from six.moves import builtins

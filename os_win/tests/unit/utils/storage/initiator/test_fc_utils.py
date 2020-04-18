@@ -14,8 +14,8 @@
 #    under the License.
 
 import ctypes
+from unittest import mock
 
-import mock
 import six
 
 from os_win import _utils
