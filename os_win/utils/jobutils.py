@@ -20,7 +20,6 @@ Base Utility class for operations on Hyper-V.
 
 import time
 
-import monotonic
 from oslo_log import log as logging
 
 from os_win import _utils
@@ -89,7 +88,7 @@ class JobUtils(baseutils.BaseUtilsVirt):
         report_interval = 5
 
         while not self._is_job_completed(job):
-            now = monotonic.monotonic()
+            now = time.monotonic()
             if now - last_report_time > report_interval:
                 job_details = self._get_job_details(job)
                 LOG.debug("Waiting for WMI job: %s.", job_details)
