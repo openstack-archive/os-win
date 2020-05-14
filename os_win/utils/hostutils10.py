@@ -27,8 +27,8 @@ class HostUtils10(hostutils.HostUtils):
 
     _HGS_NAMESPACE = '//%s/Root/Microsoft/Windows/Hgs'
 
-    _PCI_VENDOR_ID_REGEX = re.compile('VEN_(.*)&DEV')
-    _PCI_PRODUCT_ID_REGEX = re.compile('DEV_(.*)&SUBSYS')
+    _PCI_VENDOR_ID_REGEX = re.compile('VEN_(.*)&DEV', re.IGNORECASE)
+    _PCI_PRODUCT_ID_REGEX = re.compile('DEV_(.*)&SUBSYS', re.IGNORECASE)
     _PCI_ADDRESS_REGEX = re.compile(r'\b\d+\b')
 
     def __init__(self, host='.'):
