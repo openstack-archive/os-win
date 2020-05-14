@@ -229,7 +229,8 @@ class VMUtils10(vmutils.VMUtils6_3):
 
         pattern = re.compile(
             "^(.*)VEN_%(vendor_id)s&DEV_%(product_id)s&(.*)$" % {
-                'vendor_id': vendor_id, 'product_id': product_id})
+                'vendor_id': vendor_id, 'product_id': product_id},
+            re.IGNORECASE)
         for dev in pci_devices:
             if pattern.match(dev.DeviceID):
                 # NOTE(claudiub): if the given PCI device is already assigned,
@@ -260,7 +261,8 @@ class VMUtils10(vmutils.VMUtils6_3):
 
         pattern = re.compile(
             "^(.*)VEN_%(vendor_id)s&DEV_%(product_id)s&(.*)$" % {
-                'vendor_id': vendor_id, 'product_id': product_id})
+                'vendor_id': vendor_id, 'product_id': product_id},
+            re.IGNORECASE)
 
         pci_sds = _wqlutils.get_element_associated_class(
             self._conn, self._PCI_EXPRESS_SETTING_DATA,
