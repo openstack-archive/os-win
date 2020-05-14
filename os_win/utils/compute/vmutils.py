@@ -1064,7 +1064,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
         # need to accept Msvm_DiskDrive object paths for image files as well,
         # an extra check will be needed, but that may lead to some other
         # inconsistencies.
-        is_physical = r'root\virtualization\v2:Msvm_DiskDrive' in drive_path
+        is_physical = (r'root\virtualization\v2:Msvm_DiskDrive'.lower() in
+                       drive_path.lower())
         drive = self._get_mounted_disk_resource_from_path(
             drive_path, is_physical=is_physical)
 
