@@ -59,9 +59,10 @@ project = u'OS-WIN Release Notes'
 copyright = u'2015, Winstackers Developers'
 
 # openstackdocstheme options
-repository_name = 'openstack/os-win'
-bug_project = 'os-win'
-bug_tag = ''
+openstackdocs_repo_name = 'openstack/os-win'
+openstackdocs_auto_name = False
+openstackdocs_bug_project = 'os-win'
+openstackdocs_bug_tag = ''
 
 # Release notes do not need a version in the title, they span
 # multiple versions.
@@ -100,7 +101,7 @@ exclude_patterns = []
 # show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'native'
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
