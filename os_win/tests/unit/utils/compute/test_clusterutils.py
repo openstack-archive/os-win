@@ -186,7 +186,7 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
 
         ret = self._clusterutils.get_cluster_node_names()
 
-        self.assertItemsEqual(['node1', 'node2'], ret)
+        self.assertCountEqual(['node1', 'node2'], ret)
 
     @mock.patch.object(clusterutils.ClusterUtils, '_get_cluster_group_state')
     def test_get_vm_host(self, mock_get_state):
@@ -208,14 +208,14 @@ class ClusterUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_get_vm_groups.return_value = [dict(name='vm1'),
                                            dict(name='vm2')]
         ret = self._clusterutils.list_instances()
-        self.assertItemsEqual(['vm1', 'vm2'], ret)
+        self.assertCountEqual(['vm1', 'vm2'], ret)
 
     @mock.patch.object(clusterutils.ClusterUtils, '_get_vm_groups')
     def test_list_instance_uuids(self, mock_get_vm_groups):
         mock_get_vm_groups.return_value = [dict(id='uuid1'),
                                            dict(id='uuid2')]
         ret = self._clusterutils.list_instance_uuids()
-        self.assertItemsEqual(['uuid1', 'uuid2'], ret)
+        self.assertCountEqual(['uuid1', 'uuid2'], ret)
 
     @ddt.data(True, False)
     @mock.patch.object(clusterutils.ClusterUtils,
