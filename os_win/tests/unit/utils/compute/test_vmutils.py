@@ -329,6 +329,7 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         {'vnuma_enabled': mock.sentinel.vnuma_enabled},
         {'configuration_root_dir': mock.sentinel.configuration_root_dir},
         {'host_shutdown_action': mock.sentinel.shutdown_action},
+        {'chassis_asset_tag': mock.sentinel.chassis_asset_tag2},
         {})
     @ddt.unpack
     @mock.patch.object(vmutils.VMUtils, '_modify_virtual_system')
@@ -341,7 +342,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                        mock_set_mem, mock_set_vcpus,
                        mock_modify_virtual_system,
                        host_shutdown_action=None,
-                       configuration_root_dir=None, vnuma_enabled=None):
+                       configuration_root_dir=None, vnuma_enabled=None,
+                       chassis_asset_tag=None):
         mock_vmsettings = mock_lookup_vm_check.return_value
         self._vmutils.update_vm(
             mock.sentinel.vm_name, mock.sentinel.memory_mb,
@@ -350,7 +352,8 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
             mock.sentinel.dynamic_mem_ratio, configuration_root_dir,
             host_shutdown_action=host_shutdown_action,
             vnuma_enabled=vnuma_enabled,
-            snapshot_type=mock.sentinel.snap_type)
+            snapshot_type=mock.sentinel.snap_type,
+            chassis_asset_tag=chassis_asset_tag)
 
         mock_lookup_vm_check.assert_called_once_with(mock.sentinel.vm_name,
                                                      for_update=True)
@@ -377,6 +380,10 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
                              mock_vmsettings.AutomaticShutdownAction)
         if vnuma_enabled:
             self.assertEqual(vnuma_enabled, mock_vmsettings.VirtualNumaEnabled)
+
+        if chassis_asset_tag:
+            self.assertEqual(chassis_asset_tag,
+                             mock_vmsettings.ChassisAssetTag)
 
         mock_set_vm_snap_type.assert_called_once_with(
             mock_vmsettings, mock.sentinel.snap_type)

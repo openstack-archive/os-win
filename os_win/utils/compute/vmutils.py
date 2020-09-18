@@ -314,7 +314,8 @@ class VMUtils(baseutils.BaseUtilsVirt):
                   configuration_root_dir=None, snapshot_dir=None,
                   host_shutdown_action=None, vnuma_enabled=None,
                   snapshot_type=None,
-                  is_planned_vm=False):
+                  is_planned_vm=False,
+                  chassis_asset_tag=None):
         vmsetting = self._lookup_vm_check(vm_name, for_update=True)
 
         if host_shutdown_action:
@@ -337,6 +338,9 @@ class VMUtils(baseutils.BaseUtilsVirt):
 
         if snapshot_type:
             self._set_vm_snapshot_type(vmsetting, snapshot_type)
+
+        if chassis_asset_tag:
+            vmsetting.ChassisAssetTag = chassis_asset_tag
 
         self._modify_virtual_system(vmsetting)
 
