@@ -662,19 +662,26 @@ class VMUtils(baseutils.BaseUtilsVirt):
         return [nic.ElementName for nic in nics]
 
     def soft_shutdown_vm(self, vm_name):
-        vm = self._lookup_vm_check(vm_name, as_vssd=False)
-        shutdown_component = self._conn.Msvm_ShutdownComponent(
-            SystemName=vm.Name)
+        try:
+            vm = self._lookup_vm_check(vm_name, as_vssd=False)
+            shutdown_component = self._conn.Msvm_ShutdownComponent(
+                SystemName=vm.Name)
 
-        if not shutdown_component:
-            # If no shutdown_component is found, it means the VM is already
-            # in a shutdown state.
-            return
+            if not shutdown_component:
+                # If no shutdown_component is found, it means the VM is already
+                # in a shutdown state.
+                return
 
-        reason = 'Soft shutdown requested by OpenStack Nova.'
-        (ret_val, ) = shutdown_component[0].InitiateShutdown(Force=False,
-                                                             Reason=reason)
-        self._jobutils.check_ret_val(ret_val, None)
+            reason = 'Soft shutdown requested by OpenStack Nova.'
+            (ret_val, ) = shutdown_component[0].InitiateShutdown(Force=False,
+                                                                 Reason=reason)
+            self._jobutils.check_ret_val(ret_val, None)
+        except exceptions.x_wmi as ex:
+            # This operation is expected to fail while the instance is booting.
+            # In some cases, InitiateShutdown immediately throws an error
+            # instead of returning an asynchronous job reference.
+            msg = _("Soft shutdown failed. VM name: %s. Error: %s.")
+            raise exceptions.HyperVException(msg % (vm_name, ex))
 
     @_utils.retry_decorator(exceptions=exceptions.WMIJobFailed)
     def set_vm_state(self, vm_name, req_state):

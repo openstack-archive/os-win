@@ -233,6 +233,19 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.check_ret_val.assert_called_once_with(
             self._FAKE_RET_VAL, None)
 
+    def test_soft_shutdown_vm_wmi_exc(self):
+        self._lookup_vm()
+        mock_shutdown = mock.MagicMock()
+        mock_shutdown.InitiateShutdown.side_effect = exceptions.x_wmi
+        self._vmutils._conn.Msvm_ShutdownComponent.return_value = [
+            mock_shutdown]
+
+        # We ensure that the wmi exception gets converted.
+        self.assertRaises(
+            exceptions.HyperVException,
+            self._vmutils.soft_shutdown_vm,
+            self._FAKE_VM_NAME)
+
     def test_soft_shutdown_vm_no_component(self):
         mock_vm = self._lookup_vm()
         self._vmutils._conn.Msvm_ShutdownComponent.return_value = []
