@@ -134,7 +134,7 @@ class VHDUtils(object):
         self._win32_utils.close_handle(handle)
 
     def create_vhd(self, new_vhd_path, new_vhd_type, src_path=None,
-                   max_internal_size=0, parent_path=None):
+                   max_internal_size=0, parent_path=None, guid=None):
         new_device_id = self._get_vhd_device_id(new_vhd_path)
 
         vst = vdisk_struct.VIRTUAL_STORAGE_TYPE(
@@ -152,6 +152,8 @@ class VHDUtils(object):
             w_const.CREATE_VHD_PARAMS_DEFAULT_BLOCK_SIZE)
         params.Version2.SectorSizeInBytes = (
             VIRTUAL_DISK_DEFAULT_SECTOR_SIZE)
+        if guid:
+            params.Version2.UniqueId = wintypes.GUID.from_str(guid)
 
         handle = wintypes.HANDLE()
         create_virtual_disk_flag = CREATE_VIRTUAL_DISK_FLAGS.get(
@@ -356,6 +358,27 @@ class VHDUtils(object):
         params = vdisk_struct.SET_VIRTUAL_DISK_INFO()
         params.Version = w_const.SET_VIRTUAL_DISK_INFO_PARENT_PATH
         params.ParentFilePath = parent_path
+
+        self._run_and_check_output(virtdisk.SetVirtualDiskInformation,
+                                   handle,
+                                   ctypes.byref(params),
+                                   cleanup_handle=handle)
+
+    def set_vhd_guid(self, vhd_path, guid):
+        # VHDX parents will not be updated, regardless of the open flag.
+        open_params = vdisk_struct.OPEN_VIRTUAL_DISK_PARAMETERS()
+        open_params.Version = w_const.OPEN_VIRTUAL_DISK_VERSION_2
+        open_params.Version2.GetInfoOnly = False
+
+        handle = self._open(
+            vhd_path,
+            open_flag=w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS,
+            open_access_mask=0,
+            open_params=ctypes.byref(open_params))
+
+        params = vdisk_struct.SET_VIRTUAL_DISK_INFO()
+        params.Version = w_const.SET_VIRTUAL_DISK_INFO_VIRTUAL_DISK_ID
+        params.VirtualDiskId = wintypes.GUID.from_str(guid)
 
         self._run_and_check_output(virtdisk.SetVirtualDiskInformation,
                                    handle,

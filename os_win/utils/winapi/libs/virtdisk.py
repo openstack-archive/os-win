@@ -180,11 +180,19 @@ class GET_VIRTUAL_DISK_INFO(ctypes.Structure):
 PGET_VIRTUAL_DISK_INFO = ctypes.POINTER(GET_VIRTUAL_DISK_INFO)
 
 
-# Only this version is used, we avoid defining a union.
+class _SET_VIRTUAL_DISK_INFO_U(ctypes.Union):
+    _fields_ = [
+        ('ParentFilePath', wintypes.LPCWSTR),
+        ('UniqueIdentifier', wintypes.GUID),
+        ('VirtualDiskId', wintypes.GUID),
+    ]
+
+
 class SET_VIRTUAL_DISK_INFO(ctypes.Structure):
+    _anonymous_ = ['_setinfo']
     _fields_ = [
         ('Version', wintypes.DWORD),
-        ('ParentFilePath', wintypes.LPCWSTR)
+        ('_setinfo', _SET_VIRTUAL_DISK_INFO_U)
     ]
 
 

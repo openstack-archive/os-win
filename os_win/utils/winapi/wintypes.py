@@ -21,6 +21,7 @@
 
 import ctypes
 import sys
+import uuid
 
 BYTE = ctypes.c_byte
 WORD = ctypes.c_ushort
@@ -82,6 +83,12 @@ class GUID(ctypes.Structure):
         ("Data3", USHORT),
         ("Data4", BYTE * 8)
     ]
+
+    @classmethod
+    def from_str(cls, guid_str):
+        py_uuid = uuid.UUID(guid_str)
+        uuid_buff = (BYTE * 16)(*py_uuid.bytes)
+        return ctypes.cast(uuid_buff, ctypes.POINTER(GUID)).contents
 
 
 class OVERLAPPED(ctypes.Structure):

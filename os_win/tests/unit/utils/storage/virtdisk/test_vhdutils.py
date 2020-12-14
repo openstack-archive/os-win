@@ -15,6 +15,7 @@
 import ctypes
 import os
 from unittest import mock
+import uuid
 
 import ddt
 import six
@@ -134,6 +135,14 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
         self._mock_close.assert_called_once_with(
             mock.sentinel.handle)
 
+    def test_guid_from_str(self):
+        buff = list(range(16))
+        py_uuid = uuid.UUID(bytes=bytes(buff))
+        guid = wintypes.GUID.from_str(str(py_uuid))
+        guid_bytes = ctypes.cast(ctypes.byref(guid),
+                                 ctypes.POINTER(wintypes.BYTE * 16)).contents
+        self.assertEqual(buff, guid_bytes[:])
+
     @mock.patch.object(vhdutils.VHDUtils, '_get_vhd_device_id')
     def _test_create_vhd(self, mock_get_dev_id, new_vhd_type):
         create_params_struct = (
@@ -151,7 +160,8 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
             new_vhd_type=new_vhd_type,
             src_path=mock.sentinel.src_path,
             max_internal_size=mock.sentinel.max_internal_size,
-            parent_path=mock.sentinel.parent_path)
+            parent_path=mock.sentinel.parent_path,
+            guid=mock.sentinel.guid)
 
         self._fake_vst_struct.assert_called_once_with(
             DeviceId=mock_get_dev_id.return_value,
@@ -174,6 +184,11 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
         self.assertEqual(
             vhdutils.VIRTUAL_DISK_DEFAULT_SECTOR_SIZE,
             fake_create_params.Version2.SectorSizeInBytes)
+        self.assertEqual(
+            vhdutils.wintypes.GUID.from_str.return_value,
+            fake_create_params.Version2.UniqueId)
+        vhdutils.wintypes.GUID.from_str.assert_called_once_with(
+            mock.sentinel.guid)
 
         self._mock_run.assert_called_once_with(
             vhdutils.virtdisk.CreateVirtualDisk,
@@ -495,6 +510,44 @@ class VHDUtilsTestCase(test_base.BaseTestCase):
                          fake_set_params.Version)
         self.assertEqual(mock.sentinel.parent_path,
                          fake_set_params.ParentFilePath)
+
+        self._mock_run.assert_called_once_with(
+            vhdutils.virtdisk.SetVirtualDiskInformation,
+            mock.sentinel.handle,
+            vhdutils.ctypes.byref(fake_set_params),
+            **self._run_args)
+        self._mock_close.assert_called_once_with(mock.sentinel.handle)
+
+    @mock.patch.object(vhdutils.VHDUtils, '_open')
+    def test_set_vhd_guid(self, mock_open):
+        set_vdisk_info_struct = (
+            self._vdisk_struct.SET_VIRTUAL_DISK_INFO)
+        open_params_struct = (
+            self._vdisk_struct.OPEN_VIRTUAL_DISK_PARAMETERS)
+
+        fake_set_params = set_vdisk_info_struct.return_value
+        fake_open_params = open_params_struct.return_value
+        mock_open.return_value = mock.sentinel.handle
+
+        self._vhdutils.set_vhd_guid(mock.sentinel.vhd_path,
+                                    mock.sentinel.guid)
+
+        self.assertEqual(w_const.OPEN_VIRTUAL_DISK_VERSION_2,
+                         fake_open_params.Version)
+        self.assertFalse(fake_open_params.Version2.GetInfoOnly)
+
+        self._vhdutils._open.assert_called_once_with(
+            mock.sentinel.vhd_path,
+            open_flag=w_const.OPEN_VIRTUAL_DISK_FLAG_NO_PARENTS,
+            open_access_mask=0,
+            open_params=vhdutils.ctypes.byref(fake_open_params))
+        vhdutils.wintypes.GUID.from_str.assert_called_once_with(
+            mock.sentinel.guid)
+
+        self.assertEqual(w_const.SET_VIRTUAL_DISK_INFO_VIRTUAL_DISK_ID,
+                         fake_set_params.Version)
+        self.assertEqual(vhdutils.wintypes.GUID.from_str.return_value,
+                         fake_set_params.VirtualDiskId)
 
         self._mock_run.assert_called_once_with(
             vhdutils.virtdisk.SetVirtualDiskInformation,
