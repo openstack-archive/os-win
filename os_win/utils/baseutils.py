@@ -18,7 +18,7 @@
 Base WMI utility class.
 """
 
-import imp
+import importlib
 import sys
 import threading
 import time
@@ -108,7 +108,11 @@ class BaseUtilsVirt(BaseUtils):
         # .GetText_ have different results.
         if not BaseUtilsVirt._old_wmi:
             old_wmi_path = "%s.py" % wmi.__path__[0]
-            BaseUtilsVirt._old_wmi = imp.load_source('old_wmi', old_wmi_path)
+            spec = importlib.util.spec_from_file_location('old_wmi',
+                                                          old_wmi_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            BaseUtilsVirt._old_wmi = module
         return BaseUtilsVirt._old_wmi.WMI(moniker=moniker, **kwargs)
 
     def _get_wmi_obj(self, moniker, compatibility_mode=False, **kwargs):
