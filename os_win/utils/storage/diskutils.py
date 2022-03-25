@@ -13,11 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import collections
 import ctypes
 import os
 import re
 import threading
+
+from collections.abc import Iterable
 
 from oslo_log import log as logging
 
@@ -200,7 +201,7 @@ class DiskUtils(baseutils.BaseUtils):
 
         ret = self._conn_storage.Msft_StorageSetting.UpdateHostStorageCache()
 
-        if isinstance(ret, collections.Iterable):
+        if isinstance(ret, Iterable):
             ret = ret[0]
 
         if ret:
