@@ -55,8 +55,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'OS-WIN Release Notes'
-copyright = u'2015, Winstackers Developers'
+project = 'OS-WIN Release Notes'
+copyright = '2015, Winstackers Developers'
 
 # openstackdocstheme options
 openstackdocs_repo_name = 'openstack/os-win'
@@ -212,8 +212,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    ('index', 'OSWINReleaseNotes.tex', u'OS-WIN Release Notes Documentation',
-     u'Winstackers Developers', 'manual'),
+    ('index', 'OSWINReleaseNotes.tex', 'OS-WIN Release Notes Documentation',
+     'Winstackers Developers', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -242,8 +242,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'oswinreleasenotes', u'OS-WIN Release Notes Documentation',
-     [u'Winstackers Developers'], 1)
+    ('index', 'oswinreleasenotes', 'OS-WIN Release Notes Documentation',
+     ['Winstackers Developers'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -256,8 +256,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'OSWINReleaseNotes', u'OS-WIN Release Notes Documentation',
-     u'Winstackers Developers', 'OSWINReleaseNotes',
+    ('index', 'OSWINReleaseNotes', 'OS-WIN Release Notes Documentation',
+     'Winstackers Developers', 'OSWINReleaseNotes',
      'Windows / Hyper-V management lib.',
      'Miscellaneous'),
 ]
