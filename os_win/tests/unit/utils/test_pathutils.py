@@ -254,13 +254,8 @@ class PathUtilsTestCase(test_base.OsWinBaseTestCase):
         mock_delete.assert_called_once_with(mock.sentinel.temporary_file)
 
     @mock.patch.object(shutil, 'copytree')
-    @mock.patch('os.path.abspath')
-    def test_copy_dir(self, mock_abspath, mock_copytree):
-        mock_abspath.side_effect = [mock.sentinel.src, mock.sentinel.dest]
+    def test_copy_dir(self, mock_copytree):
         self._pathutils.copy_dir(mock.sentinel.src, mock.sentinel.dest)
-
-        mock_abspath.has_calls(
-            [mock.call(mock.sentinel.src), mock.call(mock.sentinel.dest)])
         mock_copytree.assert_called_once_with(mock.sentinel.src,
                                               mock.sentinel.dest)
 

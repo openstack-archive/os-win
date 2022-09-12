@@ -212,13 +212,13 @@ class VMUtils10TestCase(test_base.OsWinBaseTestCase):
             sec_profile_serialization)
 
         expected_call = [
-            mock.call(mock.sentinel.job_path_SetKeyProtector,
-                      mock.sentinel.ret_val_SetKeyProtector),
-            mock.call(mock.sentinel.job_path_SetSecurityPolicy,
-                      mock.sentinel.ret_val_SetSecurityPolicy),
-            mock.call(mock.sentinel.job_path_ModifySecuritySettings,
-                      mock.sentinel.ret_val_ModifySecuritySettings)]
-        self._vmutils._jobutils.check_ret_val.has_calls(expected_call)
+            mock.call(mock.sentinel.ret_val_SetKeyProtector,
+                      mock.sentinel.job_path_SetKeyProtector),
+            mock.call(mock.sentinel.ret_val_SetSecurityPolicy,
+                      mock.sentinel.job_path_SetSecurityPolicy),
+            mock.call(mock.sentinel.ret_val_ModifySecuritySettings,
+                      mock.sentinel.job_path_ModifySecuritySettings)]
+        self._vmutils._jobutils.check_ret_val.assert_has_calls(expected_call)
         self.assertTrue(security_profile.EncryptStateAndVmMigrationTraffic)
         self.assertTrue(security_profile.TpmEnabled)
         self.assertTrue(security_profile.ShieldingRequested)

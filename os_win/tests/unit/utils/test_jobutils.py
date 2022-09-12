@@ -252,8 +252,11 @@ class JobUtilsTestCase(test_base.OsWinBaseTestCase):
 
         mock_calls = [
             mock.call(ResourceSettings=[mock.sentinel.res_data])] * num_calls
-        mock_svc.ModifyResourceSettings.has_calls(mock_calls)
-        mock_sleep.has_calls(mock.call(1) * num_calls)
+        mock_svc.ModifyResourceSettings.assert_has_calls(mock_calls)
+        if num_calls > 1:
+            mock_sleep.assert_has_calls([mock.call(1)] * (num_calls - 1))
+        else:
+            mock_sleep.assert_not_called()
 
     def test_add_virt_resource(self):
         self._test_virt_method('AddResourceSettings', 3, 'add_virt_resource',

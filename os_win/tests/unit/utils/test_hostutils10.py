@@ -90,8 +90,8 @@ class HostUtils10TestCase(test_base.OsWinBaseTestCase):
             'dev_id': mock_pci_dev.DeviceID}
         self.assertEqual([expected_pci_dev], pci_devices)
         self._hostutils._conn.Msvm_PciExpress.assert_called_once_with()
-        mock_get_pci_device_address.has_calls(
-            [mock.call(mock_pci_dev.DeviceInstancePath)] * 3)
+        mock_get_pci_device_address.assert_has_calls(
+            [mock.call(mock_pci_dev.DeviceInstancePath)] * 2)
 
     def _check_get_pci_device_address_None(self, return_code=0):
         pnp_device = mock.MagicMock()

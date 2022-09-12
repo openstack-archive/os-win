@@ -114,7 +114,8 @@ class MigrationUtilsTestCase(test_base.OsWinBaseTestCase):
                       mock.sentinel.job_path_ValidatePlannedSystem),
             mock.call(mock.sentinel.ret_val_RealizePlannedSystem,
                       mock.sentinel.job_path_RealizePlannedSystem)]
-        self._migrationutils._jobutils.check_ret_val.has_calls(expected_call)
+        self._migrationutils._jobutils.check_ret_val.assert_has_calls(
+            expected_call)
 
     @ddt.data([mock.sentinel.planned_vm], [])
     def test_get_planned_vm(self, planned_vm):
