@@ -605,7 +605,7 @@ class _ClusterEventListener(object):
         # If eventlet monkey patching is used, this will actually be a
         # greenthread. We just don't want to enforce eventlet usage.
         worker = threading.Thread(target=self._listen)
-        worker.setDaemon(True)
+        worker.daemon = True
 
         self._running = True
         worker.start()

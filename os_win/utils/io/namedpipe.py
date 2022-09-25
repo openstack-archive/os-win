@@ -66,7 +66,7 @@ class NamedPipeHandler(object):
 
             for job in jobs:
                 worker = threading.Thread(target=job)
-                worker.setDaemon(True)
+                worker.daemon = True
                 worker.start()
                 self._workers.append(worker)
         except Exception as err:
