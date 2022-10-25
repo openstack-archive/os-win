@@ -3,5 +3,4 @@
       - check-requirements
       - openstack-python3-zed-jobs
       - release-notes-jobs-python3
-    gate:
-      queue: os-win
+    queue: os-win
