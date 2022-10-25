@@ -1,8 +1,6 @@
 - project:
     templates:
       - check-requirements
-      - openstack-lower-constraints-jobs
       - openstack-python3-victoria-jobs
       - release-notes-jobs-python3
-    gate:
-      queue: os-win
+    queue: os-win
