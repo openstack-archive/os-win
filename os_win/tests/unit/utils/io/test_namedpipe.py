@@ -76,11 +76,11 @@ class NamedPipeTestCase(test_base.BaseTestCase):
         thread = namedpipe.threading.Thread
         thread.assert_has_calls(
             [mock.call(target=self._handler._read_from_pipe),
-             mock.call().setDaemon(True),
              mock.call().start(),
              mock.call(target=self._handler._write_to_pipe),
-             mock.call().setDaemon(True),
              mock.call().start()])
+        for worker in self._handler._workers:
+            self.assertIs(True, worker.daemon)
 
     @mock.patch.object(namedpipe.NamedPipeHandler, 'stop')
     @mock.patch.object(namedpipe.NamedPipeHandler, '_open_pipe')
