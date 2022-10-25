@@ -4,5 +4,4 @@
       - openstack-lower-constraints-jobs
       - openstack-python3-wallaby-jobs
       - release-notes-jobs-python3
-    gate:
-      queue: os-win
+    queue: os-win
