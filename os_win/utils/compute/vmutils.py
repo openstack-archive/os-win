@@ -880,6 +880,18 @@ class VMUtils(baseutils.BaseUtilsVirt):
         raise exceptions.HyperVException(
             _("Exceeded the maximum number of slots"))
 
+    def enable_allow_full_scsi_command_set(self, vm_name):
+        """Enables the full SCSI command set for the instance with the given name.
+
+        :param vm_name: The name of the VM for which AllowFullSCSICommandSet will be
+                        enabled.
+        """
+
+        vs_data = self._lookup_vm_check(vm_name)
+        self._set_allow_full_scsi_command_set(vs_data)
+        vs_data.AllowFullSCSICommandSet = True
+        self._modify_virtual_system(vs_data)
+
     def _get_vm_serial_ports(self, vmsettings):
         rasds = _wqlutils.get_element_associated_class(
             self._compat_conn, self._SERIAL_PORT_SETTING_DATA_CLASS,

@@ -1272,6 +1272,11 @@ class VMUtilsTestCase(test_base.OsWinBaseTestCase):
         self._vmutils._jobutils.stop_jobs.assert_called_once_with(
             mock_vm, None)
 
+    def test_set_allow_full_scsi_command_set(self):
+        mock_vm = self._lookup_vm()
+        self._vmutils.enable_allow_full_scsi_command_set(mock.sentinel.vm_name)
+        self.assertTrue(mock_vm.AllowFullSCSICommandSet)
+
     def test_set_secure_boot(self):
         vs_data = mock.MagicMock()
         self._vmutils._set_secure_boot(vs_data, msft_ca_required=False)
