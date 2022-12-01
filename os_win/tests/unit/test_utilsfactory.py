@@ -186,8 +186,8 @@ class TestHyperVUtilsFactory(test_base.OsWinBaseTestCase):
                          "public methods not listed in class %s" % baseclass)
 
         for name in sorted(implmethods.keys()):
-            baseargs = inspect.getargspec(basemethods[name])
-            implargs = inspect.getargspec(implmethods[name])
+            baseargs = inspect.getfullargspec(basemethods[name])
+            implargs = inspect.getfullargspec(implmethods[name])
 
             self.assertEqual(baseargs, implargs,
                              "%s args don't match class %s" %
